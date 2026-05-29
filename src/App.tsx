@@ -69,10 +69,12 @@ export default function App() {
 
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [showDebugList, setShowDebugList] = useState(false);
+  const [sheetLoadError, setSheetLoadError] = useState<string | null>(null);
 
   const handleForceReload = async () => {
     setIsInitialLoading(true);
     setAuthError(null);
+    setSheetLoadError(null);
     setSyncMessage(null);
     try {
       clearDataCache();
@@ -92,7 +94,7 @@ export default function App() {
       setTimeout(() => setSyncMessage(null), 5000);
     } catch (err: any) {
       console.error(err);
-      setAuthError('실시간 동기화 오류: ' + (err.message || '스프레드시트 상태를 확인해 주세요.'));
+      setSheetLoadError(err.message || '스프레드시트 상태를 확인해 주세요.');
     } finally {
       setIsInitialLoading(false);
     }
@@ -102,6 +104,7 @@ export default function App() {
   useEffect(() => {
     async function loadSheets() {
       setIsInitialLoading(true);
+      setSheetLoadError(null);
       try {
         const data = await fetchSpreadsheetData(spreadsheetId, googleToken);
         setAuthDb(data.auth);
@@ -117,6 +120,7 @@ export default function App() {
         });
       } catch (err: any) {
         console.error('Failed to prefetch spreadsheet criteria:', err);
+        setSheetLoadError(err.message || '스프레드시트를 읽어오는 중 오류가 발생했습니다.');
         setSheetMetrics({
           success: false,
           authRows: 0,
@@ -432,6 +436,30 @@ export default function App() {
                   <div className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 animate-pulse">
                     <Sparkles className="h-4 w-4 text-blue-500 animate-ping" />
                     <span>{syncMessage}</span>
+                  </div>
+                )}
+
+                {/* Spreadsheet Connection Error */}
+                {sheetLoadError && (
+                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs space-y-2.5 shadow-sm">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
+                      <div>
+                        <p className="font-extrabold text-[12.5px] text-rose-900 leading-tight">교사용 구글 시트 연동 실패 안내</p>
+                        <p className="text-[11px] text-rose-650 mt-1 font-semibold leading-normal">현재 연결하신 스프레드시트 또는 연동 설정에 문제가 있습니다.</p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white border border-rose-100/60 text-slate-700 rounded-xl leading-relaxed text-[11px] font-mono break-all font-semibold">
+                      {sheetLoadError}
+                    </div>
+                    <div className="pt-2 border-t border-rose-200 space-y-1 font-sans text-[11px] leading-normal text-rose-700/80">
+                      <p className="font-bold text-rose-900">💡 즉시 해결 가이드:</p>
+                      <ul className="list-disc list-inside space-y-1 ml-1">
+                        <li>스프레드시트 우측 상단 <strong>[공유] ➔ [링크가 있는 모든 사용자(뷰어)]</strong> 권한 설정이 완료되었는지 확인해주세요.</li>
+                        <li>시트 하단에 <strong>students_auth</strong> (학생인증) 이름의 시트가 정확히 존재하고, 첫 줄에 <strong className="text-indigo-700 font-extrabold">학번</strong>, <strong className="text-indigo-700 font-extrabold">이름</strong>, <strong className="text-indigo-700 font-extrabold">인증번호</strong> 컬럼 헤더가 있는지 체크해 주세요.</li>
+                        <li>입력하신 구글 시트 웹주소(URL) 또는 시트 ID가 올바른지 확인해 주세요.</li>
+                      </ul>
+                    </div>
                   </div>
                 )}
               </div>
