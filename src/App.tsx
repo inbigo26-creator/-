@@ -23,6 +23,8 @@ import {
   Sprout
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { db } from './auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function App() {
   // Input fields
@@ -136,7 +138,45 @@ export default function App() {
       setIsInitialLoading(true);
       setSheetLoadError(null);
       try {
-        const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
+        let activeSpreadsheetId = spreadsheetId;
+        let activeGoogleToken = googleToken;
+        let activeAppsScriptUrl = appsScriptUrl;
+
+        // Try to fetch global config from Firestore first so we always stay synced on other devices/mobiles!
+        try {
+          const docRef = doc(db, 'app_settings', 'global_config');
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const sysData = docSnap.data();
+            if (sysData.spreadsheetId) {
+              activeSpreadsheetId = sysData.spreadsheetId;
+              setSpreadsheetId(sysData.spreadsheetId);
+              localStorage.setItem('school_spreadsheet_id', sysData.spreadsheetId);
+            }
+            if (sysData.appsScriptUrl !== undefined) {
+              activeAppsScriptUrl = sysData.appsScriptUrl || null;
+              setAppsScriptUrl(sysData.appsScriptUrl || null);
+              if (sysData.appsScriptUrl) {
+                localStorage.setItem('school_apps_script_url', sysData.appsScriptUrl);
+              } else {
+                localStorage.removeItem('school_apps_script_url');
+              }
+            }
+            if (sysData.googleToken !== undefined) {
+              activeGoogleToken = sysData.googleToken || null;
+              setGoogleToken(sysData.googleToken || null);
+              if (sysData.googleToken) {
+                localStorage.setItem('school_google_token', sysData.googleToken);
+              } else {
+                localStorage.removeItem('school_google_token');
+              }
+            }
+          }
+        } catch (dbErr) {
+          console.warn('Could not read global Firestore settings config, using local state/cache.', dbErr);
+        }
+
+        const data = await fetchSpreadsheetData(activeSpreadsheetId, activeGoogleToken, activeAppsScriptUrl);
         setAuthDb(data.auth);
         setEnglishDb(data.english);
         setKoreanDb(data.korean);
@@ -269,7 +309,7 @@ export default function App() {
   };
 
   // Called when Teacher connects a spreadsheet
-  const handleSpreadsheetConfigured = (newSpreadsheetId: string, token: string | null, newAppsScriptUrl?: string | null) => {
+  const handleSpreadsheetConfigured = async (newSpreadsheetId: string, token: string | null, newAppsScriptUrl?: string | null) => {
     setSpreadsheetId(newSpreadsheetId);
     setGoogleToken(token);
     setAppsScriptUrl(newAppsScriptUrl || null);
@@ -286,6 +326,19 @@ export default function App() {
       localStorage.setItem('school_apps_script_url', newAppsScriptUrl);
     } else {
       localStorage.removeItem('school_apps_script_url');
+    }
+
+    // Write globally to Firestore so that any student or mobile device gets the correct Google Sheet instantly!
+    try {
+      await setDoc(doc(db, 'app_settings', 'global_config'), {
+        spreadsheetId: newSpreadsheetId,
+        appsScriptUrl: newAppsScriptUrl || '',
+        googleToken: token || '',
+        updatedAt: new Date().toISOString()
+      });
+      console.log('Successfully synced spreadsheet settings to Firestore global config.');
+    } catch (err) {
+      console.error('Failed to sync global configuration to Firestore:', err);
     }
   };
 
@@ -648,6 +701,22 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                {/* 🔗 Current Spreadsheet Connection Indicator */}
+                <div className="pt-4.5 border-t border-slate-100 flex flex-col gap-1.5 text-center text-[10.5px]">
+                  <span className="text-stone-400 font-bold tracking-tight flex items-center justify-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>실시간 연동 중인 구글 스프레드시트 문서 ID</span>
+                  </span>
+                  <p className="text-emerald-700 font-mono font-bold bg-emerald-55/40 px-2.5 py-1.5 rounded-xl border border-emerald-110/30 break-all select-all">
+                    {spreadsheetId}
+                  </p>
+                  {appsScriptUrl && (
+                    <p className="text-[9.5px] text-indigo-600/70 font-mono font-bold truncate" title={appsScriptUrl}>
+                      보안 연동망: Apps Script (GAS) 활성화 중
+                    </p>
+                  )}
+                </div>
               </div>
 
             </div>

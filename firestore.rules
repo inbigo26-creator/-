@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Basic catch-all to secure other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Explicit config for app_settings collection to share spreadsheet config across devices smoothly
+    match /app_settings/{configId} {
+      // Anyone can read config to connect to Google Sheets smoothly
+      allow read: if true;
+      // Anyone can save/update the spreadsheet configuration
+      allow write: if true;
+    }
+  }
+}

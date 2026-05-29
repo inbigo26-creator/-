@@ -265,12 +265,12 @@ export async function fetchSpreadsheetData(
     levels: LevelRule[];
   }> {
   
-  // Return sample data if default placeholder is used
+  // Return empty/warning data instead of mock demo data if default placeholder is used
   if ((!spreadsheetId || spreadsheetId === DEFAULT_SPREADSHEET_ID) && (!appsScriptUrl || !appsScriptUrl.trim())) {
     return {
-      auth: SAMPLE_AUTH_DATA,
-      english: SAMPLE_ENGLISH_RECORDS,
-      korean: SAMPLE_KOREAN_RECORDS,
+      auth: [],
+      english: [],
+      korean: [],
       levels: SAMPLE_LEVEL_RULES
     };
   }

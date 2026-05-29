@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global application configuration for Google Spreadsheet mapping synchronized across devices",
+      "type": "object",
+      "properties": {
+        "spreadsheetId": {
+          "type": "string",
+          "description": "Google Spreadsheet Document ID"
+        },
+        "appsScriptUrl": {
+          "type": "string",
+          "description": "Optional Google Apps Script Web App Deployment URL for CORS-free lookup"
+        },
+        "googleToken": {
+          "type": "string",
+          "description": "Active Google Access token stored optionally"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server modified status check"
+        }
+      },
+      "required": [
+        "spreadsheetId",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/app_settings/{configId}": {
+      "schema": "AppSettings",
+      "description": "Collection storing the global configuration variables for syncing spreadsheet mapping state"
+    }
+  }
+}
