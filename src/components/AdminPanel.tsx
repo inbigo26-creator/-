@@ -13,19 +13,22 @@ import {
 import { User } from 'firebase/auth';
 
 interface AdminPanelProps {
-  onSpreadsheetConfigured: (spreadsheetId: string, accessToken: string | null) => void;
+  onSpreadsheetConfigured: (spreadsheetId: string, accessToken: string | null, appsScriptUrl?: string | null) => void;
   currentSpreadsheetId: string;
+  currentAppsScriptUrl?: string | null;
   onClose: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ 
   onSpreadsheetConfigured, 
   currentSpreadsheetId, 
+  currentAppsScriptUrl,
   onClose 
 }) => {
   const [spreadsheetIdIn, setSpreadsheetIdIn] = useState(
     currentSpreadsheetId === DEFAULT_SPREADSHEET_ID ? '' : currentSpreadsheetId
   );
+  const [appsScriptUrlIn, setAppsScriptUrlIn] = useState(currentAppsScriptUrl || '');
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -89,8 +92,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Test real database connection
   const handleTestConnection = async () => {
-    if (!spreadsheetIdIn) {
-      alert('스프레드시트 ID 또는 링크를 입력해주십시오.');
+    if (!spreadsheetIdIn && !appsScriptUrlIn) {
+      alert('스프레드시트 ID/URL 또는 가스(GAS) 앱 주소를 입력해주십시오.');
       return;
     }
     setIsTesting(true);
@@ -98,7 +101,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       // Clear data cache before test
       clearDataCache();
-      const data = await fetchSpreadsheetData(spreadsheetIdIn, accessToken);
+      const targetSheetId = spreadsheetIdIn || DEFAULT_SPREADSHEET_ID;
+      const data = await fetchSpreadsheetData(targetSheetId, accessToken, appsScriptUrlIn);
       
       setTestResult({
         success: true,
@@ -109,12 +113,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
 
       // Notify parent app of new active sheet
-      onSpreadsheetConfigured(spreadsheetIdIn, accessToken);
+      onSpreadsheetConfigured(targetSheetId, accessToken, appsScriptUrlIn);
     } catch (err: any) {
       console.error(err);
       setTestResult({
         success: false,
-        message: err.message || '인증되지 않은 시트이거나 스프레드시트 구조가 잘못되었습니다.'
+        message: err.message || '인증되지 않은 연결이거나 데이터 분석(CORS/권한)에 실패했습니다.'
       });
     } finally {
       setIsTesting(false);
@@ -124,21 +128,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Use default mockup sandbox
   const handleResetToDemo = () => {
     setSpreadsheetIdIn('');
+    setAppsScriptUrlIn('');
     setTestResult(null);
-    onSpreadsheetConfigured(DEFAULT_SPREADSHEET_ID, null);
+    onSpreadsheetConfigured(DEFAULT_SPREADSHEET_ID, null, null);
     alert('데모 가상 데이터 모드로 전환되었습니다.');
   };
 
   // Save and apply spreadsheet ID directly without requiring test sequence
   const handleSaveAndApply = () => {
-    if (!spreadsheetIdIn) {
-      alert('스프레드시트 URL 또는 ID를 먼저 입력해주십시오.');
+    if (!spreadsheetIdIn && !appsScriptUrlIn) {
+      alert('스프레드시트 URL/ID 또는 생성한 앱스 스크립트 웹 앱 URL을 먼저 입력해주십시오.');
       return;
     }
     // Clear data cache to ensure new fetch
     clearDataCache();
-    onSpreadsheetConfigured(spreadsheetIdIn, accessToken);
-    alert('🎉 스프레드시트 주소가 성공적으로 저장되었으며 대시보드에 적용되었습니다!');
+    const targetSheetId = spreadsheetIdIn || DEFAULT_SPREADSHEET_ID;
+    onSpreadsheetConfigured(targetSheetId, accessToken, appsScriptUrlIn);
+    alert('🎉 스프레드시트 주소 및 앱스 스크립트 경로가 성공적으로 저장되었으며 대시보드에 적용되었습니다!');
   };
 
   const copyToClipboard = (text: string) => {
@@ -152,14 +158,192 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
  * 학생 타자 성장 조회 시스템 - Code.gs
  * [안내] Google 스프레드시트 상단 메뉴 [확장 프로그램] > [Apps Script] 에 붙여넣으세요.
  * 
- * 제작 목적: 학생 개인정보 보호를 위한 서버 필터링 조회 시스템
+ * 제작 목적: 학생 개인정보 보호를 위한 서버 필터링 조회 시스템 및 API 게이트웨이
  */
 
-function doGet() {
+function doGet(e) {
+  // 1. 디바이스 AI 스튜디오 및 프론트엔드 실시간 API 인터페이스 분기
+  if (e && e.parameter && e.parameter.action) {
+    if (e.parameter.action === 'getAllData') {
+      try {
+        var data = getAllDataForSystem();
+        return ContentService.createTextOutput(JSON.stringify(data))
+            .setMimeType(ContentService.MimeType.JSON);
+      } catch (err) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, message: err.toString() }))
+            .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+  }
+
+  // 2. 단일 학생 검색 분기 (선택 사항)
+  if (e && e.parameter && e.parameter.studentId) {
+    try {
+      var stdId = e.parameter.studentId;
+      var pin = e.parameter.pin;
+      var data = getStudentTypingData(stdId, pin);
+      return ContentService.createTextOutput(JSON.stringify(data))
+          .setMimeType(ContentService.MimeType.JSON);
+    } catch(err) {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, message: err.toString() }))
+          .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 3. 기본값: 모바일 학생용 직접 단독 조회 HTML 페이지 파싱 렌더링
   return HtmlService.createHtmlOutputFromFile('index')
       .setTitle('학생 타자 성장 조회 시스템')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * 전교생 데이터 일괄 로드 (React 앱 연동용)
+ */
+function getAllDataForSystem() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var result = {
+    success: true,
+    auth: [],
+    english: [],
+    korean: [],
+    levels: []
+  };
+
+  // 1. students_auth
+  var authSheet = ss.getSheetByName('students_auth');
+  if (authSheet) {
+    var values = authSheet.getDataRange().getValues();
+    var headers = values[0];
+    var idxId = findHeaderIndex(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
+    var idxName = findHeaderIndex(headers, ['이름', '성명', '학생명', 'name']);
+    var idxPin = findHeaderIndex(headers, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
+    
+    if (idxId !== -1 && idxName !== -1 && idxPin !== -1) {
+      for (var i = 1; i < values.length; i++) {
+        var id = cleanCode(values[i][idxId]);
+        var p = cleanCode(values[i][idxPin]);
+        var nm = cleanValue(values[i][idxName]);
+        if (id && p) {
+          result.auth.push({ studentId: id, name: nm, pin: p });
+        }
+      }
+    }
+  }
+
+  // 통합 유연 파싱 헬퍼 (가로 누적/세로 누적 레이아웃 완벽 동시 지원)
+  function parseTypingSheet(sheetName, typeStr) {
+    var sheet = ss.getSheetByName(sheetName);
+    var dataList = [];
+    if (!sheet) return dataList;
+
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return dataList;
+
+    var headers = values[0];
+    var idxId = findHeaderIndex(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
+    var idxName = findHeaderIndex(headers, ['이름', '성명', '학생명', 'name']);
+    var idxGrade = findHeaderIndex(headers, ['학년', 'grade', '반/학년']);
+    var idxDept = findHeaderIndex(headers, ['과', '학과', '계열', 'dept', '전공']);
+
+    if (idxId === -1 || idxName === -1) return dataList;
+
+    // 헤더에서 각 월(예: 5월, 6월, 7월 등 가로 컬럼) 감지
+    var horizontalMonths = [];
+    for (var col = 0; col < headers.length; col++) {
+      var h = String(headers[col] || '').trim();
+      if (/^\\d+월$/.test(h) || (h.indexOf('월') !== -1 && /\\d+/.test(h))) {
+        horizontalMonths.push({ monthName: h, index: col });
+      }
+    }
+
+    if (horizontalMonths.length > 0) {
+      // 가로형 레이아웃 파싱: 한 행에 여러 월 데이터 동시 존재
+      for (var row = 1; row < values.length; row++) {
+        var id = cleanCode(values[row][idxId]);
+        var name = cleanValue(values[row][idxName]);
+        var grade = idxGrade !== -1 ? cleanCode(values[row][idxGrade]) : '';
+        var dept = idxDept !== -1 ? cleanValue(values[row][idxDept]) : '';
+
+        if (!id) continue;
+
+        for (var m = 0; m < horizontalMonths.length; m++) {
+          var mInfo = horizontalMonths[m];
+          var speedRaw = values[row][mInfo.index];
+          if (speedRaw !== undefined && speedRaw !== null && String(speedRaw).trim() !== '') {
+            var speedVal = parseInt(cleanCode(speedRaw), 10);
+            if (!isNaN(speedVal)) {
+              dataList.push({
+                studentId: id,
+                name: name,
+                grade: grade,
+                department: dept,
+                month: mInfo.monthName,
+                speed: speedVal,
+                type: typeStr
+              });
+            }
+          }
+        }
+      }
+    } else {
+      // 기존 세로형 레이아웃 파싱: 월(구분) 컬럼 + 타수 컬럼
+      var idxMonth = findHeaderIndex(headers, ['월', '시기', 'month', '구분']);
+      var targetHeaderName = typeStr === 'english' ? '영타' : '한타';
+      var idxSpeed = findHeaderIndex(headers, [targetHeaderName, typeStr === 'english' ? '영어' : '한글', 'speed', '타수']);
+
+      if (idxMonth !== -1 && idxSpeed !== -1) {
+        for (var row = 1; row < values.length; row++) {
+          var id = cleanCode(values[row][idxId]);
+          var mon = cleanValue(values[row][idxMonth]);
+          var speedRaw = values[row][idxSpeed];
+
+          if (id && mon && speedRaw !== undefined && speedRaw !== null && String(speedRaw).trim() !== '') {
+            var speedVal = parseInt(cleanCode(speedRaw), 10) || 0;
+            dataList.push({
+              studentId: id,
+              name: idxName !== -1 ? cleanValue(values[row][idxName]) : '',
+              grade: idxGrade !== -1 ? cleanCode(values[row][idxGrade]) : '',
+              department: idxDept !== -1 ? cleanValue(values[row][idxDept]) : '',
+              month: mon,
+              speed: speedVal,
+              type: typeStr
+            });
+          }
+        }
+      }
+    }
+    return dataList;
+  }
+
+  result.english = parseTypingSheet('english_all', 'english');
+  result.korean = parseTypingSheet('korean_all', 'korean');
+
+  // 4. level_rule
+  var ruleSheet = ss.getSheetByName('level_rule');
+  if (ruleSheet) {
+    var values = ruleSheet.getDataRange().getValues();
+    var headers = values[0];
+    var idxType = findHeaderIndex(headers, ['타입', '구분', '종류', 'type', '언어']);
+    var idxLevel = findHeaderIndex(headers, ['급수', '등급', '레벨', 'level']);
+    var idxMin = findHeaderIndex(headers, ['최소값', '기준', '타수', '최소', 'min', '최저']);
+
+    if (idxType !== -1 && idxLevel !== -1 && idxMin !== -1) {
+      for (var i = 1; i < values.length; i++) {
+        var ty = cleanValue(values[i][idxType]);
+        var lv = cleanValue(values[i][idxLevel]);
+        if (ty && lv) {
+          result.levels.push({
+            type: ty,
+            level: lv,
+            minVal: parseInt(cleanCode(values[i][idxMin]), 10) || 0
+          });
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -207,13 +391,15 @@ function cleanValue(val) {
   return str.trim();
 }
 
+/**
+ * 전열 및 공백 제거 헬퍼
+ */
 function cleanCode(val) {
   return cleanValue(val).replace(/\\s/g, '');
 }
 
 /**
  * 학생 인증 및 데이터 조회 (개인정보 보호 필터링 적용)
- * 학생은 본인의 정보만 다운로드 받으며, 전체 원본 DB가 사용자 기기로 넘어가지 않아 매우 안전합니다.
  */
 function getStudentTypingData(studentId, pin) {
   try {
@@ -255,87 +441,11 @@ function getStudentTypingData(studentId, pin) {
       return { success: false, message: "학번 또는 개인인증번호가 일치하지 않습니다." };
     }
     
-    // 2. 영어 타자 기록 가져오기
-    var englishSheet = ss.getSheetByName('english_all');
-    var englishRecords = [];
-    if (englishSheet) {
-      var engValues = englishSheet.getDataRange().getValues();
-      var engHeaders = engValues[0];
-      
-      var eIdxId = findHeaderIndex(engHeaders, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
-      var eIdxGrade = findHeaderIndex(engHeaders, ['학년', 'grade', '반/학년']);
-      var eIdxDept = findHeaderIndex(engHeaders, ['과', '학과', '계열', 'dept', '전공']);
-      var eIdxMonth = findHeaderIndex(engHeaders, ['월', '시기', 'month', '구분']);
-      var eIdxSpeed = findHeaderIndex(engHeaders, ['영타', '영어', 'speed', '타수']);
-      
-      if (eIdxId !== -1 && eIdxMonth !== -1 && eIdxSpeed !== -1) {
-        for (var i = 1; i < engValues.length; i++) {
-          if (cleanCode(engValues[i][eIdxId]) === searchId) {
-            englishRecords.push({
-              studentId: searchId,
-              name: studentName,
-              grade: eIdxGrade !== -1 ? cleanCode(engValues[i][eIdxGrade]) : '',
-              department: eIdxDept !== -1 ? cleanValue(engValues[i][eIdxDept]) : '',
-              month: cleanValue(engValues[i][eIdxMonth]),
-              speed: parseInt(cleanCode(engValues[i][eIdxSpeed]), 10) || 0,
-              type: 'english'
-            });
-          }
-        }
-      }
-    }
+    // 2. 통합 파싱 도구를 사용해 전체 데이터를 파싱한 뒤 로그인한 학생 데이터만 슬라이스 필터링 (가로형 포맷 대응 완료)
+    var allData = getAllDataForSystem();
     
-    // 3. 한글 타자 기록 가져오기
-    var koreanSheet = ss.getSheetByName('korean_all');
-    var koreanRecords = [];
-    if (koreanSheet) {
-      var korValues = koreanSheet.getDataRange().getValues();
-      var korHeaders = korValues[0];
-      
-      var kIdxId = findHeaderIndex(korHeaders, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
-      var kIdxGrade = findHeaderIndex(korHeaders, ['학년', 'grade', '반/학년']);
-      var kIdxDept = findHeaderIndex(korHeaders, ['과', '학과', '계열', 'dept', '전공']);
-      var kIdxMonth = findHeaderIndex(korHeaders, ['월', '시기', 'month', '구분']);
-      var kIdxSpeed = findHeaderIndex(korHeaders, ['한타', '한글', 'speed', '타수']);
-      
-      if (kIdxId !== -1 && kIdxMonth !== -1 && kIdxSpeed !== -1) {
-        for (var i = 1; i < korValues.length; i++) {
-          if (cleanCode(korValues[i][kIdxId]) === searchId) {
-            koreanRecords.push({
-              studentId: searchId,
-              name: studentName,
-              grade: kIdxGrade !== -1 ? cleanCode(korValues[i][kIdxGrade]) : '',
-              department: kIdxDept !== -1 ? cleanValue(korValues[i][kIdxDept]) : '',
-              month: cleanValue(korValues[i][kIdxMonth]),
-              speed: parseInt(cleanCode(korValues[i][kIdxSpeed]), 10) || 0,
-              type: 'korean'
-            });
-          }
-        }
-      }
-    }
-    
-    // 4. 타자 급수 기준 데이터 가져오기
-    var ruleSheet = ss.getSheetByName('level_rule');
-    var levelRules = [];
-    if (ruleSheet) {
-      var ruleValues = ruleSheet.getDataRange().getValues();
-      var ruleHeaders = ruleValues[0];
-      
-      var rIdxType = findHeaderIndex(ruleHeaders, ['타입', '구분', '종류', 'type', '언어']);
-      var rIdxLevel = findHeaderIndex(ruleHeaders, ['급수', '등급', '레벨', 'level']);
-      var rIdxMin = findHeaderIndex(ruleHeaders, ['최소값', '기준', '타수', '최소', 'min', '최저']);
-      
-      if (rIdxType !== -1 && rIdxLevel !== -1 && rIdxMin !== -1) {
-        for (var i = 1; i < ruleValues.length; i++) {
-          levelRules.push({
-            type: cleanValue(ruleValues[i][rIdxType]),
-            level: cleanValue(ruleValues[i][rIdxLevel]),
-            minVal: parseInt(cleanCode(ruleValues[i][rIdxMin]), 10) || 0
-          });
-        }
-      }
-    }
+    var englishRecords = allData.english.filter(function(r) { return r.studentId === searchId; });
+    var koreanRecords = allData.korean.filter(function(r) { return r.studentId === searchId; });
     
     return {
       success: true,
@@ -343,7 +453,7 @@ function getStudentTypingData(studentId, pin) {
       studentId: searchId,
       english: englishRecords,
       korean: koreanRecords,
-      levels: levelRules
+      levels: allData.levels
     };
     
   } catch(e) {
@@ -614,6 +724,33 @@ function getStudentTypingData(studentId, pin) {
             <p className="text-[11px] text-gray-400 leading-relaxed font-medium">
               * 스프레드시트 공유 권한을 <strong>'링크가 있는 모든 사용자(뷰어)'</strong>로 완료 시, 별도의 구글 로그인 없이도 즉시 전교생 조회가 가능해집니다.
             </p>
+          </div>
+
+          {/* Step 1-2: 구글 앱스 스크립트 웹 앱 URL 복사 붙여넣기 */}
+          <div className="p-5 rounded-2xl bg-indigo-50/20 border border-indigo-100/50 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full text-[10px]">교사용 분산 모딩</span>
+              <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
+                ⚡ 구글 앱스 스크립트(GAS) Web App 주소 입력
+              </label>
+            </div>
+            
+            <p className="text-xs text-indigo-805 leading-relaxed font-sans">
+              스프레드시트를 비공개로 지키면서도 <strong>로그인 없이 초고속으로</strong> 연동하려면, 생성한 웹 앱 URL(웹 앱 주소)을 아래에 입력하십시오. 제일 하단 코드로 15초 안에 즉시 배포할 수 있습니다.
+            </p>
+
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-indigo-600">
+                <Terminal className="h-4.5 w-4.5" />
+              </div>
+              <input 
+                type="text" 
+                value={appsScriptUrlIn}
+                onChange={(e) => setAppsScriptUrlIn(e.target.value.trim())}
+                placeholder="https://script.google.com/macros/s/배포키입력/exec 형태 주소 붙여넣기..."
+                className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-505 font-mono text-indigo-950"
+              />
+            </div>
           </div>
 
           {/* Step 2: Private Access via Teacher OAuth */}

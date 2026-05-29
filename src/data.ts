@@ -208,7 +208,8 @@ export function clearDataCache() {
 // Fetch Google Sheets Data
 export async function fetchSpreadsheetData(
   spreadsheetId: string,
-  accessToken?: string | null
+  accessToken?: string | null,
+  appsScriptUrl?: string | null
 ): Promise<{
     auth: StudentAuth[];
     english: TypingRecord[];
@@ -217,7 +218,7 @@ export async function fetchSpreadsheetData(
   }> {
   
   // Return sample data if default placeholder is used
-  if (!spreadsheetId || spreadsheetId === DEFAULT_SPREADSHEET_ID) {
+  if ((!spreadsheetId || spreadsheetId === DEFAULT_SPREADSHEET_ID) && (!appsScriptUrl || !appsScriptUrl.trim())) {
     return {
       auth: SAMPLE_AUTH_DATA,
       english: SAMPLE_ENGLISH_RECORDS,
@@ -234,6 +235,42 @@ export async function fetchSpreadsheetData(
       korean: cachedSpreadsheetKorean,
       levels: cachedSpreadsheetLevels
     };
+  }
+
+  // If Apps Script URL is specified, query it first
+  if (appsScriptUrl && appsScriptUrl.trim()) {
+    try {
+      const cleanUrl = appsScriptUrl.trim();
+      const fetchUrl = cleanUrl.includes('?') 
+        ? `${cleanUrl}&action=getAllData&t=${Date.now()}` 
+        : `${cleanUrl}?action=getAllData&t=${Date.now()}`;
+        
+      const response = await fetch(fetchUrl);
+      if (!response.ok) {
+        throw new Error(`Apps Script 웹 앱 응답 코드 오류: ${response.status}`);
+      }
+      const json = await response.json();
+      if (json && (json.success === true || (json.auth && json.english))) {
+        cachedSpreadsheetAuth = json.auth || [];
+        cachedSpreadsheetEnglish = json.english || [];
+        cachedSpreadsheetKorean = json.korean || [];
+        cachedSpreadsheetLevels = json.levels || [];
+        
+        return {
+          auth: cachedSpreadsheetAuth,
+          english: cachedSpreadsheetEnglish,
+          korean: cachedSpreadsheetKorean,
+          levels: cachedSpreadsheetLevels
+        };
+      } else if (json && json.success === false) {
+        throw new Error(json.message || 'Apps Script 처리 중 오류가 발생했습니다.');
+      }
+    } catch (e: any) {
+      console.error('Apps Script Fetch Failed. Falling back to Google Sheets direct access.', e);
+      if (!spreadsheetId || spreadsheetId === DEFAULT_SPREADSHEET_ID) {
+        throw new Error(`구글 앱스 스크립트(GAS) 연동 실패: ${e.message || e}`);
+      }
+    }
   }
 
   try {
@@ -303,33 +340,87 @@ export async function fetchSpreadsheetData(
           })).filter(item => item.studentId && item.pin);
 
         } else if (sheetName === 'english_all' || sheetName === 'korean_all') {
-          // Parse columns: 학번, 이름, 학년, 과, 월, 영타/한타
+          // Parse columns: 학번, 이름, 학년, 과
           const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
           const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
           const idxGrade = findIndexByNames(headers, ['학년', 'grade', '반/학년']);
           const idxDept = findIndexByNames(headers, ['과', '학과', '계열', 'dept', '전공']);
-          const idxMonth = findIndexByNames(headers, ['월', '시기', 'month', '구분']);
-          const speedHeader = sheetName === 'english_all' ? '영타' : '한타';
-          const idxSpeed = findIndexByNames(headers, [speedHeader, sheetName === 'english_all' ? '영어' : '한글', 'speed', '타수']);
 
-          if (idxId === -1 || idxName === -1 || idxSpeed === -1 || idxMonth === -1) {
+          if (idxId === -1 || idxName === -1) {
             const missing = [];
             if (idxId === -1) missing.push('학번');
             if (idxName === -1) missing.push('이름');
-            if (idxMonth === -1) missing.push('월');
-            if (idxSpeed === -1) missing.push(speedHeader);
             throw new Error(`'${sheetName}' 시트의 필수 컬럼 헤더(${missing.join(', ')})를 찾을 수 없습니다.`);
           }
 
-          results[sheetName] = rows.slice(1).map(row => ({
-            studentId: cleanCodeValue(row[idxId]),
-            name: cleanCellValue(row[idxName]),
-            grade: idxGrade !== -1 ? cleanCodeValue(row[idxGrade]) : '',
-            department: idxDept !== -1 ? cleanCellValue(row[idxDept]) : '',
-            month: cleanCellValue(row[idxMonth]),
-            speed: parseInt(cleanCodeValue(row[idxSpeed]), 10) || 0,
-            type: sheetName === 'english_all' ? 'english' : 'korean'
-          })).filter(item => item.studentId && item.month);
+          // Detect horizontal month columns (e.g. 5월, 6월, 7월, 8월, 9월, 10월, etc.)
+          const horizontalMonths: { monthName: string; index: number }[] = [];
+          headers.forEach((header, index) => {
+            const hTrimmed = String(header || '').trim();
+            // Match pattern like "5월", "10월" or contains month numbering
+            if (/^\d+월$/.test(hTrimmed) || (hTrimmed.includes('월') && /\d+/.test(hTrimmed))) {
+              horizontalMonths.push({ monthName: hTrimmed, index });
+            }
+          });
+
+          const isHorizontal = horizontalMonths.length > 0;
+          const parsedRecords: TypingRecord[] = [];
+
+          if (isHorizontal) {
+            // 1. HORIZONTAL PIVOT: Pivot columns (5월, 6월...) into individual records
+            rows.slice(1).forEach(row => {
+              const studentId = cleanCodeValue(row[idxId]);
+              const name = cleanCellValue(row[idxName]);
+              const grade = idxGrade !== -1 ? cleanCodeValue(row[idxGrade]) : '';
+              const department = idxDept !== -1 ? cleanCellValue(row[idxDept]) : '';
+
+              if (!studentId) return;
+
+              horizontalMonths.forEach(({ monthName, index }) => {
+                const speedRaw = row[index];
+                if (speedRaw !== undefined && speedRaw !== null) {
+                  const cleanedSpeed = cleanCodeValue(speedRaw);
+                  if (cleanedSpeed !== '') { // Create records only for months where there is record data
+                    const speedVal = parseInt(cleanedSpeed, 10);
+                    if (!isNaN(speedVal)) {
+                      parsedRecords.push({
+                        studentId,
+                        name,
+                        grade,
+                        department,
+                        month: monthName,
+                        speed: speedVal,
+                        type: sheetName === 'english_all' ? 'english' : 'korean'
+                      });
+                    }
+                  }
+                }
+              });
+            });
+            results[sheetName] = parsedRecords;
+          } else {
+            // 2. VERTICAL STANDARD PARSING
+            const idxMonth = findIndexByNames(headers, ['월', '시기', 'month', '구분']);
+            const speedHeader = sheetName === 'english_all' ? '영타' : '한타';
+            const idxSpeed = findIndexByNames(headers, [speedHeader, sheetName === 'english_all' ? '영어' : '한글', 'speed', '타수']);
+
+            if (idxSpeed === -1 || idxMonth === -1) {
+              const missing = [];
+              if (idxMonth === -1) missing.push('월(또는 각 월별 가로 컬럼)');
+              if (idxSpeed === -1) missing.push(speedHeader);
+              throw new Error(`'${sheetName}' 시트의 필수 컬럼 헤더(${missing.join(', ')})를 찾을 수 없습니다. (스프레드시트에 '5월', '6월' 같은 열을 만드시거나 '월'과 '${speedHeader}' 열을 갖춰 주십시오.)`);
+            }
+
+            results[sheetName] = rows.slice(1).map(row => ({
+              studentId: cleanCodeValue(row[idxId]),
+              name: cleanCellValue(row[idxName]),
+              grade: idxGrade !== -1 ? cleanCodeValue(row[idxGrade]) : '',
+              department: idxDept !== -1 ? cleanCellValue(row[idxDept]) : '',
+              month: cleanCellValue(row[idxMonth]),
+              speed: parseInt(cleanCodeValue(row[idxSpeed]), 10) || 0,
+              type: sheetName === 'english_all' ? 'english' : 'korean'
+            })).filter(item => item.studentId && item.month);
+          }
 
         } else if (sheetName === 'level_rule') {
           // Parse columns: 타입, 급수, 최소값

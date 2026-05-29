@@ -35,6 +35,9 @@ export default function App() {
   const [googleToken, setGoogleToken] = useState<string | null>(() => {
     return localStorage.getItem('school_google_token') || null;
   });
+  const [appsScriptUrl, setAppsScriptUrl] = useState<string | null>(() => {
+    return localStorage.getItem('school_apps_script_url') || null;
+  });
 
   // State loaded databases
   const [authDb, setAuthDb] = useState<StudentAuth[]>([]);
@@ -78,7 +81,7 @@ export default function App() {
     setSyncMessage(null);
     try {
       clearDataCache();
-      const data = await fetchSpreadsheetData(spreadsheetId, googleToken);
+      const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
       setAuthDb(data.auth);
       setEnglishDb(data.english);
       setKoreanDb(data.korean);
@@ -106,7 +109,7 @@ export default function App() {
       setIsInitialLoading(true);
       setSheetLoadError(null);
       try {
-        const data = await fetchSpreadsheetData(spreadsheetId, googleToken);
+        const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
         setAuthDb(data.auth);
         setEnglishDb(data.english);
         setKoreanDb(data.korean);
@@ -132,7 +135,7 @@ export default function App() {
       }
     }
     loadSheets();
-  }, [spreadsheetId, googleToken]);
+  }, [spreadsheetId, googleToken, appsScriptUrl]);
 
   // Normalization function to handle common Google Sheets formatting anomalies (like .0 float artifacts, commas, or extra spacing)
   const normalizeValue = (val: any): string => {
@@ -244,9 +247,10 @@ export default function App() {
   };
 
   // Called when Teacher connects a spreadsheet
-  const handleSpreadsheetConfigured = (newSpreadsheetId: string, token: string | null) => {
+  const handleSpreadsheetConfigured = (newSpreadsheetId: string, token: string | null, newAppsScriptUrl?: string | null) => {
     setSpreadsheetId(newSpreadsheetId);
     setGoogleToken(token);
+    setAppsScriptUrl(newAppsScriptUrl || null);
     
     // Persist sheets settings to device Local Storage
     localStorage.setItem('school_spreadsheet_id', newSpreadsheetId);
@@ -254,6 +258,12 @@ export default function App() {
       localStorage.setItem('school_google_token', token);
     } else {
       localStorage.removeItem('school_google_token');
+    }
+
+    if (newAppsScriptUrl) {
+      localStorage.setItem('school_apps_script_url', newAppsScriptUrl);
+    } else {
+      localStorage.removeItem('school_apps_script_url');
     }
   };
 
@@ -400,8 +410,31 @@ export default function App() {
             <div className="max-w-md w-full space-y-6 py-6">
               
               <div className="flex flex-col gap-2">
-                {spreadsheetId !== DEFAULT_SPREADSHEET_ID ? (
-                  <div className="p-3.5 bg-emerald-50/95 border border-emerald-100 rounded-2xl flex flex-col sm:flex-row gap-2.5 items-center justify-between text-xs text-emerald-850 font-medium shadow-sm w-full">
+                {appsScriptUrl ? (
+                  <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-2xl flex flex-col sm:flex-row gap-2.5 items-center justify-between text-xs text-indigo-900 font-medium shadow-sm w-full">
+                    <span className="flex items-center gap-1.5 text-left">
+                      <Sparkles className="h-4 w-4 text-indigo-600 animate-pulse shrink-0" />
+                      <span><strong>[학교 정보 모드]</strong> ⚡ Apps Script 연동 보호막 작동 중 (구글 로그인 무관)</span>
+                    </span>
+                    <div className="flex gap-1.5 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={handleForceReload}
+                        className="flex-1 sm:flex-initial px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs whitespace-nowrap text-[11px]"
+                      >
+                        시트 즉시 갱신 🔄
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAdmin(true)}
+                        className="flex-1 sm:flex-initial px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs whitespace-nowrap text-[11px]"
+                      >
+                        연동 설정 변경 ⚙️
+                      </button>
+                    </div>
+                  </div>
+                ) : spreadsheetId !== DEFAULT_SPREADSHEET_ID ? (
+                  <div className="p-3.5 bg-emerald-50/95 border border-emerald-100 rounded-2xl flex flex-col sm:flex-row gap-2.5 items-center justify-between text-xs text-emerald-855 font-medium shadow-sm w-full">
                     <span className="flex items-center gap-1.5 text-left">
                       <Sparkles className="h-4 w-4 text-emerald-600 animate-pulse shrink-0" />
                       <span><strong>[학교 정보 모드]</strong> 실시간 스프레드시트 연동 중</span>
@@ -712,6 +745,7 @@ export default function App() {
         <AdminPanel 
           onSpreadsheetConfigured={handleSpreadsheetConfigured}
           currentSpreadsheetId={spreadsheetId}
+          currentAppsScriptUrl={appsScriptUrl}
           onClose={() => setShowAdmin(false)}
         />
       )}
