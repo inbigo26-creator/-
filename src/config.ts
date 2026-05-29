@@ -8,7 +8,7 @@
 
 // 1. 구글 스프레드시트 ID (스프레드시트 주소창의 'd/'와 '/edit' 사이의 영문 대소문자+기호 조합)
 // 예: https://docs.google.com/spreadsheets/d/1abcdefg12345/edit 에서 "1abcdefg12345"가 ID입니다.
-export const SCHOOL_SPREADSHEET_ID = '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o';
+export const SCHOOL_SPREADSHEET_ID = '1pmKwrT4XIheljpSZjpsarQe_GFwzWk2lAu71QBiFPeo';
 
 // 2. Apps Script 웹 앱 배포 URL (있을 때만 입력, 없으면 빈값 ''로 유지)
 // CORS 보안 우회 장치(Apps Script)를 통해 학생 비밀번호를 즉시 조회하는 연결망 주소입니다.

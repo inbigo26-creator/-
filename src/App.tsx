@@ -190,7 +190,7 @@ export default function App() {
       return;
     }
     if (!pinInput || pinInput.length < 4 || pinInput.length > 8) {
-      setAuthError('비밀번호/생년월일 8자리를 올바르게 입력해 주세요. (예: 20081015)');
+      setAuthError('생년월일 8자리를 올바르게 입력해 주세요. (예: 20080101)');
       return;
     }
 
@@ -597,12 +597,12 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
                       <GraduationCap className="h-4 w-4 text-emerald-600" />
-                      학번 (5자리 정수)
+                      학번 (5자리)
                     </label>
                     <input 
                       type="text" 
                       maxLength={5}
-                      placeholder="예: 10101 (1학년 1반 01번)"
+                      placeholder="예: 10101"
                       value={studentIdInput}
                       onChange={(e) => setStudentIdInput(e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full px-4 py-3 border border-emerald-105 rounded-2xl text-base font-mono tracking-wide placeholder:font-sans placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-stone-50/20"
@@ -618,7 +618,7 @@ export default function App() {
                     <input 
                       type="password" 
                       maxLength={8}
-                      placeholder="생년월일 8자리(예: 20081015) 또는 지정된 비밀번호..."
+                      placeholder="생년월일 8자리(예: 20080101)"
                       value={pinInput}
                       onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full px-4 py-3 border border-emerald-105 rounded-2xl text-base font-mono tracking-wide placeholder:font-sans placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-stone-50/20"
@@ -741,7 +741,7 @@ export default function App() {
               </div>
 
               <p className="text-xs text-slate-400 text-center font-medium leading-relaxed max-w-sm mx-auto">
-                학생 개인정보 보호 체계가 가동 중입니다. 본 기록은 타인 학생 목록에 공유되지 않는 폐쇄형 네트워크 암호 조립 데이터입니다.
+                학생 개인정보 보호 체계가 가동 중입니다. 
               </p>
 
             </div>
