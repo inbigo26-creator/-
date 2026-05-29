@@ -169,7 +169,7 @@ function findHeaderIndex(headers, possibleNames) {
   if (!headers || headers.length === 0) return -1;
   
   var cleanedHeaders = headers.map(function(h) {
-    return String(h || '').trim().toLowerCase().replace(/['"“”\\s_\\/\\\\-]/g, '');
+    return String(h || '').trim().replace(/^\\uFEFF/, '').toLowerCase().replace(/['"“”\\s_\\/\\\\-]/g, '');
   });
   
   var cleanedPossibles = possibleNames.map(function(p) {

@@ -11,7 +11,9 @@ export const DEFAULT_SPREADSHEET_ID = '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o';
 // --- ROBUST INLINE CSV PARSER ---
 export function parseCSV(text: string): string[][] {
   const result: string[][] = [];
-  const rows = text.split(/\r?\n/);
+  // Ensure we strip any UTF-8 Byte Order Mark (BOM) at the very start of the text
+  const cleanText = text.replace(/^\uFEFF/, '');
+  const rows = cleanText.split(/\r?\n/);
   
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i].trim();
@@ -73,9 +75,9 @@ export function cleanCodeValue(val: any): string {
 export function findIndexByNames(headers: string[], possibleNames: string[]): number {
   if (!headers || headers.length === 0) return -1;
 
-  // Clean actual headers: lowercase, remove all whitespaces/quotes
+  // Clean actual headers: remove BOM, lowercase, remove all whitespaces/quotes/hyphens
   const cleanedHeaders = headers.map(h => 
-    String(h || '').trim().toLowerCase().replace(/['"“”\s_/-]/g, '')
+    String(h || '').trim().replace(/^\uFEFF/, '').toLowerCase().replace(/['"“”\s_/-]/g, '')
   );
 
   // Clean target potential names

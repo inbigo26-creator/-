@@ -401,19 +401,27 @@ export default function App() {
               
               <div className="flex flex-col gap-2">
                 {spreadsheetId !== DEFAULT_SPREADSHEET_ID ? (
-                  <div className="p-3.5 bg-emerald-50/90 border border-emerald-100 rounded-2xl flex flex-col sm:flex-row gap-2.5 items-center justify-between text-xs text-emerald-800 font-medium shadow-xs">
+                  <div className="p-3.5 bg-emerald-50/95 border border-emerald-100 rounded-2xl flex flex-col sm:flex-row gap-2.5 items-center justify-between text-xs text-emerald-850 font-medium shadow-sm w-full">
                     <span className="flex items-center gap-1.5 text-left">
                       <Sparkles className="h-4 w-4 text-emerald-600 animate-pulse shrink-0" />
-                      <span><strong>[학교 정보 모드]</strong> 스프레드시트 인증 적용 중</span>
+                      <span><strong>[학교 정보 모드]</strong> 실시간 스프레드시트 연동 중</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleForceReload}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-xs whitespace-nowrap text-[11px]"
-                    >
-                      <Sprout className="h-3 w-3 animate-bounce shrink-0" />
-                      스프레드시트 새로고침 🔄
-                    </button>
+                    <div className="flex gap-1.5 w-full sm:w-auto">
+                      <button
+                        type="button"
+                        onClick={handleForceReload}
+                        className="flex-1 sm:flex-initial px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs whitespace-nowrap text-[11px]"
+                      >
+                        스프레드시트 새로고침 🔄
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAdmin(true)}
+                        className="flex-1 sm:flex-initial px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-extrabold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs whitespace-nowrap text-[11px]"
+                      >
+                        연동 설정 변경 ⚙️
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="p-3.5 bg-amber-50/80 border border-amber-200/60 rounded-2xl flex flex-col sm:flex-row gap-2.5 items-center justify-between text-xs text-amber-800 font-medium">
