@@ -23,8 +23,7 @@ import {
   Sprout
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { db } from './auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { SCHOOL_APPS_SCRIPT_URL } from './config';
 
 export default function App() {
   // Input fields
@@ -39,7 +38,7 @@ export default function App() {
     return localStorage.getItem('school_google_token') || null;
   });
   const [appsScriptUrl, setAppsScriptUrl] = useState<string | null>(() => {
-    return localStorage.getItem('school_apps_script_url') || null;
+    return localStorage.getItem('school_apps_script_url') || SCHOOL_APPS_SCRIPT_URL || null;
   });
 
   // State loaded databases
@@ -138,45 +137,7 @@ export default function App() {
       setIsInitialLoading(true);
       setSheetLoadError(null);
       try {
-        let activeSpreadsheetId = spreadsheetId;
-        let activeGoogleToken = googleToken;
-        let activeAppsScriptUrl = appsScriptUrl;
-
-        // Try to fetch global config from Firestore first so we always stay synced on other devices/mobiles!
-        try {
-          const docRef = doc(db, 'app_settings', 'global_config');
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const sysData = docSnap.data();
-            if (sysData.spreadsheetId) {
-              activeSpreadsheetId = sysData.spreadsheetId;
-              setSpreadsheetId(sysData.spreadsheetId);
-              localStorage.setItem('school_spreadsheet_id', sysData.spreadsheetId);
-            }
-            if (sysData.appsScriptUrl !== undefined) {
-              activeAppsScriptUrl = sysData.appsScriptUrl || null;
-              setAppsScriptUrl(sysData.appsScriptUrl || null);
-              if (sysData.appsScriptUrl) {
-                localStorage.setItem('school_apps_script_url', sysData.appsScriptUrl);
-              } else {
-                localStorage.removeItem('school_apps_script_url');
-              }
-            }
-            if (sysData.googleToken !== undefined) {
-              activeGoogleToken = sysData.googleToken || null;
-              setGoogleToken(sysData.googleToken || null);
-              if (sysData.googleToken) {
-                localStorage.setItem('school_google_token', sysData.googleToken);
-              } else {
-                localStorage.removeItem('school_google_token');
-              }
-            }
-          }
-        } catch (dbErr) {
-          console.warn('Could not read global Firestore settings config, using local state/cache.', dbErr);
-        }
-
-        const data = await fetchSpreadsheetData(activeSpreadsheetId, activeGoogleToken, activeAppsScriptUrl);
+        const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
         setAuthDb(data.auth);
         setEnglishDb(data.english);
         setKoreanDb(data.korean);
@@ -228,8 +189,8 @@ export default function App() {
       setAuthError('학번 5자리를 정확히 입력해 주세요. (예: 10101)');
       return;
     }
-    if (!pinInput || pinInput.length !== 4) {
-      setAuthError('인증번호 4자리를 정확히 입력해 주세요. (예: 4821)');
+    if (!pinInput || pinInput.length < 4 || pinInput.length > 8) {
+      setAuthError('비밀번호/생년월일을 올바르게 입력해 주세요. (4~8자리)');
       return;
     }
 
@@ -309,7 +270,7 @@ export default function App() {
   };
 
   // Called when Teacher connects a spreadsheet
-  const handleSpreadsheetConfigured = async (newSpreadsheetId: string, token: string | null, newAppsScriptUrl?: string | null) => {
+  const handleSpreadsheetConfigured = (newSpreadsheetId: string, token: string | null, newAppsScriptUrl?: string | null) => {
     setSpreadsheetId(newSpreadsheetId);
     setGoogleToken(token);
     setAppsScriptUrl(newAppsScriptUrl || null);
@@ -326,19 +287,6 @@ export default function App() {
       localStorage.setItem('school_apps_script_url', newAppsScriptUrl);
     } else {
       localStorage.removeItem('school_apps_script_url');
-    }
-
-    // Write globally to Firestore so that any student or mobile device gets the correct Google Sheet instantly!
-    try {
-      await setDoc(doc(db, 'app_settings', 'global_config'), {
-        spreadsheetId: newSpreadsheetId,
-        appsScriptUrl: newAppsScriptUrl || '',
-        googleToken: token || '',
-        updatedAt: new Date().toISOString()
-      });
-      console.log('Successfully synced spreadsheet settings to Firestore global config.');
-    } catch (err) {
-      console.error('Failed to sync global configuration to Firestore:', err);
     }
   };
 
@@ -641,7 +589,7 @@ export default function App() {
                     디지털 읽걷쓰 성장 프로젝트
                   </p>
                   <p className="text-[11px] text-stone-400 leading-relaxed font-semibold mt-2">
-                    학급에서 전달받은 학번 5자리와 개인 인증번호 4자리를 정확하게 입력하고 로그인해 주세요.
+                    학급에서 전달받은 학번 5자리와 개인 비밀번호(생년월일 6자리 등)를 정확하게 입력하고 로그인해 주세요.
                   </p>
                 </div>
 
@@ -665,12 +613,12 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
                       <Lock className="h-4 w-4 text-emerald-600" />
-                      개인 비밀 인증번호 (4자리)
+                      개인 비밀번호 / 생년월일 (6자리 등)
                     </label>
                     <input 
                       type="password" 
-                      maxLength={4}
-                      placeholder="핸드폰 끝 4자리 등의 인증 번호..."
+                      maxLength={8}
+                      placeholder="생년월일 6자리(예: 081015) 또는 지정된 비밀번호..."
                       value={pinInput}
                       onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full px-4 py-3 border border-emerald-105 rounded-2xl text-base font-mono tracking-wide placeholder:font-sans placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-stone-50/20"
@@ -695,7 +643,7 @@ export default function App() {
                       <div>
                         <p className="font-extrabold text-rose-800">로그인에 실패하였습니다</p>
                         <p className="text-[11.1px] text-rose-600 font-bold leading-relaxed mt-1">
-                          학번 정보 혹은 본인 비밀코드가 일치하지 않습니다. 올바른 5자리 학번과 4자리 비밀코드를 적어주시고, 분실하였을 시 학급 담임 선생님께 비밀번호 대조 확인을 부탁해 주시기 바랍니다.
+                          학번 정보 혹은 본인 비밀코드가 일치하지 않습니다. 올바른 5자리 학번과 비밀번호를 입력해주시고, 분실하였을 시 학급 담임 선생님께 대조 확인을 부탁해 주시기 바랍니다.
                         </p>
                       </div>
                     </div>

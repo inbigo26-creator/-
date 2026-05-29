@@ -4,9 +4,10 @@
  */
 
 import { StudentAuth, TypingRecord, LevelRule, StudentStats } from './types';
+import { SCHOOL_SPREADSHEET_ID } from './config';
 
-// Default Spreadsheet ID (Used as an example in school setups)
-export const DEFAULT_SPREADSHEET_ID = '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o';
+// Default Spreadsheet ID (Imported from school config.ts)
+export const DEFAULT_SPREADSHEET_ID = SCHOOL_SPREADSHEET_ID;
 
 // --- ROBUST INLINE CSV PARSER ---
 export function parseCSV(text: string): string[][] {
@@ -266,7 +267,7 @@ export async function fetchSpreadsheetData(
   }> {
   
   // Return empty/warning data instead of mock demo data if default placeholder is used
-  if ((!spreadsheetId || spreadsheetId === DEFAULT_SPREADSHEET_ID) && (!appsScriptUrl || !appsScriptUrl.trim())) {
+  if ((!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') && (!appsScriptUrl || !appsScriptUrl.trim())) {
     return {
       auth: [],
       english: [],
@@ -315,7 +316,7 @@ export async function fetchSpreadsheetData(
       }
     } catch (e: any) {
       console.error('Apps Script Fetch Failed. Falling back to Google Sheets direct access.', e);
-      if (!spreadsheetId || spreadsheetId === DEFAULT_SPREADSHEET_ID) {
+      if (!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') {
         throw new Error(`구글 앱스 스크립트(GAS) 연동 실패: ${e.message || e}`);
       }
     }
