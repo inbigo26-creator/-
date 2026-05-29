@@ -9,7 +9,8 @@ import {
   calculateStudentStats, 
   DEFAULT_SPREADSHEET_ID, 
   getMonthNumber,
-  clearDataCache
+  clearDataCache,
+  parseStudentIdInfo
 } from './data';
 import { StudentAuth, TypingRecord, LevelRule, StudentStats } from './types';
 import { StudentStatsCard } from './components/StudentCards';
@@ -184,15 +185,10 @@ export default function App() {
       const englishStats = calculateStudentStats(currentAuth.studentId, englishDb, levelRulesDb, 'english');
       const koreanStats = calculateStudentStats(currentAuth.studentId, koreanDb, levelRulesDb, 'korean');
 
-      // Attempt to retrieve Grade/Class metadata from records
-      let grade = '1';
-      let department = '일반';
-      
-      const foundRec = [...englishDb, ...koreanDb].find(r => r.studentId === currentAuth.studentId);
-      if (foundRec) {
-        grade = foundRec.grade || '1';
-        department = foundRec.department || '공통';
-      }
+      // Dynamically extract Grade and Department strictly based on school 5-digit Student ID rule
+      const studentInfo = parseStudentIdInfo(currentAuth.studentId);
+      const grade = studentInfo.grade;
+      const department = studentInfo.department;
 
       const session = {
         id: currentAuth.studentId,

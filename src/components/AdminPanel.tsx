@@ -243,8 +243,6 @@ function getAllDataForSystem() {
     var headers = values[0];
     var idxId = findHeaderIndex(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
     var idxName = findHeaderIndex(headers, ['이름', '성명', '학생명', 'name']);
-    var idxGrade = findHeaderIndex(headers, ['학년', 'grade', '반/학년']);
-    var idxDept = findHeaderIndex(headers, ['과', '학과', '계열', 'dept', '전공']);
 
     if (idxId === -1 || idxName === -1) return dataList;
 
@@ -262,10 +260,10 @@ function getAllDataForSystem() {
       for (var row = 1; row < values.length; row++) {
         var id = cleanCode(values[row][idxId]);
         var name = cleanValue(values[row][idxName]);
-        var grade = idxGrade !== -1 ? cleanCode(values[row][idxGrade]) : '';
-        var dept = idxDept !== -1 ? cleanValue(values[row][idxDept]) : '';
 
         if (!id) continue;
+
+        var studentInfo = parseStudentIdInfoGas(id);
 
         for (var m = 0; m < horizontalMonths.length; m++) {
           var mInfo = horizontalMonths[m];
@@ -276,8 +274,8 @@ function getAllDataForSystem() {
               dataList.push({
                 studentId: id,
                 name: name,
-                grade: grade,
-                department: dept,
+                grade: studentInfo.grade,
+                department: studentInfo.department,
                 month: mInfo.monthName,
                 speed: speedVal,
                 type: typeStr
@@ -300,11 +298,12 @@ function getAllDataForSystem() {
 
           if (id && mon && speedRaw !== undefined && speedRaw !== null && String(speedRaw).trim() !== '') {
             var speedVal = parseInt(cleanCode(speedRaw), 10) || 0;
+            var studentInfo = parseStudentIdInfoGas(id);
             dataList.push({
               studentId: id,
               name: idxName !== -1 ? cleanValue(values[row][idxName]) : '',
-              grade: idxGrade !== -1 ? cleanCode(values[row][idxGrade]) : '',
-              department: idxDept !== -1 ? cleanValue(values[row][idxDept]) : '',
+              grade: studentInfo.grade,
+              department: studentInfo.department,
               month: mon,
               speed: speedVal,
               type: typeStr
@@ -396,6 +395,44 @@ function cleanValue(val) {
  */
 function cleanCode(val) {
   return cleanValue(val).replace(/\\s/g, '');
+}
+
+/**
+ * 학번 5자리 기반 학년/학과 추출 규칙 지원
+ */
+function parseStudentIdInfoGas(studentId) {
+  var cleanId = String(studentId || '').trim();
+  var grade = '1';
+  var classNum = 1;
+  var department = '일반';
+
+  if (cleanId.length >= 5) {
+    grade = cleanId.charAt(0);
+    var classChar = cleanId.charAt(2);
+    var parsedClass = parseInt(classChar, 10);
+    if (!isNaN(parsedClass)) {
+      classNum = parsedClass;
+    }
+  } else if (cleanId.length > 0) {
+    var firstChar = cleanId.charAt(0);
+    if (/^\d$/.test(firstChar)) {
+      grade = firstChar;
+    }
+  }
+
+  if (classNum === 1 || classNum === 2) {
+    department = '항공서비스과';
+  } else if (classNum === 3 || classNum === 4) {
+    department = '부사관경영과';
+  } else if (classNum === 5 || classNum === 6) {
+    department = 'SNS마케팅과';
+  } else if (classNum === 7 || classNum === 8) {
+    department = '콘텐츠디자인과';
+  } else {
+    department = '기타';
+  }
+
+  return { grade: grade, department: department };
 }
 
 /**

@@ -71,6 +71,54 @@ export function cleanCodeValue(val: any): string {
   return cleanCellValue(val).replace(/\s/g, '');
 }
 
+/**
+ * 학번을 기반으로 학년과 학과(반 배정 규칙) 정보를 자동으로 추출하는 분석 함수
+ * - 학번 5자리 기준: 1번째 자리 = 학년, 3번째 자리 = 반
+ * - 반 배정 학과 정보:
+ *   - 1,2반: 항공서비스과
+ *   - 3,4반: 부사관경영과
+ *   - 5,6반: SNS마케팅과
+ *   - 7,8반: 콘텐츠디자인과
+ *   - 기타: 기타
+ */
+export function parseStudentIdInfo(studentId: string): { grade: string; classNum: number; department: string } {
+  const cleanId = String(studentId || '').trim();
+  let grade = '1';
+  let classNum = 1;
+  let department = '일반';
+
+  if (cleanId.length >= 5) {
+    // 1번째 자리: 학년
+    grade = cleanId.charAt(0);
+    // 3번째 자리: 반
+    const classChar = cleanId.charAt(2);
+    const parsedClass = parseInt(classChar, 10);
+    if (!isNaN(parsedClass)) {
+      classNum = parsedClass;
+    }
+  } else if (cleanId.length > 0) {
+    const firstChar = cleanId.charAt(0);
+    if (/^\d$/.test(firstChar)) {
+      grade = firstChar;
+    }
+  }
+
+  // 1,2반 -> 항공서비스과, 3,4반 -> 부사관경영과, 5,6반 -> SNS마케팅과, 7,8반 -> 콘텐츠디자인과
+  if (classNum === 1 || classNum === 2) {
+    department = '항공서비스과';
+  } else if (classNum === 3 || classNum === 4) {
+    department = '부사관경영과';
+  } else if (classNum === 5 || classNum === 6) {
+    department = 'SNS마케팅과';
+  } else if (classNum === 7 || classNum === 8) {
+    department = '콘텐츠디자인과';
+  } else {
+    department = '기타';
+  }
+
+  return { grade, classNum, department };
+}
+
 // Helper to look up column header index supporting alternative names, case insensivity, and spacing variants
 export function findIndexByNames(headers: string[], possibleNames: string[]): number {
   if (!headers || headers.length === 0) return -1;
@@ -371,10 +419,13 @@ export async function fetchSpreadsheetData(
             rows.slice(1).forEach(row => {
               const studentId = cleanCodeValue(row[idxId]);
               const name = cleanCellValue(row[idxName]);
-              const grade = idxGrade !== -1 ? cleanCodeValue(row[idxGrade]) : '';
-              const department = idxDept !== -1 ? cleanCellValue(row[idxDept]) : '';
-
+              
               if (!studentId) return;
+
+              // Extract dynamically based on 5-digit studentId rule
+              const studentInfo = parseStudentIdInfo(studentId);
+              const grade = studentInfo.grade;
+              const department = studentInfo.department;
 
               horizontalMonths.forEach(({ monthName, index }) => {
                 const speedRaw = row[index];
@@ -411,15 +462,19 @@ export async function fetchSpreadsheetData(
               throw new Error(`'${sheetName}' 시트의 필수 컬럼 헤더(${missing.join(', ')})를 찾을 수 없습니다. (스프레드시트에 '5월', '6월' 같은 열을 만드시거나 '월'과 '${speedHeader}' 열을 갖춰 주십시오.)`);
             }
 
-            results[sheetName] = rows.slice(1).map(row => ({
-              studentId: cleanCodeValue(row[idxId]),
-              name: cleanCellValue(row[idxName]),
-              grade: idxGrade !== -1 ? cleanCodeValue(row[idxGrade]) : '',
-              department: idxDept !== -1 ? cleanCellValue(row[idxDept]) : '',
-              month: cleanCellValue(row[idxMonth]),
-              speed: parseInt(cleanCodeValue(row[idxSpeed]), 10) || 0,
-              type: sheetName === 'english_all' ? 'english' : 'korean'
-            })).filter(item => item.studentId && item.month);
+            results[sheetName] = rows.slice(1).map(row => {
+              const studentId = cleanCodeValue(row[idxId]);
+              const studentInfo = parseStudentIdInfo(studentId);
+              return {
+                studentId,
+                name: cleanCellValue(row[idxName]),
+                grade: studentInfo.grade,
+                department: studentInfo.department,
+                month: cleanCellValue(row[idxMonth]),
+                speed: parseInt(cleanCodeValue(row[idxSpeed]), 10) || 0,
+                type: sheetName === 'english_all' ? 'english' : 'korean'
+              };
+            }).filter(item => item.studentId && item.month);
           }
 
         } else if (sheetName === 'level_rule') {
