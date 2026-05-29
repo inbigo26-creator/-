@@ -68,6 +68,7 @@ export default function App() {
   } | null>(null);
 
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [showDebugList, setShowDebugList] = useState(false);
 
   const handleForceReload = async () => {
     setIsInitialLoading(true);
@@ -129,6 +130,21 @@ export default function App() {
     loadSheets();
   }, [spreadsheetId, googleToken]);
 
+  // Normalization function to handle common Google Sheets formatting anomalies (like .0 float artifacts, commas, or extra spacing)
+  const normalizeValue = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    let cleaned = String(val).trim().replace(/,/g, '');
+    if (cleaned.endsWith('.0')) {
+      cleaned = cleaned.substring(0, cleaned.length - 2);
+    } else if (cleaned.includes('.')) {
+      const parts = cleaned.split('.');
+      if (/^0+$/.test(parts[1])) {
+        cleaned = parts[0];
+      }
+    }
+    return cleaned.replace(/[^0-9A-Za-z]/g, '');
+  };
+
   // Handle student credentials login match
   const handleStudentLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,9 +162,9 @@ export default function App() {
     setIsAuthenticating(true);
 
     try {
-      // Find matching credentials in students_auth DB
+      // Find matching credentials in students_auth DB with robust normalization
       const currentAuth = authDb.find(
-        (a) => String(a.studentId).trim() === studentIdInput.trim() && String(a.pin).trim() === pinInput.trim()
+        (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
       );
 
       if (!currentAuth) {
@@ -496,6 +512,53 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                {/* Real-time Spreadsheet Data Inspector Toggle (highly helpful for teachers) */}
+                <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDebugList(!showDebugList)}
+                    className="w-full text-center text-xs text-slate-500 hover:text-emerald-700 bg-slate-50/50 hover:bg-emerald-50/50 py-2.5 px-3 rounded-xl border border-dashed border-slate-200 transition-all font-semibold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span>🔍 {showDebugList ? '연동 데이터 점검창 닫기' : '현재 웹앱이 해석한 전체 학생 명단/비밀번호 확인'}</span>
+                    <Sprout className={`h-3 w-3 text-emerald-500 transition-transform ${showDebugList ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showDebugList && (
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                        <span className="text-[11px] text-slate-500 font-bold block">
+                          📂 실시간 연동 등록 학생 (총 {authDb.length}명)
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                          {spreadsheetId === DEFAULT_SPREADSHEET_ID ? '가상 데모' : '실제 학교 연결'}
+                        </span>
+                      </div>
+                      
+                      {authDb.length === 0 ? (
+                        <p className="text-stone-500 text-[11px] leading-relaxed">
+                          현재 시트에 등록된 사용자가 없거나, <code>students_auth</code> 시트에서 양식에 맞게 학번, 이름, 인증번호를 불러오지 못했습니다. '교사용 설정'의 스프레드시트 주소가 정확하며 공유 권한이 '뷰어'로 열려 있는지 점검 바랍니다.
+                        </p>
+                      ) : (
+                        <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 text-[11px] font-sans">
+                          <p className="text-amber-750 bg-amber-50 p-2 rounded-lg border border-amber-100/60 leading-normal font-semibold mb-2">
+                            💡 구글 시트에서 즉각 수합한 보안 대조군 데이터입니다. 실제 저장되어 있는 학번과 인증번호가 웹앱 관점에서 소수점(.0)이나 공백 없이 어떻게 전달되고 있는지 실시간 점검이 가능합니다.
+                          </p>
+                          <div className="grid grid-cols-2 gap-1.5 font-mono">
+                            {authDb.map((st, i) => (
+                              <div key={i} className="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-between hover:border-emerald-300 transition-all">
+                                <span className="text-slate-800 font-bold">{st.name} ({st.studentId})</span>
+                                <span className="text-slate-600 font-semibold mt-1 text-[11px]">
+                                  비밀번호: <strong className="text-indigo-600 font-extrabold bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded text-[11.5px] font-mono">{st.pin}</strong>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {spreadsheetId === DEFAULT_SPREADSHEET_ID && (
