@@ -8,7 +8,8 @@ import {
   fetchSpreadsheetData, 
   calculateStudentStats, 
   DEFAULT_SPREADSHEET_ID, 
-  getMonthNumber 
+  getMonthNumber,
+  clearDataCache
 } from './data';
 import { StudentAuth, TypingRecord, LevelRule, StudentStats } from './types';
 import { StudentStatsCard } from './components/StudentCards';
@@ -65,6 +66,36 @@ export default function App() {
     totalEng: number;
     totalKor: number;
   } | null>(null);
+
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const handleForceReload = async () => {
+    setIsInitialLoading(true);
+    setAuthError(null);
+    setSyncMessage(null);
+    try {
+      clearDataCache();
+      const data = await fetchSpreadsheetData(spreadsheetId, googleToken);
+      setAuthDb(data.auth);
+      setEnglishDb(data.english);
+      setKoreanDb(data.korean);
+      setLevelRulesDb(data.levels);
+      
+      setSheetMetrics({
+        success: true,
+        authRows: data.auth.length,
+        totalEng: data.english.length,
+        totalKor: data.korean.length
+      });
+      setSyncMessage('스프레드시트 최신 정보(인증번호 1234 등) 실시간 연동 완료!');
+      setTimeout(() => setSyncMessage(null), 5000);
+    } catch (err: any) {
+      console.error(err);
+      setAuthError('실시간 동기화 오류: ' + (err.message || '스프레드시트 상태를 확인해 주세요.'));
+    } finally {
+      setIsInitialLoading(false);
+    }
+  };
 
   // Load spreadsheet data on configuration mount/change
   useEffect(() => {
@@ -348,14 +379,46 @@ export default function App() {
           {!isInitialLoading && !studentSession && (
             <div className="max-w-md w-full space-y-6 py-6">
               
-              {spreadsheetId !== DEFAULT_SPREADSHEET_ID && (
-                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between text-xs text-emerald-800 font-medium">
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4 text-emerald-600" />
-                    학교 구글 스프레드시트가 실시간 동기화 중입니다
-                  </span>
-                </div>
-              )}
+              <div className="flex flex-col gap-2">
+                {spreadsheetId !== DEFAULT_SPREADSHEET_ID ? (
+                  <div className="p-3.5 bg-emerald-50/90 border border-emerald-100 rounded-2xl flex flex-col sm:flex-row gap-2.5 items-center justify-between text-xs text-emerald-800 font-medium shadow-xs">
+                    <span className="flex items-center gap-1.5 text-left">
+                      <Sparkles className="h-4 w-4 text-emerald-600 animate-pulse shrink-0" />
+                      <span><strong>[학교 정보 모드]</strong> 스프레드시트 인증 적용 중</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleForceReload}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-xs whitespace-nowrap text-[11px]"
+                    >
+                      <Sprout className="h-3 w-3 animate-bounce shrink-0" />
+                      스프레드시트 새로고침 🔄
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-amber-50/80 border border-amber-200/60 rounded-2xl flex flex-col sm:flex-row gap-2.5 items-center justify-between text-xs text-amber-800 font-medium">
+                    <span className="flex items-center gap-1.5 text-left">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span><strong>[가상 데모 모드]</strong> 가상 데이타 시연용 모드입니다.</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdmin(true)}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition-all text-[11px] whitespace-nowrap cursor-pointer"
+                    >
+                      실물 시트 연동 ⚙️
+                    </button>
+                  </div>
+                )}
+
+                {/* Local Sync Notification Popup */}
+                {syncMessage && (
+                  <div className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 animate-pulse">
+                    <Sparkles className="h-4 w-4 text-blue-500 animate-ping" />
+                    <span>{syncMessage}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Center Login Card */}
               <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-8 space-y-6 relative overflow-hidden">
@@ -420,9 +483,17 @@ export default function App() {
                 </form>
 
                 {authError && (
-                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 flex items-start gap-2 text-xs">
-                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                    <span className="font-semibold lead-loose">{authError}</span>
+                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 flex flex-col gap-2 text-xs">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span className="font-bold leading-relaxed">{authError}</span>
+                    </div>
+                    <div className="mt-1.5 pt-2 border-t border-rose-200/50 text-rose-600 space-y-1.5 font-sans font-medium text-[11px] leading-relaxed">
+                      <p className="font-extrabold text-rose-800">💡 로그인 번호가 맞지 않는다고 나오시나요?</p>
+                      <p><strong>1. 스프레드시트 업데이트 반영 지연</strong><br />구글 스프레드시트에 새로 바꾼 비밀번호(예: 1234)가 웹 브라우저 캐시에 옛날 값으로 남아 있어서 발생할 수 있습니다. 상단의 <strong className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100">[스프레드시트 새로고침 🔄]</strong> 버튼을 누르면 실시간으로 최신 데이터가 즉시 연동됩니다!</p>
+                      <p><strong>2. 현재 가동 모드 재확인</strong><br />지금 <strong>{spreadsheetId === DEFAULT_SPREADSHEET_ID ? '가상 데모 모드 (Demo Sandbox)' : '우리 학교 개별 시트 모드'}</strong>입니다. {spreadsheetId === DEFAULT_SPREADSHEET_ID ? '데모 모드에서는 10101의 비빌번호가 4821로 지정되어 있으며, 선생님의 스프레드시트 1234 번호가 동작하려면 먼저 우측 상단 [교사용 설정]에서 본인이 관리하는 학급 구글 스프레드시트 ID/주소를 입력하고 연결해주셔야 합니다.' : '학교 스프레드시트가 연결된 상태입니다.'}</p>
+                      <p><strong>3. 시트 명칭 및 학번 확인</strong><br />구글 스프레드시트의 <code>students_auth</code> 시트에 학생 <strong>학번(5자리)</strong>과 <strong>인증번호(4자리, 예: 1234)</strong>가 띄어쓰기 빈칸 없이 정확히 적혀 있는지 확인해주세요.</p>
+                    </div>
                   </div>
                 )}
               </div>

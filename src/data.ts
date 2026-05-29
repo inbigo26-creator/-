@@ -187,9 +187,10 @@ export async function fetchSpreadsheetData(
     for (const sheetName of sheetsToFetch) {
       let rows: string[][] = [];
 
+      const cacheBust = `t=${Date.now()}`;
       if (accessToken) {
         // Method 1: Private sheet fetching utilizing Google Sheets API v4 with active OAuth Token
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}?valueRenderOption=FORMATTED_VALUE`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}?valueRenderOption=FORMATTED_VALUE&${cacheBust}`;
         const res = await fetch(url, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
@@ -204,7 +205,7 @@ export async function fetchSpreadsheetData(
         rows = data.values || [];
       } else {
         // Method 2: Public sheet fetching viewer endpoint when shared as "Anyone with the link can view"
-        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&${cacheBust}`;
         const res = await fetch(url);
         
         if (!res.ok) {
