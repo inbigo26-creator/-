@@ -1,0 +1,6 @@
+{
+  "name": "학생 타자 성장 조회 시스템",
+  "description": "구글 스프레드시트 기반의 고등학교 영어/한글 타자 기록 및 성장 분석 웹앱",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
