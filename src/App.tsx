@@ -190,7 +190,7 @@ export default function App() {
       return;
     }
     if (!pinInput || pinInput.length < 4 || pinInput.length > 8) {
-      setAuthError('비밀번호/생년월일을 올바르게 입력해 주세요. (4~8자리)');
+      setAuthError('비밀번호/생년월일 8자리를 올바르게 입력해 주세요. (예: 20081015)');
       return;
     }
 
@@ -589,7 +589,7 @@ export default function App() {
                     디지털 읽걷쓰 성장 프로젝트
                   </p>
                   <p className="text-[11px] text-stone-400 leading-relaxed font-semibold mt-2">
-                    학급에서 전달받은 학번 5자리와 개인 비밀번호(생년월일 6자리 등)를 정확하게 입력하고 로그인해 주세요.
+                    학급에서 전달받은 학번 5자리와 개인 비밀번호(생년월일 8자리)를 정확하게 입력하고 로그인해 주세요.
                   </p>
                 </div>
 
@@ -613,12 +613,12 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
                       <Lock className="h-4 w-4 text-emerald-600" />
-                      개인 비밀번호 / 생년월일 (6자리 등)
+                      개인 비밀번호 / 생년월일 (8자리)
                     </label>
                     <input 
                       type="password" 
                       maxLength={8}
-                      placeholder="생년월일 6자리(예: 081015) 또는 지정된 비밀번호..."
+                      placeholder="생년월일 8자리(예: 20081015) 또는 지정된 비밀번호..."
                       value={pinInput}
                       onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
                       className="w-full px-4 py-3 border border-emerald-105 rounded-2xl text-base font-mono tracking-wide placeholder:font-sans placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-stone-50/20"
