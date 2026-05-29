@@ -129,6 +129,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     alert('데모 가상 데이터 모드로 전환되었습니다.');
   };
 
+  // Save and apply spreadsheet ID directly without requiring test sequence
+  const handleSaveAndApply = () => {
+    if (!spreadsheetIdIn) {
+      alert('스프레드시트 URL 또는 ID를 먼저 입력해주십시오.');
+      return;
+    }
+    // Clear data cache to ensure new fetch
+    clearDataCache();
+    onSpreadsheetConfigured(spreadsheetIdIn, accessToken);
+    alert('🎉 스프레드시트 주소가 성공적으로 저장되었으며 대시보드에 적용되었습니다!');
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedText(true);
@@ -515,7 +527,7 @@ function getStudentTypingData(studentId, pin) {
               </button>
             </div>
             
-            <div className="flex gap-2.5">
+            <div className="flex flex-col sm:flex-row gap-2.5">
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
                   <Link2 className="h-5 w-5" />
@@ -525,9 +537,17 @@ function getStudentTypingData(studentId, pin) {
                   value={spreadsheetIdIn}
                   onChange={(e) => handleSpreadsheetIdChange(e.target.value)}
                   placeholder="https://docs.google.com/spreadsheets/d/시트ID/edit 형태 링크 입력..."
-                  className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-505"
                 />
               </div>
+              <button
+                type="button"
+                onClick={handleSaveAndApply}
+                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-2xl shadow-xs hover:shadow-md transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 justify-center"
+              >
+                <CheckCircle2 className="h-4.5 w-4.5" />
+                저장 및 연동하기
+              </button>
             </div>
             <p className="text-[11px] text-gray-400 leading-relaxed font-medium">
               * 스프레드시트 공유 권한을 <strong>'링크가 있는 모든 사용자(뷰어)'</strong>로 완료 시, 별도의 구글 로그인 없이도 즉시 전교생 조회가 가능해집니다.
