@@ -163,38 +163,90 @@ function doGet() {
 }
 
 /**
+ * 유연한 헤더 매칭용 인덱스 검색 함수 (대소문자, 공백, 다양한 한글명 대응)
+ */
+function findHeaderIndex(headers, possibleNames) {
+  if (!headers || headers.length === 0) return -1;
+  
+  var cleanedHeaders = headers.map(function(h) {
+    return String(h || '').trim().toLowerCase().replace(/['"“”\\s_\\/\\\\-]/g, '');
+  });
+  
+  var cleanedPossibles = possibleNames.map(function(p) {
+    return String(p || '').trim().toLowerCase().replace(/['"“”\\s_\\/\\\\-]/g, '');
+  });
+  
+  // 1차: 완전 일치 체크
+  for (var i = 0; i < cleanedPossibles.length; i++) {
+    var idx = cleanedHeaders.indexOf(cleanedPossibles[i]);
+    if (idx !== -1) return idx;
+  }
+  
+  // 2차: 포함 체크
+  for (var i = 0; i < cleanedHeaders.length; i++) {
+    var header = cleanedHeaders[i];
+    if (!header) continue;
+    for (var j = 0; j < cleanedPossibles.length; j++) {
+      if (header.indexOf(cleanedPossibles[j]) !== -1 || cleanedPossibles[j].indexOf(header) !== -1) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
+/**
+ * 값 정제 헬퍼 (소수점 .0 및 따옴표 제거)
+ */
+function cleanValue(val) {
+  if (val === null || val === undefined) return '';
+  var str = String(val).trim().replace(/['"“”]/g, '');
+  if (str.endsWith('.0')) {
+    str = str.substring(0, str.length - 2);
+  }
+  return str.trim();
+}
+
+function cleanCode(val) {
+  return cleanValue(val).replace(/\\s/g, '');
+}
+
+/**
  * 학생 인증 및 데이터 조회 (개인정보 보호 필터링 적용)
  * 학생은 본인의 정보만 다운로드 받으며, 전체 원본 DB가 사용자 기기로 넘어가지 않아 매우 안전합니다.
  */
 function getStudentTypingData(studentId, pin) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // 1. 학생 본인 인증 시트 조회
-    const authSheet = ss.getSheetByName('students_auth');
+    var authSheet = ss.getSheetByName('students_auth');
     if (!authSheet) {
       return { success: false, message: "students_auth 시트를 찾을 수 없습니다." };
     }
     
-    const authValues = authSheet.getDataRange().getValues();
-    const authHeaders = authValues[0];
-    const idxId = authHeaders.indexOf('학번');
-    const idxName = authHeaders.indexOf('이름');
-    const idxPin = authHeaders.indexOf('인증번호');
+    var authValues = authSheet.getDataRange().getValues();
+    var authHeaders = authValues[0];
+    
+    var idxId = findHeaderIndex(authHeaders, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
+    var idxName = findHeaderIndex(authHeaders, ['이름', '성명', '학생명', 'name']);
+    var idxPin = findHeaderIndex(authHeaders, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
     
     if (idxId === -1 || idxName === -1 || idxPin === -1) {
-      return { success: false, message: "students_auth 시트의 컬럼 헤더는 반드시 [학번, 이름, 인증번호] 여야 합니다." };
+      return { success: false, message: "students_auth 시트의 필수 컬럼 헤더(학번, 이름, 인증번호)를 일치시킬 수 없습니다. 헤더 이름을 확인해 주세요." };
     }
     
-    let isAuthorized = false;
-    let studentName = '';
+    var isAuthorized = false;
+    var studentName = '';
+    var searchId = cleanCode(studentId);
+    var searchPin = cleanCode(pin);
     
-    for (let i = 1; i < authValues.length; i++) {
-      const rowId = String(authValues[i][idxId]).trim();
-      const rowPin = String(authValues[i][idxPin]).trim();
-      if (rowId === String(studentId).trim() && rowPin === String(pin).trim()) {
+    for (var i = 1; i < authValues.length; i++) {
+      var rowId = cleanCode(authValues[i][idxId]);
+      var rowPin = cleanCode(authValues[i][idxPin]);
+      if (rowId === searchId && rowPin === searchPin) {
         isAuthorized = true;
-        studentName = String(authValues[i][idxName]).trim();
+        studentName = cleanValue(authValues[i][idxName]);
         break;
       }
     }
@@ -204,81 +256,91 @@ function getStudentTypingData(studentId, pin) {
     }
     
     // 2. 영어 타자 기록 가져오기
-    const englishSheet = ss.getSheetByName('english_all');
-    let englishRecords = [];
+    var englishSheet = ss.getSheetByName('english_all');
+    var englishRecords = [];
     if (englishSheet) {
-      const engValues = englishSheet.getDataRange().getValues();
-      const engHeaders = engValues[0];
-      const eIdxId = engHeaders.indexOf('학번');
-      const eIdxGrade = engHeaders.indexOf('학년');
-      const eIdxDept = engHeaders.indexOf('과');
-      const eIdxMonth = engHeaders.indexOf('월');
-      const eIdxSpeed = engHeaders.indexOf('영타');
+      var engValues = englishSheet.getDataRange().getValues();
+      var engHeaders = engValues[0];
       
-      for (let i = 1; i < engValues.length; i++) {
-        if (String(engValues[i][eIdxId]).trim() === String(studentId).trim()) {
-          englishRecords.push({
-            studentId: studentId,
-            name: studentName,
-            grade: eIdxGrade !== -1 ? String(engValues[i][eIdxGrade]) : '',
-            department: eIdxDept !== -1 ? String(engValues[i][eIdxDept]) : '',
-            month: String(engValues[i][eIdxMonth]),
-            speed: parseInt(engValues[i][eIdxSpeed]) || 0,
-            type: 'english'
-          });
+      var eIdxId = findHeaderIndex(engHeaders, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
+      var eIdxGrade = findHeaderIndex(engHeaders, ['학년', 'grade', '반/학년']);
+      var eIdxDept = findHeaderIndex(engHeaders, ['과', '학과', '계열', 'dept', '전공']);
+      var eIdxMonth = findHeaderIndex(engHeaders, ['월', '시기', 'month', '구분']);
+      var eIdxSpeed = findHeaderIndex(engHeaders, ['영타', '영어', 'speed', '타수']);
+      
+      if (eIdxId !== -1 && eIdxMonth !== -1 && eIdxSpeed !== -1) {
+        for (var i = 1; i < engValues.length; i++) {
+          if (cleanCode(engValues[i][eIdxId]) === searchId) {
+            englishRecords.push({
+              studentId: searchId,
+              name: studentName,
+              grade: eIdxGrade !== -1 ? cleanCode(engValues[i][eIdxGrade]) : '',
+              department: eIdxDept !== -1 ? cleanValue(engValues[i][eIdxDept]) : '',
+              month: cleanValue(engValues[i][eIdxMonth]),
+              speed: parseInt(cleanCode(engValues[i][eIdxSpeed]), 10) || 0,
+              type: 'english'
+            });
+          }
         }
       }
     }
     
     // 3. 한글 타자 기록 가져오기
-    const koreanSheet = ss.getSheetByName('korean_all');
-    let koreanRecords = [];
+    var koreanSheet = ss.getSheetByName('korean_all');
+    var koreanRecords = [];
     if (koreanSheet) {
-      const korValues = koreanSheet.getDataRange().getValues();
-      const korHeaders = korValues[0];
-      const kIdxId = korHeaders.indexOf('학번');
-      const kIdxGrade = korHeaders.indexOf('학년');
-      const kIdxDept = korHeaders.indexOf('과');
-      const kIdxMonth = korHeaders.indexOf('월');
-      const kIdxSpeed = korHeaders.indexOf('한타');
+      var korValues = koreanSheet.getDataRange().getValues();
+      var korHeaders = korValues[0];
       
-      for (let i = 1; i < korValues.length; i++) {
-        if (String(korValues[i][kIdxId]).trim() === String(studentId).trim()) {
-          koreanRecords.push({
-            studentId: studentId,
-            name: studentName,
-            grade: kIdxGrade !== -1 ? String(korValues[i][kIdxGrade]) : '',
-            department: kIdxDept !== -1 ? String(korValues[i][kIdxDept]) : '',
-            month: String(korValues[i][kIdxMonth]),
-            speed: parseInt(korValues[i][kIdxSpeed]) || 0,
-            type: 'korean'
-          });
+      var kIdxId = findHeaderIndex(korHeaders, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
+      var kIdxGrade = findHeaderIndex(korHeaders, ['학년', 'grade', '반/학년']);
+      var kIdxDept = findHeaderIndex(korHeaders, ['과', '학과', '계열', 'dept', '전공']);
+      var kIdxMonth = findHeaderIndex(korHeaders, ['월', '시기', 'month', '구분']);
+      var kIdxSpeed = findHeaderIndex(korHeaders, ['한타', '한글', 'speed', '타수']);
+      
+      if (kIdxId !== -1 && kIdxMonth !== -1 && kIdxSpeed !== -1) {
+        for (var i = 1; i < korValues.length; i++) {
+          if (cleanCode(korValues[i][kIdxId]) === searchId) {
+            koreanRecords.push({
+              studentId: searchId,
+              name: studentName,
+              grade: kIdxGrade !== -1 ? cleanCode(korValues[i][kIdxGrade]) : '',
+              department: kIdxDept !== -1 ? cleanValue(korValues[i][kIdxDept]) : '',
+              month: cleanValue(korValues[i][kIdxMonth]),
+              speed: parseInt(cleanCode(korValues[i][kIdxSpeed]), 10) || 0,
+              type: 'korean'
+            });
+          }
         }
       }
     }
     
     // 4. 타자 급수 기준 데이터 가져오기
-    const ruleSheet = ss.getSheetByName('level_rule');
-    let levelRules = [];
+    var ruleSheet = ss.getSheetByName('level_rule');
+    var levelRules = [];
     if (ruleSheet) {
-      const ruleValues = ruleSheet.getDataRange().getValues();
-      const ruleHeaders = ruleValues[0];
-      const rIdxType = ruleHeaders.indexOf('타입');
-      const rIdxLevel = ruleHeaders.indexOf('급수');
-      const rIdxMin = ruleHeaders.indexOf('최소값');
+      var ruleValues = ruleSheet.getDataRange().getValues();
+      var ruleHeaders = ruleValues[0];
       
-      for (let i = 1; i < ruleValues.length; i++) {
-        levelRules.push({
-          type: String(ruleValues[i][rIdxType]),
-          level: String(ruleValues[i][rIdxLevel]),
-          minVal: parseInt(ruleValues[i][rIdxMin]) || 0
-        });
+      var rIdxType = findHeaderIndex(ruleHeaders, ['타입', '구분', '종류', 'type', '언어']);
+      var rIdxLevel = findHeaderIndex(ruleHeaders, ['급수', '등급', '레벨', 'level']);
+      var rIdxMin = findHeaderIndex(ruleHeaders, ['최소값', '기준', '타수', '최소', 'min', '최저']);
+      
+      if (rIdxType !== -1 && rIdxLevel !== -1 && rIdxMin !== -1) {
+        for (var i = 1; i < ruleValues.length; i++) {
+          levelRules.push({
+            type: cleanValue(ruleValues[i][rIdxType]),
+            level: cleanValue(ruleValues[i][rIdxLevel]),
+            minVal: parseInt(cleanCode(ruleValues[i][rIdxMin]), 10) || 0
+          });
+        }
       }
     }
     
     return {
       success: true,
       studentName: studentName,
+      studentId: searchId,
       english: englishRecords,
       korean: koreanRecords,
       levels: levelRules
