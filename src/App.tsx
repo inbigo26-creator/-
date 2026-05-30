@@ -17,6 +17,7 @@ import { StudentStatsCard } from './components/StudentCards';
 import { TypingChart } from './components/TypingChart';
 import { AdminPanel } from './components/AdminPanel';
 import { GuideModal } from './components/GuideModal';
+import { TeacherAnalytics } from './components/TeacherAnalytics';
 import { 
   Keyboard, LogIn, GraduationCap, Lock, HelpCircle, 
   Settings, AlertCircle, BookOpen, LogOut, Medal, Sparkles,
@@ -415,259 +416,117 @@ export default function App() {
           {isInitialLoading && (
             <div className="text-center py-20 px-8 bg-white border border-emerald-100 rounded-3xl max-w-md w-full shadow-sm">
               <div className="animate-spin h-10 w-10 border-4 border-emerald-600 border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-sm text-stone-600 font-bold mb-1">스프레드시트 데이터베이스를 원격 분석 중입니다...</p>
+              <p className="text-sm text-stone-605 font-bold mb-1">스프레드시트 데이터베이스를 원격 분석 중입니다...</p>
               <p className="text-xs text-stone-400 font-sans">최초 구동 시 최대 3초가 소요될 수 있습니다.</p>
             </div>
           )}
 
-          {/* 2. STUDENT LOGIN GATES (Rendered if not logged in & not loading) */}
+          {/* 2. CORE VIEW: TEACHER ANALYTICS OR STUDENT LOGIN GATES (Rendered if not loaded in session) */}
           {!isInitialLoading && !studentSession && (
-            <div className="max-w-md w-full space-y-6 py-6">
-              
-              {/* TEACHER ADMINISTRATIVE CONSOLE - SHOWN ONLY TO AUTHENTICATED TEACHERS */}
-              {isTeacher && (
-                <div className="p-6 bg-indigo-50/70 border border-indigo-150 rounded-3xl space-y-5 shadow-xs animate-fade-in">
-                  <div className="flex items-center justify-between pb-3 border-b border-indigo-200">
-                    <div className="flex items-center gap-2">
-                      <span className="p-2 bg-indigo-600 text-white rounded-xl shadow-2xs">
-                        <Settings className="h-4 w-4" />
-                      </span>
-                      <div>
-                        <h3 className="text-sm font-black text-slate-900 tracking-tight">선생님 전용 관리 콘솔</h3>
-                        <p className="text-[10px] text-indigo-700 font-bold mt-0.5">실시간 데이터 연동 및 인증번호를 확인합니다.</p>
+            isTeacher ? (
+              <TeacherAnalytics 
+                authDb={authDb}
+                englishDb={englishDb}
+                koreanDb={koreanDb}
+                onShowSettings={() => setShowAdmin(true)}
+                spreadsheetId={spreadsheetId}
+              />
+            ) : (
+              <div className="max-w-md w-full space-y-6 py-6">
+                
+                {/* Center Student Login Card */}
+                <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-8 space-y-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-600" />
+
+                  <div className="space-y-4 text-center border-b border-slate-100 pb-5">
+                    <div className="flex justify-center">
+                      <div className="p-2.5 bg-emerald-50 rounded-2xl border border-emerald-100 text-emerald-600 shadow-xs animate-pulse inline-flex">
+                        <Sprout className="h-6 w-6" />
                       </div>
                     </div>
-                  </div>
-
-                  {/* Connection mode details */}
-                  <div className="space-y-3">
-                    {appsScriptUrl ? (
-                      <div className="p-3.5 bg-white rounded-2xl border border-indigo-100 flex flex-col gap-1 shadow-2xs text-xs">
-                        <span className="flex items-center gap-1.5 font-bold text-slate-800">
-                          <Sparkles className="h-4 w-4 text-indigo-600 animate-pulse" />
-                          <span>Apps Script 원격 연동 활성화 중</span>
-                        </span>
-                        <p className="text-[10px] text-slate-500 font-mono select-all break-all leading-normal mt-1 bg-stone-50 p-2 rounded-lg border border-stone-200">
-                          ID: {spreadsheetId}<br/>
-                          URL: {appsScriptUrl}
-                        </p>
-                      </div>
-                    ) : spreadsheetId !== DEFAULT_SPREADSHEET_ID ? (
-                      <div className="p-3.5 bg-white rounded-2xl border border-emerald-100 flex flex-col gap-1 shadow-2xs text-xs">
-                        <span className="flex items-center gap-1.5 font-bold text-emerald-800">
-                          <Sparkles className="h-4 w-4 text-emerald-600 animate-pulse" />
-                          <span>실시간 구글 시트 연동 중 (공개 뷰어 모드)</span>
-                        </span>
-                        <p className="text-[10px] text-slate-500 font-mono select-all break-all leading-normal mt-1 bg-stone-50 p-2 rounded-lg border border-stone-200">
-                          ID: {spreadsheetId}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-3.5 bg-amber-50 border border-amber-200/60 rounded-2xl flex flex-col gap-1.5 shadow-2xs text-xs">
-                        <span className="flex items-center gap-1.5 font-bold text-amber-800">
-                          <AlertCircle className="h-4 w-4 text-amber-600" />
-                          <span>가상 데모 시연 모드 작동 중</span>
-                        </span>
-                        <p className="text-[10.5px] text-amber-700 leading-normal font-medium">
-                          교사용 설정에서 구글 시트를 등록하면, 우리 학교만의 실시간 데이터로 즉시 전환됩니다.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Action buttons grid */}
-                    <div className="grid grid-cols-3 gap-2.5 text-xs font-black">
-                      <button
-                        type="button"
-                        onClick={handleForceReload}
-                        className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all shadow-xs flex flex-col items-center justify-center gap-1.5 cursor-pointer text-center"
-                      >
-                        <span className="text-lg">🔄</span>
-                        <span className="text-[10.5px] tracking-tight">구글시트 갱신</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAdmin(true)}
-                        className="p-3 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl transition-all shadow-xs flex flex-col items-center justify-center gap-1.5 cursor-pointer text-center"
-                      >
-                        <span className="text-lg">⚙️</span>
-                        <span className="text-[10.5px] tracking-tight">연동 설정</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowGuide(true)}
-                        className="p-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl transition-all shadow-xs flex flex-col items-center justify-center gap-1.5 cursor-pointer text-center"
-                      >
-                        <span className="text-lg">📖</span>
-                        <span className="text-[10.5px] tracking-tight">학급 구축 가이드</span>
-                      </button>
-                    </div>
-
-                    {/* Reload or system feedback alerts */}
-                    {syncMessage && (
-                      <div className="p-3 bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl text-xs font-semibold flex items-center gap-1.5 animate-pulse">
-                        <Sparkles className="h-4 w-4 text-indigo-500 animate-ping" />
-                        <span>{syncMessage}</span>
-                      </div>
-                    )}
-
-                    {sheetLoadError && (
-                      <div className="p-4 bg-rose-55 border border-rose-250 text-rose-800 rounded-2xl text-xs space-y-2">
-                        <p className="font-extrabold text-rose-900 flex items-center gap-1.5">
-                          <AlertCircle className="h-4.5 w-4.5 text-rose-600 animate-bounce" />
-                          <span>시트 데이터 파싱 오류가 감지되었습니다.</span>
-                        </p>
-                        <div className="p-3 bg-white border border-rose-100 text-slate-700 rounded-xl leading-relaxed text-[11px] font-mono break-all font-semibold">
-                          {sheetLoadError}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Real-time Spreadsheet Data Inspector / Roster (guarded inside teacher panel) */}
-                  <div className="bg-white rounded-2xl border border-indigo-100 p-4 space-y-3 shadow-2xs">
-                    <div className="flex justify-between items-center pb-2 border-b border-stone-100">
-                      <span className="text-[11px] text-slate-500 font-extrabold flex items-center gap-1">
-                        📂 실시간 학생 인증대조표 (총 {authDb.length}명)
-                      </span>
-                      <span className="text-[9.5px] text-indigo-700 font-extrabold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-                        선생님 전용
-                      </span>
-                    </div>
-
-                    {authDb.length === 0 ? (
-                      <p className="text-stone-500 text-[11px] leading-relaxed">
-                        현재 등록된 학생이 없거나 데이터 수집 전입니다.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-100/60 leading-normal text-[10px] font-semibold">
-                          💡 학생의 비밀번호 분실 문의 시 아래 표에서 학번을 찾아 조립된 비밀번호를 알려주시면 됩니다.
-                        </p>
-                        <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 text-[11px] font-mono">
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {authDb.map((st, i) => (
-                              <div key={i} className="bg-stone-50 p-2 rounded-lg border border-stone-150 flex flex-col justify-between hover:border-indigo-300 transition-all font-sans">
-                                <span className="text-slate-800 font-bold text-[11.5px]">{st.name} ({st.studentId})</span>
-                                <span className="text-slate-600 font-semibold mt-1 text-[10.5px]">
-                                  비밀번호 : <strong className="text-indigo-600 font-extrabold bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded tracking-wide">{st.pin}</strong>
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Sandbox accounts helper (placed inside teacher dashboard so student doesn't see it) */}
-                  {spreadsheetId === DEFAULT_SPREADSHEET_ID && (
-                    <div className="bg-amber-50/60 border border-amber-200/60 rounded-2xl p-4 space-y-1.5 text-[11px] text-stone-600 animate-fade-in">
-                      <p className="font-extrabold text-amber-850">💡 가상 데모용 간이 테스트 계정 (비번):</p>
-                      <div className="font-mono space-y-1 pl-1 bg-white p-2.5 rounded-xl border border-amber-100">
-                        <p>• 계정 A: 학번 <strong>10101</strong> / 비밀번호 <strong>4821</strong> (항공서비스과)</p>
-                        <p>• 계정 B: 학번 <strong>10102</strong> / 비밀번호 <strong>1234</strong> (항공서비스과)</p>
-                        <p>• 계정 C: 학번 <strong>10201</strong> / 비밀번호 <strong>1234</strong> (부사관경영과)</p>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {/* Center Student Login Card */}
-              <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-8 space-y-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-600" />
-
-                <div className="space-y-2 text-center border-b border-slate-100 pb-5">
-                  <div className="flex justify-center mb-2">
-                    <div className="p-2.5 bg-emerald-50 rounded-2xl border border-emerald-100 text-emerald-600 shadow-xs animate-pulse inline-flex">
-                      <Sprout className="h-6 w-6" />
-                    </div>
-                  </div>
-                  <h2 className="text-2xl font-black tracking-tight text-stone-900 leading-tight">2026 Speed-Up 인비 타자 챌린지</h2>
-                  <p className="text-xs text-emerald-650 font-extrabold mt-1">
-                    디지털 읽걷쓰 성장 프로젝트
-                  </p>
-                  <p className="text-[11px] text-stone-400 leading-relaxed font-semibold mt-2">
-                    학급에서 전달받은 학번 5자리와 개인 비밀번호(생년월일 8자리)를 정확하게 입력하고 로그인해 주세요.
-                  </p>
-                </div>
-
-                <form onSubmit={handleStudentLogin} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
-                      <GraduationCap className="h-4 w-4 text-emerald-600" />
-                      학번 (5자리)
-                    </label>
-                    <input 
-                      type="text" 
-                      maxLength={5}
-                      placeholder="예: 10101"
-                      value={studentIdInput}
-                      onChange={(e) => setStudentIdInput(e.target.value.replace(/[^0-9]/g, ''))}
-                      className="w-full px-4 py-3 border border-emerald-105 rounded-2xl text-base font-mono tracking-wide placeholder:font-sans placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-stone-50/20"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
-                      <Lock className="h-4 w-4 text-emerald-600" />
-                      개인 비밀번호 / 생년월일 (8자리)
-                    </label>
-                    <input 
-                      type="password" 
-                      maxLength={8}
-                      placeholder="생년월일 8자리(예: 20080101)"
-                      value={pinInput}
-                      onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
-                      className="w-full px-4 py-3 border border-emerald-105 rounded-2xl text-base font-mono tracking-wide placeholder:font-sans placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-stone-50/20"
-                      required
-                    />
-                  </div>
-
-                  <button 
-                    type="submit"
-                    disabled={isAuthenticating}
-                    className="w-full bg-linear-to-r from-emerald-600 to-green-600 text-white font-extrabold py-3.5 px-4 rounded-2xl hover:brightness-105 active:scale-[0.99] transition-all text-sm cursor-pointer shadow-lg shadow-emerald-100/50 flex items-center justify-center gap-1.5"
-                  >
-                    <LogIn className="h-4.5 w-4.5" />
-                    {isAuthenticating ? '인증 매칭 연동 중...' : '챌린지 결과 조회 및 성장 대시보드 입장'}
-                  </button>
-                </form>
-
-                {authError && (
-                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-105 text-rose-700 flex flex-col gap-2 text-xs">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5 text-rose-600" />
-                      <div>
-                        <p className="font-extrabold text-rose-800">로그인에 실패하였습니다</p>
-                        <p className="text-[11.1px] text-rose-600 font-bold leading-relaxed mt-1">
-                          학번 정보 혹은 본인 비밀코드가 일치하지 않습니다. 올바른 5자리 학번과 비밀번호를 입력해주시고, 분실하였을 시 학급 담임 선생님께 대조 확인을 부탁해 주시기 바랍니다.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 🔗 Current Spreadsheet Connection Indicator */}
-                <div className="pt-4.5 border-t border-slate-100 flex flex-col gap-1.5 text-center text-[10.5px]">
-                  <span className="text-stone-400 font-bold tracking-tight flex items-center justify-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>실시간 연동 중인 구글 스프레드시트 문서 ID</span>
-                  </span>
-                  <p className="text-emerald-700 font-mono font-bold bg-emerald-55/40 px-2.5 py-1.5 rounded-xl border border-emerald-110/30 break-all select-all">
-                    {spreadsheetId}
-                  </p>
-                  {appsScriptUrl && (
-                    <p className="text-[9.5px] text-indigo-600/70 font-mono font-bold truncate" title={appsScriptUrl}>
-                      보안 연동망: Apps Script (GAS) 활성화 중
+                    <h2 className="text-2xl font-black tracking-tight text-stone-900 leading-tight">2026 Speed-Up 인비 타자 챌린지</h2>
+                    <p className="text-lg sm:text-xl text-emerald-655 font-extrabold mt-1.5 leading-snug">
+                      디지털 읽걷쓰 성장 프로젝트
                     </p>
-                  )}
-                </div>
-              </div>
+                  </div>
 
-            </div>
+                  <form onSubmit={handleStudentLogin} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
+                        <GraduationCap className="h-4 w-4 text-emerald-600" />
+                        학번 (5자리)
+                      </label>
+                      <input 
+                        type="text" 
+                        maxLength={5}
+                        placeholder="예: 10101"
+                        value={studentIdInput}
+                        onChange={(e) => setStudentIdInput(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="w-full px-4 py-3 border border-emerald-105 rounded-2xl text-base font-mono tracking-wide placeholder:font-sans placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-stone-50/20"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1">
+                        <Lock className="h-4 w-4 text-emerald-600" />
+                        개인 비밀번호 / 생년월일 (8자리)
+                      </label>
+                      <input 
+                        type="password" 
+                        maxLength={8}
+                        placeholder="생년월일 8자리(예: 20080101)"
+                        value={pinInput}
+                        onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="w-full px-4 py-3 border border-emerald-105 rounded-2xl text-base font-mono tracking-wide placeholder:font-sans placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-stone-50/20"
+                        required
+                      />
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={isAuthenticating}
+                      className="w-full bg-linear-to-r from-emerald-600 to-green-600 text-white font-extrabold py-3.5 px-4 rounded-2xl hover:brightness-105 active:scale-[0.99] transition-all text-sm cursor-pointer shadow-lg shadow-emerald-100/50 flex items-center justify-center gap-1.5"
+                    >
+                      <LogIn className="h-4.5 w-4.5" />
+                      {isAuthenticating ? '인증 매칭 연동 중...' : '내 기록 확인하기'}
+                    </button>
+                  </form>
+
+                  {authError && (
+                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-105 text-rose-700 flex flex-col gap-2 text-xs">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5 text-rose-600" />
+                        <div>
+                          <p className="font-extrabold text-rose-800">로그인에 실패하였습니다</p>
+                          <p className="text-[11.1px] text-rose-600 font-bold leading-relaxed mt-1">
+                            학번 정보 혹은 본인 비밀코드가 일치하지 않습니다. 올바른 5자리 학번 and 비밀번호를 입력해주시고, 분실하였을 시 학급 담임 선생님께 대조 확인을 부탁해 주시기 바랍니다.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 🔐 Teacher Login Quick Trigger Button replacing original Spreadsheet Connection Indicator */}
+                  <div className="pt-5 border-t border-slate-105 flex flex-col items-center justify-center gap-2">
+                    <p className="text-[10px] text-stone-400 font-bold">인비 타자 챌린지 교육용 원격 제어 체계</p>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setTeacherPasswordError(null);
+                        setTeacherPasswordInput('');
+                        setShowTeacherLogin(true);
+                      }}
+                      className="px-4.5 py-2.5 text-[11px] font-black text-slate-600 hover:text-indigo-700 bg-stone-55 hover:bg-indigo-50 border border-slate-200 rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs w-full"
+                    >
+                      <Lock className="h-4 w-4 text-slate-500" />
+                      선생님 전용 로그인 (원격 시각 진단)
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            )
           )}
 
           {/* 3. CORE PERSONAL PERFORMANCE DASHBOARD */}
