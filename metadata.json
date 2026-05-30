@@ -1,6 +1,6 @@
 {
   "name": "2006 Speed-up 인비 타자 챌린지",
-  "description": "구글 스프레드시트 기반의 고등학교 영어/한글 타자 기록 및 성장 분석 웹앱",
+  "description": "구글 스프레드시트 기반의 인비고 영어/한글 타자 기록 및 성장 분석 웹앱",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -76,10 +76,10 @@ export function cleanCodeValue(val: any): string {
  * 학번을 기반으로 학년과 학과(반 배정 규칙) 정보를 자동으로 추출하는 분석 함수
  * - 학번 5자리 기준: 1번째 자리 = 학년, 3번째 자리 = 반
  * - 반 배정 학과 정보:
- *   - 1,2반: 항공서비스과
- *   - 3,4반: 부사관경영과
- *   - 5,6반: SNS마케팅과
- *   - 7,8반: 콘텐츠디자인과
+ *   - 1,2반: 항공서비스
+ *   - 3,4반: 부사관경영
+ *   - 5,6반: SNS마케팅
+ *   - 7,8반: 콘텐츠디자인
  *   - 기타: 기타
  */
 export function parseStudentIdInfo(studentId: string): { grade: string; classNum: number; department: string } {
@@ -106,13 +106,13 @@ export function parseStudentIdInfo(studentId: string): { grade: string; classNum
 
   // 1,2반 -> 항공서비스과, 3,4반 -> 부사관경영과, 5,6반 -> SNS마케팅과, 7,8반 -> 콘텐츠디자인과
   if (classNum === 1 || classNum === 2) {
-    department = '항공서비스과';
+    department = '항공서비스';
   } else if (classNum === 3 || classNum === 4) {
-    department = '부사관경영과';
+    department = '부사관경영';
   } else if (classNum === 5 || classNum === 6) {
-    department = 'SNS마케팅과';
+    department = 'SNS마케팅';
   } else if (classNum === 7 || classNum === 8) {
-    department = '콘텐츠디자인과';
+    department = '콘텐츠디자인';
   } else {
     department = '기타';
   }
