@@ -500,7 +500,7 @@ export default function App() {
                         <div>
                           <p className="font-extrabold text-rose-800">로그인에 실패하였습니다</p>
                           <p className="text-[11.1px] text-rose-600 font-bold leading-relaxed mt-1">
-                            학번 정보 혹은 본인 비밀코드가 일치하지 않습니다. 올바른 5자리 학번 and 비밀번호를 입력해주시고, 분실하였을 시 학급 담임 선생님께 대조 확인을 부탁해 주시기 바랍니다.
+                            학번(5자리) 또는 생년월일(8자리)이 일치하지 않습니다. 로그인이 안될 경운 교육정보부로 문의하세요.
                           </p>
                         </div>
                       </div>
@@ -509,7 +509,7 @@ export default function App() {
 
                   {/* 🔐 Teacher Login Quick Trigger Button replacing original Spreadsheet Connection Indicator */}
                   <div className="pt-5 border-t border-slate-105 flex flex-col items-center justify-center gap-2">
-                    <p className="text-[10px] text-stone-400 font-bold">인비 타자 챌린지 교육용 원격 제어 체계</p>
+                    <p className="text-[10px] text-stone-400 font-bold">2026 인비 타자 챌린지 성장 기록 시스템</p>
                     <button 
                       type="button"
                       onClick={() => {
@@ -646,7 +646,7 @@ export default function App() {
             
             <div className="flex justify-between items-start">
               <div className="space-y-1">
-                <h3 className="text-base font-black text-stone-900 tracking-tight">선생님 본인 인증 로그인</h3>
+                <h3 className="text-base font-black text-stone-900 tracking-tight">선생님 인증 로그인</h3>
                 <p className="text-xs text-stone-400 font-semibold">관리 권한 소유자인지 패스워드를 요구합니다.</p>
               </div>
               <button 
@@ -668,7 +668,7 @@ export default function App() {
                 </label>
                 <input 
                   type="password" 
-                  placeholder="관리 암호 4자리를 입력하세요."
+                  placeholder="학교 비밀번호 4자리(한 번)를 입력하세요."
                   value={teacherPasswordInput}
                   onChange={(e) => setTeacherPasswordInput(e.target.value)}
                   className="w-full px-4 py-2.5 border border-slate-250 rounded-2xl text-base font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-stone-50/10"
@@ -687,7 +687,7 @@ export default function App() {
                 type="submit"
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 px-4 rounded-2xl transition-all text-xs cursor-pointer shadow-xs"
               >
-                교사용 설정 모드 진입하기 🔓
+                선생님 모드 진입하기 🔓
               </button>
             </form>
           </div>
