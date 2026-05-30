@@ -611,7 +611,7 @@ export default function App() {
         {/* FOOTER */}
         <footer className="w-full bg-white border-t border-slate-205 py-6 text-center text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center px-4 sm:px-8 gap-3">
           <p className="font-medium tracking-wide">
-            © 2026 School Typing Tracker. Created by Information Department.
+            Copyright © 2026 INBIGO. All rights reserved. | Version 1.0.0
           </p>
           <div className="flex gap-6">
             <div className="flex items-center gap-2">
