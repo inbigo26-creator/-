@@ -520,7 +520,7 @@ export default function App() {
                       className="px-4.5 py-2.5 text-[11px] font-black text-slate-600 hover:text-indigo-700 bg-stone-55 hover:bg-indigo-50 border border-slate-200 rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs w-full"
                     >
                       <Lock className="h-4 w-4 text-slate-500" />
-                      선생님 로그인 (데이터 분석 확인)
+                      선생님 로그인 (결과 통계 확인)
                     </button>
                   </div>
                 </div>
@@ -573,7 +573,7 @@ export default function App() {
                 <div className="space-y-6">
                   <StudentStatsCard 
                     stats={studentSession.englishStats} 
-                    title="영어 타자 성장 진척도" 
+                    title="영어 타자 성장 기록" 
                     type="english" 
                   />
                   
@@ -587,7 +587,7 @@ export default function App() {
                 <div className="space-y-6">
                   <StudentStatsCard 
                     stats={studentSession.koreanStats} 
-                    title="한글 타자 성장 진척도" 
+                    title="한글 타자 성장 기록" 
                     type="korean" 
                   />
 
@@ -647,7 +647,7 @@ export default function App() {
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <h3 className="text-base font-black text-stone-900 tracking-tight">선생님 로그인</h3>
-                <p className="text-xs text-stone-400 font-semibold">관리 권한 소유자인지 패스워드를 요구합니다.</p>
+                <p className="text-xs text-stone-400 font-semibold">학생들의 타자 결과 통계를 확인할 수 있습니다.</p>
               </div>
               <button 
                 onClick={() => {
@@ -668,7 +668,7 @@ export default function App() {
                 </label>
                 <input 
                   type="password" 
-                  placeholder="학교 비밀번호 4자리(한 번)"
+                  placeholder="학교 비밀번호 4자리"
                   value={teacherPasswordInput}
                   onChange={(e) => setTeacherPasswordInput(e.target.value)}
                   className="w-full px-4 py-2.5 border border-slate-250 rounded-2xl text-base font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-stone-50/10"
@@ -687,7 +687,7 @@ export default function App() {
                 type="submit"
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 px-4 rounded-2xl transition-all text-xs cursor-pointer shadow-xs"
               >
-                선생님 모드 진입하기 🔓
+                선생님 모드 들어가기 🔓
               </button>
             </form>
           </div>
