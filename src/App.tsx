@@ -26,6 +26,14 @@ import {
 import confetti from 'canvas-confetti';
 import { SCHOOL_APPS_SCRIPT_URL } from './config';
 
+const isExcludedStudentName = (name: string): boolean => {
+  if (!name) return false;
+  const n = name.trim();
+  return n.includes('(자퇴)') || n.includes('(위탁)') || n.includes('*');
+};
+
+const cleanStudentId = (id: string) => String(id || '').trim().replace(/[^0-9A-Za-z]/g, '');
+
 export default function App() {
   // Input fields
   const [studentIdInput, setStudentIdInput] = useState('');
@@ -89,6 +97,72 @@ export default function App() {
     setIsTeacher(false);
     localStorage.removeItem('is_teacher_authenticated');
   };
+
+  // 📋 Calculate student-level latest speed averages (excluding special status students) for school & grade comparison
+  const statsAverages = React.useMemo(() => {
+    // 1. Get unique student set from authDb
+    const studentMap = new Map<string, { studentId: string; name: string; grade: string }>();
+    authDb.forEach(s => {
+      const info = parseStudentIdInfo(s.studentId);
+      studentMap.set(cleanStudentId(s.studentId), {
+        studentId: s.studentId,
+        name: s.name,
+        grade: info.grade
+      });
+    });
+
+    const validStudents = Array.from(studentMap.values()).filter(s => !isExcludedStudentName(s.name));
+
+    // 2. Map latest Korean and English speeds
+    const studentsWithLatestSpeeds = validStudents.map(s => {
+      const cleanId = cleanStudentId(s.studentId);
+      
+      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanId)
+        .sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const engSpeed = sEng.length > 0 ? sEng[sEng.length - 1].speed : 0;
+
+      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanId)
+        .sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const korSpeed = sKor.length > 0 ? sKor[sKor.length - 1].speed : 0;
+
+      return {
+        ...s,
+        engSpeed,
+        korSpeed
+      };
+    });
+
+    // 3. Compute Korean Averages
+    const korSchoolCount = studentsWithLatestSpeeds.length;
+    const korSchoolAvg = korSchoolCount > 0 ? Math.round(studentsWithLatestSpeeds.reduce((sum, s) => sum + s.korSpeed, 0) / korSchoolCount) : 0;
+
+    const korGradeAvg: { [grade: string]: number } = { '1': 0, '2': 0, '3': 0 };
+    ['1', '2', '3'].forEach(g => {
+      const list = studentsWithLatestSpeeds.filter(s => s.grade === g);
+      korGradeAvg[g] = list.length > 0 ? Math.round(list.reduce((sum, s) => sum + s.korSpeed, 0) / list.length) : 0;
+    });
+
+    // 4. Compute English Averages
+    const engSchoolCount = studentsWithLatestSpeeds.length;
+    const engSchoolAvg = engSchoolCount > 0 ? Math.round(studentsWithLatestSpeeds.reduce((sum, s) => sum + s.engSpeed, 0) / engSchoolCount) : 0;
+
+    const engGradeAvg: { [grade: string]: number } = { '1': 0, '2': 0, '3': 0 };
+    ['1', '2', '3'].forEach(g => {
+      const list = studentsWithLatestSpeeds.filter(s => s.grade === g);
+      engGradeAvg[g] = list.length > 0 ? Math.round(list.reduce((sum, s) => sum + s.engSpeed, 0) / list.length) : 0;
+    });
+
+    return {
+      korean: {
+        schoolAverage: korSchoolAvg,
+        gradeAverage: korGradeAvg
+      },
+      english: {
+        schoolAverage: engSchoolAvg,
+        gradeAverage: engGradeAvg
+      }
+    };
+  }, [authDb, englishDb, koreanDb]);
 
   const handleTeacherLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -569,31 +643,35 @@ export default function App() {
               {/* Side by side stats */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 
-                {/* English */}
-                <div className="space-y-6">
-                  <StudentStatsCard 
-                    stats={studentSession.englishStats} 
-                    title="영어 타자 성장 기록" 
-                    type="english" 
-                  />
-                  
-                  <TypingChart 
-                    history={studentSession.englishStats.history} 
-                    type="english" 
-                  />
-                </div>
-
                 {/* Korean */}
                 <div className="space-y-6">
                   <StudentStatsCard 
                     stats={studentSession.koreanStats} 
                     title="한글 타자 성장 기록" 
                     type="korean" 
+                    gradeAverage={statsAverages.korean.gradeAverage[studentSession.grade || '1']}
+                    schoolAverage={statsAverages.korean.schoolAverage}
                   />
 
                   <TypingChart 
                     history={studentSession.koreanStats.history} 
                     type="korean" 
+                  />
+                </div>
+
+                {/* English */}
+                <div className="space-y-6">
+                  <StudentStatsCard 
+                    stats={studentSession.englishStats} 
+                    title="영어 타자 성장 기록" 
+                    type="english" 
+                    gradeAverage={statsAverages.english.gradeAverage[studentSession.grade || '1']}
+                    schoolAverage={statsAverages.english.schoolAverage}
+                  />
+                  
+                  <TypingChart 
+                    history={studentSession.englishStats.history} 
+                    type="english" 
                   />
                 </div>
 

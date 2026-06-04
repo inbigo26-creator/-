@@ -16,7 +16,13 @@ interface TeacherAnalyticsProps {
   spreadsheetId: string;
 }
 
-type ActiveTab = 'achievement' | 'monthly_snacks' | 'final_awards' | 'growth_trends' | 'integrated_stats';
+type ActiveTab = 'achievement' | 'class_rankings' | 'monthly_snacks' | 'final_awards' | 'growth_trends' | 'integrated_stats';
+
+const isExcludedStudentName = (name: string): boolean => {
+  if (!name) return false;
+  const n = name.trim();
+  return n.includes('(자퇴)') || n.includes('(위탁)') || n.includes('*');
+};
 
 interface Winner {
   studentId: string;
@@ -58,6 +64,24 @@ function getLevelColorBadge(points: number): string {
   if (points === 1) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
   return 'bg-stone-105 text-stone-500 border-stone-200';
 }
+
+const cleanStudentId = (id: string) => String(id || '').trim().replace(/[^0-9A-Za-z]/g, '');
+
+const isDeptMatch = (dbDept: string, targetDept: string) => {
+  if (!dbDept || !targetDept) return false;
+  const d = dbDept.trim();
+  const t = targetDept.trim();
+  if (d === t) return true;
+  
+  const simplify = (name: string) => {
+    if (name.includes('항공')) return '항공';
+    if (name.includes('부사관')) return '부사관';
+    if (name.includes('SNS') || name.includes('sns')) return 'SNS';
+    if (name.includes('콘텐츠') || name.includes('컨텐츠')) return '콘텐츠';
+    return name;
+  };
+  return simplify(d) === simplify(t);
+};
 
 export function TeacherAnalytics({ 
   authDb, 
@@ -140,13 +164,15 @@ export function TeacherAnalytics({
   // Evaluates every student's latest English and Korean speed & level
   const studentCertificates = useMemo(() => {
     return students.map(s => {
+      const isExcluded = isExcludedStudentName(s.name);
+      
       // Find latest English speed
-      const sEng = englishDb.filter(r => r.studentId === s.studentId)
+      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId))
         .sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
       const engSpeed = sEng.length > 0 ? sEng[sEng.length - 1].speed : 0;
       
       // Find latest Korean speed
-      const sKor = koreanDb.filter(r => r.studentId === s.studentId)
+      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId))
         .sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
       const korSpeed = sKor.length > 0 ? sKor[sKor.length - 1].speed : 0;
 
@@ -157,7 +183,7 @@ export function TeacherAnalytics({
 
       // Determine month of achieving this level
       let levelAchievedMonth = '-';
-      if (finalPoints > 0) {
+      if (finalPoints > 0 && !isExcluded) {
         for (const m of sortedMonths) {
           // English speed in or before month m
           const engRecsUpToM = sEng.filter(r => getMonthNumber(r.month) <= getMonthNumber(m));
@@ -184,14 +210,23 @@ export function TeacherAnalytics({
         korPoints,
         engPoints,
         finalPoints,
-        isCertified: finalPoints > 0,
-        levelAchievedMonth
+        isCertified: finalPoints > 0 && !isExcluded,
+        levelAchievedMonth,
+        isExcluded
       };
     });
   }, [students, englishDb, koreanDb, sortedMonths]);
 
   const availableDepts = useMemo(() => {
-    return Array.from(new Set(studentCertificates.map(s => s.department))).filter(Boolean);
+    const rawDepts = studentCertificates.map(s => s.department).filter(Boolean);
+    const normalized = rawDepts.map(d => {
+      if (d.includes('항공')) return '항공서비스';
+      if (d.includes('부사관')) return '부사관경영';
+      if (d.includes('SNS') || d.includes('sns')) return 'SNS마케팅';
+      if (d.includes('콘텐츠') || d.includes('컨텐츠')) return '콘텐츠디자인';
+      return d;
+    });
+    return Array.from(new Set(normalized));
   }, [studentCertificates]);
 
   const availableAchievementMonths = useMemo(() => {
@@ -208,7 +243,7 @@ export function TeacherAnalytics({
   const filteredStudents = useMemo(() => {
     return studentCertificates.filter(s => {
       if (filterGrade !== 'all' && s.grade !== filterGrade) return false;
-      if (filterDept !== 'all' && s.department !== filterDept) return false;
+      if (filterDept !== 'all' && !isDeptMatch(s.department, filterDept)) return false;
       if (filterMonth !== 'all') {
         if (filterMonth === '미달') {
           if (s.levelAchievedMonth !== '-') return false;
@@ -228,24 +263,25 @@ export function TeacherAnalytics({
 
   // 🟠 AGGREGATES: SCHOOL, GRADE AND DEPARTMENT STATISTICS
   const aggregateStats = useMemo(() => {
-    const totalCount = studentCertificates.length;
-    const certifiedCount = studentCertificates.filter(s => s.isCertified).length;
+    const validStudents = studentCertificates.filter(s => !s.isExcluded);
+    const totalCount = validStudents.length;
+    const certifiedCount = validStudents.filter(s => s.isCertified).length;
     const certRate = totalCount > 0 ? parseFloat(((certifiedCount / totalCount) * 100).toFixed(1)) : 0;
 
     // School level counts
-    const level1Count = studentCertificates.filter(s => s.finalPoints === 3).length;
-    const level2Count = studentCertificates.filter(s => s.finalPoints === 2).length;
-    const level3Count = studentCertificates.filter(s => s.finalPoints === 1).length;
+    const level1Count = validStudents.filter(s => s.finalPoints === 3).length;
+    const level2Count = validStudents.filter(s => s.finalPoints === 2).length;
+    const level3Count = validStudents.filter(s => s.finalPoints === 1).length;
     const failCount = totalCount - certifiedCount;
 
     // Averages
-    const avgKor = totalCount > 0 ? Math.round(studentCertificates.reduce((sum, s) => sum + s.korSpeed, 0) / totalCount) : 0;
-    const avgEng = totalCount > 0 ? Math.round(studentCertificates.reduce((sum, s) => sum + s.engSpeed, 0) / totalCount) : 0;
+    const avgKor = totalCount > 0 ? Math.round(validStudents.reduce((sum, s) => sum + s.korSpeed, 0) / totalCount) : 0;
+    const avgEng = totalCount > 0 ? Math.round(validStudents.reduce((sum, s) => sum + s.engSpeed, 0) / totalCount) : 0;
 
     // Grade comparison
     const grades = ['1', '2', '3'];
     const gradeStats = grades.map(g => {
-      const list = studentCertificates.filter(s => s.grade === g);
+      const list = validStudents.filter(s => s.grade === g);
       const total = list.length;
       const certified = list.filter(s => s.isCertified).length;
       const rate = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
@@ -255,9 +291,15 @@ export function TeacherAnalytics({
     });
 
     // Department comparison
-    const depts = Array.from(new Set(studentCertificates.map(s => s.department))).filter(Boolean);
+    const depts = Array.from(new Set(validStudents.map(s => {
+      if (s.department.includes('항공')) return '항공서비스';
+      if (s.department.includes('부사관')) return '부사관경영';
+      if (s.department.includes('SNS') || s.department.includes('sns')) return 'SNS마케팅';
+      if (s.department.includes('콘텐츠') || s.department.includes('컨텐츠')) return '콘텐츠디자인';
+      return s.department;
+    }))).filter(Boolean) as string[];
     const deptStats = depts.map(d => {
-      const list = studentCertificates.filter(s => s.department === d);
+      const list = validStudents.filter(s => isDeptMatch(s.department, d));
       const total = list.length;
       const certified = list.filter(s => s.isCertified).length;
       const rate = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
@@ -268,7 +310,7 @@ export function TeacherAnalytics({
 
     // 🏆 Class-level Unified rankings: Grade & Dept combinations (3 Grades * 4 Main Departments = 12 combinations)
     const activeGrades = ['1', '2', '3'];
-    const activeDepts = ['항공과', '부사관과', 'SNS과', '콘텐츠과'];
+    const activeDepts = ['항공서비스', '부사관경영', 'SNS마케팅', '콘텐츠디자인'];
     const classCombinedStats: {
       grade: string;
       department: string;
@@ -282,7 +324,7 @@ export function TeacherAnalytics({
 
     activeGrades.forEach(g => {
       activeDepts.forEach(d => {
-        const list = studentCertificates.filter(s => s.grade === g && s.department === d);
+        const list = validStudents.filter(s => s.grade === g && isDeptMatch(s.department, d));
         const total = list.length;
         const certified = list.filter(s => s.isCertified).length;
         const rateVal = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
@@ -305,8 +347,11 @@ export function TeacherAnalytics({
     // Sort combinations by rate descending, and then by total count as fallback order
     classCombinedStats.sort((a, b) => b.rate - a.rate || b.total - a.total || a.displayName.localeCompare(b.displayName));
 
+    const korRankings = [...classCombinedStats].sort((a, b) => b.korSpeedAvg - a.korSpeedAvg || b.total - a.total);
+    const engRankings = [...classCombinedStats].sort((a, b) => b.engSpeedAvg - a.engSpeedAvg || b.total - a.total);
+
     // ③ FAILURE REASON ANALYTICS (Bottlenecks)
-    const fails = studentCertificates.filter(s => !s.isCertified);
+    const fails = validStudents.filter(s => !s.isCertified);
     const totalFails = fails.length;
     
     // Bottleneck 1: English-only fail (Korean is dynamic certified >= 150, but English is < 100)
@@ -333,6 +378,8 @@ export function TeacherAnalytics({
       gradeStats,
       deptStats,
       combinedStats: classCombinedStats,
+      korRankings,
+      engRankings,
       bottleneck: {
         korCount: korBottleneckCount,
         engCount: engBottleneckCount,
@@ -394,7 +441,7 @@ export function TeacherAnalytics({
       if (prevMonthName) {
         const korPrev = koreanDb.filter(r => r.month === prevMonthName);
         korThisMonth.forEach(curr => {
-          const prev = korPrev.find(p => p.studentId === curr.studentId);
+          const prev = korPrev.find(p => cleanStudentId(p.studentId) === cleanStudentId(curr.studentId));
           if (prev) {
             const diff = curr.speed - prev.speed;
             if (diff > 0) {
@@ -416,7 +463,7 @@ export function TeacherAnalytics({
       if (prevMonthName) {
         const engPrev = englishDb.filter(r => r.month === prevMonthName);
         engThisMonth.forEach(curr => {
-          const prev = engPrev.find(p => p.studentId === curr.studentId);
+          const prev = engPrev.find(p => cleanStudentId(p.studentId) === cleanStudentId(curr.studentId));
           if (prev) {
             const diff = curr.speed - prev.speed;
             if (diff > 0) {
@@ -433,15 +480,17 @@ export function TeacherAnalytics({
       }
       rawEngGrowthCandidates.sort((a,b) => b.value - a.value);
 
-      // Selection logic prioritizing Top-1 for Speed (Kor/Eng) and Top-2 for Growth (Kor/Eng)
-      // total = 6 students. Avoid duplicating any student *within* this month + *across prior months*.
+      // Selection logic prioritizing Top-1 for Speed (Kor/Eng) and Top-1 for Growth (Kor/Eng) per Grade (1, 2, 3)
+      // total = up to 12 students. Avoid duplicating any student *within* this month + *across prior months*.
       const selectedWinners: typeof historyMap[string]['winners'] = [];
       const localSelectedSet = new Set<string>();
 
-      const trySelectWinner = (list: Winner[], numToTake: number, reasonTag: string) => {
-        let count = 0;
+      const trySelectWinnerForGrade = (list: Winner[], gradeVal: string, reasonTag: string) => {
         for (let i = 0; i < list.length; i++) {
           const s = list[i];
+          if (String(s.grade) !== String(gradeVal)) continue;
+          if (isExcludedStudentName(s.name)) continue;
+
           // Filter out if they won in past months or are already selected this month
           if (!cumulativeSnackWinners.has(s.studentId) && !localSelectedSet.has(s.studentId)) {
             selectedWinners.push({
@@ -449,29 +498,39 @@ export function TeacherAnalytics({
               name: s.name,
               department: s.department,
               grade: s.grade,
-              reason: `${reasonTag} ${count + 1}위`,
+              reason: `${gradeVal}학년 ${reasonTag}`,
               value: s.value
             });
             localSelectedSet.add(s.studentId);
             cumulativeSnackWinners.add(s.studentId);
-            count++;
-            if (count >= numToTake) break;
+            break; // selected 1 for this grade & category combination, we are done
           }
         }
       };
 
       // Select chronologically:
-      // A. Korean Speed Top 1
-      trySelectWinner(rawKorSpeedCandidates, 1, '한글 타자 최고 속도');
-      // B. English Speed Top 1
-      trySelectWinner(rawEngSpeedCandidates, 1, '영어 타자 최고 속도');
-      // C. Korean Growth Top 2 (only if June onwards)
+      // A. Korean Speed (학년별 1명씩 = 총 3명)
+      ['1', '2', '3'].forEach(g => {
+        trySelectWinnerForGrade(rawKorSpeedCandidates, g, '한글 최고 속도');
+      });
+
+      // B. English Speed (학년별 1명씩 = 총 3명)
+      ['1', '2', '3'].forEach(g => {
+        trySelectWinnerForGrade(rawEngSpeedCandidates, g, '영어 최고 속도');
+      });
+
+      // C. Korean Growth (6월부터 학년별 1명씩 = 총 3명)
       if (prevMonthName) {
-        trySelectWinner(rawKorGrowthCandidates, 2, '한글 타자 최고 향상');
+        ['1', '2', '3'].forEach(g => {
+          trySelectWinnerForGrade(rawKorGrowthCandidates, g, '한글 최고 향상도');
+        });
       }
-      // D. English Growth Top 2 (only if June onwards)
+
+      // D. English Growth (6월부터 학년별 1명씩 = 총 3명)
       if (prevMonthName) {
-        trySelectWinner(rawEngGrowthCandidates, 2, '영어 타자 최고 향상');
+        ['1', '2', '3'].forEach(g => {
+          trySelectWinnerForGrade(rawEngGrowthCandidates, g, '영어 최고 향상도');
+        });
       }
 
       historyMap[month] = {
@@ -500,8 +559,8 @@ export function TeacherAnalytics({
     const engGrowths: typeof korSpeeds = [];
 
     studentIds.forEach(sid => {
-      const sKor = koreanDb.filter(r => r.studentId === sid).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
-      const sEng = englishDb.filter(r => r.studentId === sid).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(sid)).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(sid)).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
 
       if (sKor.length > 0) {
         const maxVal = Math.max(...sKor.map(r => r.speed));
@@ -556,11 +615,26 @@ export function TeacherAnalytics({
       }
     });
 
+    const getTopPerGrade = (list: typeof korSpeeds) => {
+      const result: typeof korSpeeds = [];
+      const grades = ['1', '2', '3'];
+      grades.forEach(g => {
+        const sortedForGrade = list
+          .filter(s => String(s.grade) === String(g) && !isExcludedStudentName(s.name))
+          .sort((a, b) => b.value - a.value);
+        if (sortedForGrade.length > 0) {
+          result.push(sortedForGrade[0]);
+        }
+      });
+      // Sort the final 3 winners by grade ascending
+      return result.sort((a, b) => a.grade.localeCompare(b.grade));
+    };
+
     return {
-      korSpeed: korSpeeds.sort((a,b) => b.value - a.value).slice(0, 3),
-      engSpeed: engSpeeds.sort((a,b) => b.value - a.value).slice(0, 3),
-      korGrowth: korGrowths.sort((a,b) => b.value - a.value).slice(0, 3),
-      engGrowth: engGrowths.sort((a,b) => b.value - a.value).slice(0, 3)
+      korSpeed: getTopPerGrade(korSpeeds),
+      engSpeed: getTopPerGrade(engSpeeds),
+      korGrowth: getTopPerGrade(korGrowths),
+      engGrowth: getTopPerGrade(engGrowths)
     };
   }, [englishDb, koreanDb]);
 
@@ -592,7 +666,8 @@ export function TeacherAnalytics({
       const db = lang === 'english' ? englishDb : koreanDb;
       const filtered = db.filter(r => 
         r.grade === grade && 
-        r.department === dept && 
+        !isExcludedStudentName(r.name) &&
+        isDeptMatch(r.department, dept) && 
         getMonthNumber(r.month) === getMonthNumber(mStr)
       );
       if (filtered.length === 0) return 0;
@@ -604,6 +679,7 @@ export function TeacherAnalytics({
       const db = lang === 'english' ? englishDb : koreanDb;
       const filtered = db.filter(r => 
         r.grade === grade && 
+        !isExcludedStudentName(r.name) &&
         getMonthNumber(r.month) === getMonthNumber(mStr)
       );
       if (filtered.length === 0) return 0;
@@ -614,6 +690,7 @@ export function TeacherAnalytics({
     const flexOverallAverage = (lang: 'english' | 'korean', mStr: string) => {
       const db = lang === 'english' ? englishDb : koreanDb;
       const filtered = db.filter(r => 
+        !isExcludedStudentName(r.name) &&
         getMonthNumber(r.month) === getMonthNumber(mStr)
       );
       if (filtered.length === 0) return 0;
@@ -729,6 +806,18 @@ export function TeacherAnalytics({
         >
           <BarChart2 className="h-4 w-4" />
           <span>기본 분석 & 급수 수집</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('class_rankings')}
+          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
+            activeTab === 'class_rankings' 
+              ? 'border-indigo-600 text-indigo-600' 
+              : 'border-transparent text-stone-400 hover:text-stone-700'
+          }`}
+        >
+          <Trophy className="h-4 w-4 text-purple-600" />
+          <span>각 반별 통합 수련 랭킹</span>
         </button>
 
         <button
@@ -853,185 +942,124 @@ export function TeacherAnalytics({
 
               </div>
 
-              {/* Grid 2 Column: Left Grade/Dept Rates | Right Failure Reasons */}
+              {/* Grid 2 Column: Left Bottleneck | Right Level Distribution */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                {/* 1. Grade & Department Combined Rankings (12 Categories) */}
-                <div className="space-y-6">
-                  
-                  {/* 통합 학년/학과별 12개 분류 랭킹 보드 */}
-                  <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-4 shadow-2xs">
-                    <div className="flex justify-between items-center pb-2 border-b border-stone-100">
-                      <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
-                        <Trophy className="h-4 w-4 text-amber-500 animate-bounce" />
-                        학년·학과별 통합 수련 랭킹 (12클래스 전체 순위)
-                      </h4>
-                      <span className="text-[9.5px] bg-indigo-50 text-indigo-750 border border-indigo-100 px-2.5 py-1 rounded-lg font-bold">달성률 기준 정렬</span>
-                    </div>
-
-                    <div className="divide-y divide-stone-100 max-h-[460px] overflow-y-auto pr-1 space-y-2.5">
-                      {aggregateStats.combinedStats.map((item, idx) => {
-                        const medalEmoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
-                        
-                        return (
-                          <div key={idx} className="pt-2.5 first:pt-0 space-y-1">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="flex items-center gap-1.5">
-                                <span className={`w-5 h-5 rounded-md border text-[10px] font-black flex items-center justify-center ${
-                                  idx === 0 ? 'bg-amber-100 border-amber-200 text-amber-850' : 
-                                  idx === 1 ? 'bg-slate-100 border-slate-200 text-slate-750' : 
-                                  idx === 2 ? 'bg-orange-50 border-orange-100 text-orange-750' : 
-                                  'bg-stone-50 border-stone-150 text-stone-600'
-                                }`}>
-                                  {idx + 1}
-                                </span>
-                                <span className="font-extrabold text-stone-800 text-[12.5px]">
-                                  {item.displayName} {medalEmoji}
-                                </span>
-                              </span>
-                              <span className="font-mono font-extrabold text-indigo-700 bg-indigo-50/50 px-2 py-0.5 rounded border border-indigo-100/50">
-                                {item.rate}% 인증 <span className="text-stone-400 font-normal">({item.certified}/{item.total}명)</span>
-                              </span>
-                            </div>
-
-                            <div className="h-2 w-full bg-slate-50 border border-slate-100 rounded-full overflow-hidden flex">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  idx === 0 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
-                                  idx === 1 ? 'bg-gradient-to-r from-slate-400 to-slate-500' :
-                                  idx === 2 ? 'bg-gradient-to-r from-orange-400 to-orange-500' :
-                                  'bg-indigo-600/80'
-                                }`} 
-                                style={{ width: `${item.rate}%` }}
-                              />
-                            </div>
-
-                            <div className="flex justify-between text-[10px] text-stone-450 font-mono pl-6">
-                              <span>한영 평균 타수: {item.korSpeedAvg}타 / {item.engSpeedAvg}타</span>
-                              <span className="text-[9px] font-sans text-stone-400">총 {item.total}명</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                {/* Left Column: Failure bottleneck analysis */}
+                <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-6 shadow-2xs">
+                  <div className="pb-2 border-b border-stone-100 flex justify-between items-center">
+                    <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4 text-rose-500 animate-pulse" />
+                      인증서 미달성 요인 추이 분석 (Bottleneck)
+                    </h4>
+                    <span className="text-[10px] font-bold text-rose-650 bg-rose-50 px-2 py-0.5 rounded-lg">미달성자 {aggregateStats.bottleneck.totalFails}명 정밀 진단</span>
                   </div>
 
-                </div>
-
-                {/* 2. Bottlenecks & Certified Stats */}
-                <div className="space-y-6">
-                  
-                  {/* Failure bottleneck analysis (낙제점 비율 추이 요인 분석) */}
-                  <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-6 shadow-2xs">
-                    <div className="pb-2 border-b border-stone-100 flex justify-between items-center">
-                      <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
-                        <AlertCircle className="h-4 w-4 text-rose-500 animate-pulse" />
-                        인증서 미달성 요인 추이 분석 (Bottleneck)
-                      </h4>
-                      <span className="text-[10px] font-bold text-rose-650 bg-rose-50 px-2 py-0.5 rounded-lg">미달성자 {aggregateStats.bottleneck.totalFails}명 정밀 진단</span>
+                  {aggregateStats.bottleneck.totalFails === 0 ? (
+                    <div className="text-center py-10 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-6">
+                      <Flame className="h-8 w-8 text-emerald-600 mx-auto mb-2 animate-bounce" />
+                      <h4 className="text-xs font-black text-emerald-800">훈련 낙제생 전원 극복!</h4>
+                      <p className="text-[11.5px] text-emerald-600 mt-1 leading-relaxed">
+                        현재 전체 활성 학생이 한문 및 영문 자격 인증인 최저 3급 수준을 동시 만족하고 있습니다.
+                      </p>
                     </div>
-
-                    {aggregateStats.bottleneck.totalFails === 0 ? (
-                      <div className="text-center py-10 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-6">
-                        <Flame className="h-8 w-8 text-emerald-600 mx-auto mb-2 animate-bounce" />
-                        <h4 className="text-xs font-black text-emerald-800">훈련 낙제생 전원 극복!</h4>
-                        <p className="text-[11.5px] text-emerald-600 mt-1 leading-relaxed">
-                          현재 전체 활성 학생이 한문 및 영문 자격 인증인 최저 3급 수준을 동시 만족하고 있습니다.
+                  ) : (
+                    <div className="space-y-5">
+                      
+                      {/* Summary Insight */}
+                      <div className="p-3.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs space-y-1">
+                        <span className="font-extrabold text-stone-850 flex items-center gap-1.5">
+                          <Lightbulb className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                          훈련 교사 보고용 분석 리포트
+                        </span>
+                        <p className="text-[11.1px] text-stone-600 font-medium leading-relaxed">
+                          {(() => {
+                            const b = aggregateStats.bottleneck;
+                            if (b.engRate > b.korRate && b.engRate > b.bothRate) {
+                              return `인비고 미달성 학생의 무려 ${b.engRate}%가 '영어 타수 부족'으로 인해 인증서를 입수하지 못하고 있습니다. 영어 단어 및 문장 타자 훈련 기회를 30% 늘릴 유도가 필요합니다.`;
+                            } else if (b.korRate > b.engRate && b.korRate > b.bothRate) {
+                              return `인비고 미달성 학생의 ${b.korRate}%가 '한글 타수 미충족'이 병목이며, 한자 및 장문 타이핑 정석 운지법 보충이 지목됩니다.`;
+                            } else {
+                              return `다수의 학생(${b.bothRate}%)이 한글과 영어 타자 모두에서 최저 수련 등급(100/150타)을 도달하지 못해, 포괄적 기초 타자 집중 훈련이 요청됩니다.`;
+                            }
+                          })()}
                         </p>
                       </div>
-                    ) : (
-                      <div className="space-y-5">
+
+                      {/* Progress bars of bottlenecks */}
+                      <div className="space-y-4">
                         
-                        {/* Summary Insight */}
-                        <div className="p-3.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs space-y-1">
-                          <span className="font-extrabold text-stone-850 flex items-center gap-1.5">
-                            <Lightbulb className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                            훈련 교사 보고용 분석 리포트
-                          </span>
-                          <p className="text-[11.1px] text-stone-600 font-medium leading-relaxed">
-                            {(() => {
-                              const b = aggregateStats.bottleneck;
-                              if (b.engRate > b.korRate && b.engRate > b.bothRate) {
-                                return `인비고 미달성 학생의 무려 ${b.engRate}%가 '영어 타수 부족'으로 인해 인증서를 입수하지 못하고 있습니다. 영어 단어 및 문장 타자 훈련 기회를 30% 늘릴 유도가 필요합니다.`;
-                              } else if (b.korRate > b.engRate && b.korRate > b.bothRate) {
-                                return `인비고 미달성 학생의 ${b.korRate}%가 '한글 타수 미충족'이 병목이며, 한자 및 장문 타이핑 정석 운지법 보충이 지목됩니다.`;
-                              } else {
-                                return `다수의 학생(${b.bothRate}%)이 한글과 영어 타자 모두에서 최저 수련 등급(100/150타)을 도달하지 못해, 포괄적 기초 타자 집중 훈련이 요청됩니다.`;
-                              }
-                            })()}
-                          </p>
+                        {/* English fail bottle */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                            <span>영어 타수만 미달 (영어 병목형)</span>
+                            <span className="font-mono text-rose-600">{aggregateStats.bottleneck.engRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.engCount}명)</span></span>
+                          </div>
+                          <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-rose-500 rounded-full" style={{ width: `${aggregateStats.bottleneck.engRate}%` }} />
+                          </div>
+                          <p className="text-[10px] text-stone-400">한글은 3급 이상(150타+) 달성했으나 영어 최저 기준(100타) 미달</p>
                         </div>
 
-                        {/* Progress bars of bottlenecks */}
-                        <div className="space-y-4">
-                          
-                          {/* English fail bottle */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                              <span>영어 타수만 미달 (영어 병목형)</span>
-                              <span className="font-mono text-rose-600">{aggregateStats.bottleneck.engRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.engCount}명)</span></span>
-                            </div>
-                            <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-rose-500 rounded-full" style={{ width: `${aggregateStats.bottleneck.engRate}%` }} />
-                            </div>
-                            <p className="text-[10px] text-stone-400">한글은 3급 이상(150타+) 달성했으나 영어 최저 기준(100타) 미달</p>
+                        {/* Korean fail bottle */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                            <span>한글 타수만 미달 (한글 병목형)</span>
+                            <span className="font-mono text-rose-600">{aggregateStats.bottleneck.korRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.korCount}명)</span></span>
                           </div>
-
-                          {/* Korean fail bottle */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                              <span>한글 타수만 미달 (한글 병목형)</span>
-                              <span className="font-mono text-rose-600">{aggregateStats.bottleneck.korRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.korCount}명)</span></span>
-                            </div>
-                            <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${aggregateStats.bottleneck.korRate}%` }} />
-                            </div>
-                            <p className="text-[10px] text-stone-400">영어는 3급 이상(100타+) 달성했으나 한글 최저 기준(150타) 미달</p>
+                          <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${aggregateStats.bottleneck.korRate}%` }} />
                           </div>
+                          <p className="text-[10px] text-stone-400">영어는 3급 이상(100타+) 달성했으나 한글 최저 기준(150타) 미달</p>
+                        </div>
 
-                          {/* Both fail bottle */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                              <span>한글/영어 모두 미달 (복합 누적 요인)</span>
-                              <span className="font-mono text-rose-600">{aggregateStats.bottleneck.bothRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.bothCount}명)</span></span>
-                            </div>
-                            <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-stone-400 rounded-full" style={{ width: `${aggregateStats.bottleneck.bothRate}%` }} />
-                            </div>
-                            <p className="text-[10px] text-stone-400">한글(150타 미만) 및 영어(100타 미만) 둘 다 최저 미충족</p>
+                        {/* Both fail bottle */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                            <span>한글/영어 모두 미달 (복합 누적 요인)</span>
+                            <span className="font-mono text-rose-600">{aggregateStats.bottleneck.bothRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.bothCount}명)</span></span>
                           </div>
-
+                          <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-stone-400 rounded-full" style={{ width: `${aggregateStats.bottleneck.bothRate}%` }} />
+                          </div>
+                          <p className="text-[10px] text-stone-400">한글(150타 미만) 및 영어(100타 미만) 둘 다 최저 미충족</p>
                         </div>
 
                       </div>
-                    )}
-                  </div>
 
-                  {/* Level Distribution Ratios Card */}
-                  <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-4 shadow-2xs">
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Level Distribution Ratios Card */}
+                <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-4 shadow-2xs flex flex-col justify-between">
+                  <div className="space-y-4">
                     <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase pb-2 border-b border-stone-100">
                       인비 챌린지 최종 자격급수 보유 통계
                     </h4>
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                      <div className="p-3 bg-rose-50 border border-slate-100 rounded-xl animate-fade-in">
-                        <span className="text-[10.5px] font-bold text-rose-600 block">1급 인증 🥇</span>
-                        <span className="text-lg font-black text-rose-800 font-mono mt-0.5 inline-block">{aggregateStats.level1Count}명</span>
+                    <div className="grid grid-cols-2 gap-3 text-center">
+                      <div className="p-4 bg-rose-50 border border-slate-100 rounded-2xl animate-fade-in">
+                        <span className="text-[11px] font-bold text-rose-600 block">1급 인증 🥇</span>
+                        <span className="text-2xl font-black text-rose-800 font-mono mt-0.5 inline-block">{aggregateStats.level1Count}명</span>
                       </div>
-                      <div className="p-3 bg-amber-50 border border-slate-100 rounded-xl animate-fade-in">
-                        <span className="text-[10.5px] font-bold text-amber-600 block">2급 인증 🥈</span>
-                        <span className="text-lg font-black text-amber-800 font-mono mt-0.5 inline-block">{aggregateStats.level2Count}명</span>
+                      <div className="p-4 bg-amber-50 border border-slate-100 rounded-2xl animate-fade-in">
+                        <span className="text-[11px] font-bold text-amber-600 block">2급 인증 🥈</span>
+                        <span className="text-2xl font-black text-amber-800 font-mono mt-0.5 inline-block">{aggregateStats.level2Count}명</span>
                       </div>
-                      <div className="p-3 bg-emerald-50 border border-slate-100 rounded-xl animate-fade-in">
-                        <span className="text-[10.5px] font-bold text-emerald-600 block">3급 인증 🥉</span>
-                        <span className="text-lg font-black text-emerald-800 font-mono mt-0.5 inline-block">{aggregateStats.level3Count}명</span>
+                      <div className="p-4 bg-emerald-50 border border-slate-100 rounded-2xl animate-fade-in">
+                        <span className="text-[11px] font-bold text-emerald-600 block">3급 인증 🥉</span>
+                        <span className="text-2xl font-black text-emerald-800 font-mono mt-0.5 inline-block">{aggregateStats.level3Count}명</span>
                       </div>
-                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl animate-fade-in">
-                        <span className="text-[10.5px] font-bold text-slate-550 block">급수 없음 🚫</span>
-                        <span className="text-lg font-black text-slate-700 font-mono mt-0.5 inline-block">{aggregateStats.failCount}명</span>
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl animate-fade-in">
+                        <span className="text-[11px] font-bold text-slate-550 block">급수 없음 🚫</span>
+                        <span className="text-2xl font-black text-slate-700 font-mono mt-0.5 inline-block">{aggregateStats.failCount}명</span>
                       </div>
                     </div>
                   </div>
 
+                  <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl text-[11px] text-indigo-850 font-medium leading-relaxed font-sans mt-4">
+                    💡 <strong>인증 달성 팁:</strong> 학생들의 한글 타수와 영어 타수 모두가 자격 기준을 통과해야 인증서가 정상 발급됩니다. 미달 요인 학생들을 파악하여 지도해 보세요.
+                  </div>
                 </div>
 
               </div>
@@ -1213,6 +1241,126 @@ export function TeacherAnalytics({
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* 👑 TAB: GRADE & DEPT CLASS RANKINGS (한글/영어 따로 정렬) */}
+          {activeTab === 'class_rankings' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-amber-50/50 border border-amber-200/65 rounded-2xl p-5 space-y-2 text-xs">
+                <span className="font-black text-amber-850 flex items-center gap-1.5 uppercase">
+                  <Trophy className="h-4 w-4 text-amber-600 animate-bounce" />
+                  ★ 학년·학과별 평균 타수 기준 랭킹 정렬 안내
+                </span>
+                <p className="text-[11.2px] text-amber-800 font-medium leading-relaxed">
+                  학년·학과별 평균 타수(한글/영어 개별 정렬) 기준 순위입니다. 평균속도가 높은 학과가 상위에 정렬됩니다.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* 1. Korean Rankings (Purple) */}
+                <div className="bg-white rounded-2xl border border-purple-200 p-6 space-y-4 shadow-2xs">
+                  <div className="flex justify-between items-center pb-2 border-b border-purple-100">
+                    <h4 className="text-sm font-black text-purple-900 tracking-wider uppercase flex items-center gap-1.5">
+                      <Trophy className="h-4 w-4 text-purple-600" />
+                      한글 타자 학급 순위 (평균속도 기준)
+                    </h4>
+                  </div>
+
+                  <div className="divide-y divide-purple-100 max-h-[500px] overflow-y-auto pr-1 space-y-2.5">
+                    {aggregateStats.korRankings.map((item, idx) => {
+                      const medalEmoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+                      return (
+                        <div key={idx} className="pt-2.5 first:pt-0 space-y-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="flex items-center gap-1.5">
+                              <span className={`w-5 h-5 rounded-md border text-[10px] font-black flex items-center justify-center ${
+                                idx === 0 ? 'bg-purple-100 border-purple-200 text-purple-800' : 
+                                idx === 1 ? 'bg-slate-100 border-slate-200 text-slate-750' : 
+                                idx === 2 ? 'bg-orange-50 border-orange-100 text-orange-750' : 
+                                'bg-stone-50 border-stone-150 text-stone-600'
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <span className="font-extrabold text-stone-850 text-[12.5px]">
+                                {item.displayName} {medalEmoji}
+                              </span>
+                            </span>
+                            <span className="font-mono font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                              평균: {item.korSpeedAvg}타
+                            </span>
+                          </div>
+
+                          <div className="h-2 w-full bg-slate-50 border border-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 bg-purple-600`} 
+                              style={{ width: `${Math.min(100, (item.korSpeedAvg / 450) * 100)}%` }}
+                            />
+                          </div>
+
+                          <div className="flex justify-between text-[10px] text-stone-450 font-mono pl-6">
+                            <span>인증학생: {item.certified}명 / 총 {item.total}명</span>
+                            <span>인증 비율: {item.rate}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. English Rankings (Indigo) */}
+                <div className="bg-white rounded-2xl border border-indigo-200 p-6 space-y-4 shadow-2xs">
+                  <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
+                    <h4 className="text-sm font-black text-indigo-900 tracking-wider uppercase flex items-center gap-1.5">
+                      <Trophy className="h-4 w-4 text-indigo-600" />
+                      영어 타자 학급 순위 (평균속도 기준)
+                    </h4>
+                  </div>
+
+                  <div className="divide-y divide-indigo-100 max-h-[500px] overflow-y-auto pr-1 space-y-2.5">
+                    {aggregateStats.engRankings.map((item, idx) => {
+                      const medalEmoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+                      return (
+                        <div key={idx} className="pt-2.5 first:pt-0 space-y-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="flex items-center gap-1.5">
+                              <span className={`w-5 h-5 rounded-md border text-[10px] font-black flex items-center justify-center ${
+                                idx === 0 ? 'bg-indigo-100 border-indigo-200 text-indigo-800' : 
+                                idx === 1 ? 'bg-slate-100 border-slate-200 text-slate-750' : 
+                                idx === 2 ? 'bg-orange-50 border-orange-100 text-orange-750' : 
+                                'bg-stone-50 border-stone-150 text-stone-600'
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <span className="font-extrabold text-stone-850 text-[12.5px]">
+                                {item.displayName} {medalEmoji}
+                              </span>
+                            </span>
+                            <span className="font-mono font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                              평균: {item.engSpeedAvg}타
+                            </span>
+                          </div>
+
+                          <div className="h-2 w-full bg-slate-50 border border-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 bg-indigo-600`} 
+                              style={{ width: `${Math.min(100, (item.engSpeedAvg / 250) * 100)}%` }}
+                            />
+                          </div>
+
+                          <div className="flex justify-between text-[10px] text-stone-450 font-mono pl-6">
+                            <span>인증학생: {item.certified}명 / 총 {item.total}명</span>
+                            <span>인증 비율: {item.rate}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
               </div>
 
             </div>
@@ -1469,8 +1617,8 @@ export function TeacherAnalytics({
                       {cumulativeFinalAwards.korSpeed.map((s, idx) => (
                         <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-rose-50/40 border border-rose-100 flex-row text-xs">
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-rose-200 text-rose-800 text-[10px] font-black flex items-center justify-center">
-                              {idx + 1}
+                            <span className="px-2 py-0.5 rounded-lg bg-rose-200 text-rose-800 text-[10px] font-black">
+                              {s.grade}학년 1위
                             </span>
                             <div>
                               <p className="font-extrabold text-stone-900">{s.name}</p>
@@ -1494,8 +1642,8 @@ export function TeacherAnalytics({
                       {cumulativeFinalAwards.engSpeed.map((s, idx) => (
                         <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/40 border border-indigo-100 flex-row text-xs">
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-indigo-200 text-indigo-800 text-[10px] font-black flex items-center justify-center">
-                              {idx + 1}
+                            <span className="px-2 py-0.5 rounded-lg bg-indigo-200 text-indigo-850 text-[10px] font-black">
+                              {s.grade}학년 1위
                             </span>
                             <div>
                               <p className="font-extrabold text-stone-900">{s.name}</p>
@@ -1527,8 +1675,8 @@ export function TeacherAnalytics({
                         cumulativeFinalAwards.korGrowth.map((s, idx) => (
                           <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex-row text-xs">
                             <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black flex items-center justify-center">
-                                {idx + 1}
+                              <span className="px-2 py-0.5 rounded-lg bg-emerald-200 text-emerald-800 text-[10px] font-black">
+                                {s.grade}학년 1위
                               </span>
                               <div>
                                 <p className="font-extrabold text-stone-900">{s.name}</p>
@@ -1559,8 +1707,8 @@ export function TeacherAnalytics({
                         cumulativeFinalAwards.engGrowth.map((s, idx) => (
                           <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex-row text-xs">
                             <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black flex items-center justify-center">
-                                {idx + 1}
+                              <span className="px-2 py-0.5 rounded-lg bg-emerald-200 text-emerald-800 text-[10px] font-black">
+                                {s.grade}학년 1위
                               </span>
                               <div>
                                 <p className="font-extrabold text-stone-900">{s.name}</p>
@@ -1662,17 +1810,17 @@ export function TeacherAnalytics({
 
                           return (
                             <>
-                              {/* Han/Kor Area and Line - styled beautifully in violet */}
-                              <path d={`${korD} L 100 100 L 0 100 Z`} fill="url(#violetLinearGrad)" opacity="0.08" />
-                              <path d={korD} fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" />
+                              {/* Han/Kor Area and Line - styled beautifully in purple */}
+                              <path d={`${korD} L 100 100 L 0 100 Z`} fill="url(#purpleLinearGrad)" opacity="0.08" />
+                              <path d={korD} fill="none" stroke="#9333ea" strokeWidth="3" strokeLinecap="round" />
 
                               {/* Eng Area and Line - styled in indigo */}
                               <path d={`${engD} L 100 100 L 0 100 Z`} fill="url(#indigoLinearGrad)" opacity="0.08" />
                               <path d={engD} fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" />
 
-                              {/* Interactive dots for Violet (Han) */}
+                              {/* Interactive dots for Purple (Han) */}
                               {korPoints.map((p, idx) => (
-                                <circle key={`k-${idx}`} cx={p.x} cy={p.y} r="4" fill="#7c3aed" stroke="white" strokeWidth="2" />
+                                <circle key={`k-${idx}`} cx={p.x} cy={p.y} r="4" fill="#9333ea" stroke="white" strokeWidth="2" />
                               ))}
 
                               {/* Interactive dots for Indigo (Eng) */}
@@ -1682,8 +1830,8 @@ export function TeacherAnalytics({
 
                               {/* Grad Gradients */}
                               <defs>
-                                <linearGradient id="violetLinearGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#7c3aed" />
+                                <linearGradient id="purpleLinearGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#9333ea" />
                                   <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
                                 </linearGradient>
                                 <linearGradient id="indigoLinearGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1702,7 +1850,7 @@ export function TeacherAnalytics({
                       {growthTrendsTimeline.map((t, idx) => (
                         <div key={idx} className="text-center">
                           <div className="flex flex-col gap-0.5 mb-1 items-center justify-center">
-                            <span className="text-violet-700 font-extrabold">한: {t.korAvg}타</span>
+                            <span className="text-purple-700 font-extrabold">한: {t.korAvg}타</span>
                             <span className="text-indigo-700 font-extrabold">영: {t.engAvg}타</span>
                           </div>
                           <span className="text-stone-400 font-bold block">{t.month}</span>
@@ -1713,8 +1861,8 @@ export function TeacherAnalytics({
 
                   {/* Legends visual indicator */}
                   <div className="flex gap-4 justify-center text-xs">
-                    <span className="flex items-center gap-1.5 text-violet-700 font-bold">
-                      <span className="w-3 h-3 bg-violet-600 rounded-full" />
+                    <span className="flex items-center gap-1.5 text-purple-700 font-bold">
+                      <span className="w-3 h-3 bg-purple-600 rounded-full" />
                       전교생 한글 타자 평균
                     </span>
                     <span className="flex items-center gap-1.5 text-indigo-700 font-bold">
@@ -1726,174 +1874,174 @@ export function TeacherAnalytics({
                 </div>
               )}
 
-            </div>
-          )}
-
-          {/* 📊 TAB 5: INTEGRATED RESULTS PANEL BY GRADE & DEPT */}
-          {activeTab === 'integrated_stats' && (
-            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-xs animate-fade-in">
-              <div className="flex justify-between items-center pb-2 border-b border-stone-100">
-                <div>
-                  <h4 className="text-sm font-black text-stone-900 tracking-wider uppercase">
-                    학년·학과별 통합 수련 타수 결과 현황판
-                  </h4>
-                  <p className="text-[10.5px] text-stone-400 font-medium">단일 화면 내 컴팩트 뷰로 세로 학과 조합 및 가로 월별 실시간 평균 수집 성적을 모니터링합니다.</p>
-                </div>
-                <div className="shrink-0 text-right bg-violet-50 border border-violet-100 px-3 py-1.5 rounded-xl font-sans text-[10px] text-violet-700/95 font-bold">
-                  <span>2026 전체 타자 통계</span>
-                </div>
-              </div>
-
-              {/* Grid with Korean & English tables side-by-side on large screens, stacked on small */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 col-span-2">
-                
-                {/* 1. KOREAN SECTION (PLACED FIRST) */}
-                <div className="border border-stone-200/85 rounded-2xl p-3 bg-stone-50/10 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-stone-200/50 pb-2">
-                    <span className="w-2.5 h-2.5 bg-gradient-to-tr from-violet-600 to-fuchsia-500 rounded-full animate-pulse" />
-                    <h5 className="text-xs font-black text-stone-800 tracking-wider flex items-center gap-1">
-                      한글 타자 현황판 <span className="text-[10px] text-violet-600 font-bold font-mono">(Korean Speed)</span>
-                    </h5>
+              {/* 📊 TAB 5: INTEGRATED RESULTS PANEL BY GRADE & DEPT */}
+              {activeTab === 'integrated_stats' && (
+                <div className="bg-white rounded-2xl border border-stone-200 p-6 space-y-6 shadow-xs animate-fade-in">
+                  <div className="flex justify-between items-center pb-3 border-b border-stone-100">
+                    <div>
+                      <h4 className="text-sm font-black text-stone-900 tracking-wider uppercase">
+                        학년·학과별 통합 수련 타수 결과 현황판 (5월 ~ 10월)
+                      </h4>
+                      <p className="text-[10.5px] text-stone-400 font-medium">데스크톱 가로 전폭 레이아웃으로 옆 스크롤 없이 가로 월별 실시간 평균 수집 성적을 쾌적하게 모니터링합니다.</p>
+                    </div>
+                    <div className="shrink-0 text-right bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-xl font-sans text-[10px] text-purple-755 font-bold">
+                      <span>2026 전체 통합 타자 수련 통계</span>
+                    </div>
                   </div>
-                  
-                  <div className="overflow-x-auto rounded-xl border border-stone-200 shadow-3xs">
-                    <table className="w-full text-left text-xs text-stone-700 border-collapse table-fixed min-w-[420px]">
-                      <thead>
-                        <tr className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 text-[10.5px]">
-                          <th className="py-2 px-1 w-[80px] text-center border-r border-stone-200 font-black">학년/학과</th>
-                          {integratedStats.months.map((m, idx) => (
-                            <th key={idx} className="py-2 px-0.5 text-center font-black">{m}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-150">
-                        {/* 12 Departments */}
-                        {integratedStats.korean.rows.map((row, rIdx) => (
-                          <tr key={rIdx} className="hover:bg-violet-50/30 transition-colors">
-                            <td className="py-1.5 px-1 bg-stone-50 text-stone-800 font-bold text-[10px] border-r border-stone-150 font-sans truncate text-center">
-                              {row.label}
-                            </td>
-                            {row.values.map((val, vIdx) => (
-                              <td key={vIdx} className="py-1.5 px-0.5 text-center font-mono text-[11px]">
-                                {val > 0 ? (
-                                  <span className="font-bold text-violet-950">{val}타</span>
-                                ) : (
-                                  <span className="text-stone-300">-</span>
-                                )}
-                              </td>
+
+                  {/* Stacked Full Width Layout (No more cramming into col-span-2 side-by-side, no horizontal scrolls!) */}
+                  <div className="space-y-8 col-span-2">
+                    
+                    {/* 1. KOREAN SECTION (PLACED FIRST) - SEAMLESS ELEGANT PURPLE */}
+                    <div className="border border-purple-100 rounded-2xl p-4 bg-purple-50/10 space-y-3">
+                      <div className="flex items-center gap-2 border-b border-purple-100/50 pb-2">
+                        <span className="w-2.5 h-2.5 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-full animate-pulse" />
+                        <h5 className="text-xs font-black text-stone-850 tracking-wider flex items-center gap-1">
+                          한글 타수 현황판 <span className="text-[10px] text-purple-600 font-bold font-mono">(Korean Typing Speed)</span>
+                        </h5>
+                      </div>
+                      
+                      <div className="overflow-x-auto rounded-xl border border-purple-100/70 shadow-2xs">
+                        <table className="w-full text-left text-xs text-stone-700 border-collapse table-auto">
+                          <thead>
+                            <tr className="bg-purple-50/70 text-purple-950 font-bold border-b border-purple-150 text-[11px]">
+                              <th className="py-3 px-3 text-center border-r border-purple-150 font-black">학년/학과</th>
+                              {integratedStats.months.map((m, idx) => (
+                                <th key={idx} className="py-3 px-2 text-center font-black">{m}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-purple-100/70">
+                            {/* 12 Departments */}
+                            {integratedStats.korean.rows.map((row, rIdx) => (
+                              <tr key={rIdx} className="hover:bg-purple-50/40 transition-colors">
+                                <td className="py-2.5 px-3 bg-purple-50/20 text-stone-800 font-bold text-[11px] border-r border-purple-100 font-sans truncate text-center">
+                                  {row.label}
+                                </td>
+                                {row.values.map((val, vIdx) => (
+                                  <td key={vIdx} className="py-2.5 px-2 text-center font-mono text-[12px]">
+                                    {val > 0 ? (
+                                      <span className="font-bold text-purple-950">{val}타</span>
+                                    ) : (
+                                      <span className="text-stone-300">-</span>
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
                             ))}
-                          </tr>
-                        ))}
 
-                        {/* Spacer line */}
-                        <tr className="bg-stone-100/40">
-                          <td colSpan={7} className="py-[1px] px-0 bg-stone-200"></td>
-                        </tr>
+                            {/* Spacer line */}
+                            <tr className="bg-purple-100/30 font-bold">
+                              <td colSpan={7} className="py-[1px] px-0 bg-purple-150"></td>
+                            </tr>
 
-                        {/* Grade Averages */}
-                        {integratedStats.korean.gradeAverages.map((row, rIdx) => (
-                          <tr key={rIdx} className="bg-violet-50/40 hover:bg-violet-50/60 transition-colors border-t border-stone-200 font-bold">
-                            <td className="py-1.5 px-1 bg-violet-100/20 text-violet-800 font-black text-[10px] border-r border-stone-150 text-center font-sans">
-                              {row.label}
-                            </td>
-                            {row.values.map((val, vIdx) => (
-                              <td key={vIdx} className="py-1.5 px-0.5 text-center font-mono text-[11px] text-violet-900 font-extrabold">
-                                {val > 0 ? `${val}타` : '-'}
-                              </td>
+                            {/* Grade Averages */}
+                            {integratedStats.korean.gradeAverages.map((row, rIdx) => (
+                              <tr key={rIdx} className="bg-purple-50/50 hover:bg-purple-100/30 transition-colors border-t border-purple-100 font-bold">
+                                <td className="py-2.5 px-3 bg-purple-105/20 text-purple-800 font-black text-[11px] border-r border-purple-100 text-center font-sans">
+                                  {row.label}
+                                </td>
+                                {row.values.map((val, vIdx) => (
+                                  <td key={vIdx} className="py-2.5 px-2 text-center font-mono text-[12px] text-purple-900 font-extrabold">
+                                    {val > 0 ? `${val}타` : '-'}
+                                  </td>
+                                ))}
+                              </tr>
                             ))}
-                          </tr>
-                        ))}
 
-                        {/* Overall Average */}
-                        <tr className="bg-violet-650 font-black text-white text-[11px] border-t-2 border-violet-700">
-                          <td className="py-2 px-1 bg-violet-700/90 text-white font-black text-[10px] border-r border-violet-700 text-center font-sans tracking-wide">
-                            {integratedStats.korean.overallAverage.label}
-                          </td>
-                          {integratedStats.korean.overallAverage.values.map((val, vIdx) => (
-                            <td key={vIdx} className="py-2 px-0.5 text-center font-mono text-[11.5px] text-white font-black">
-                              {val > 0 ? `${val}타` : '-'}
-                            </td>
-                          ))}
-                        </tr>
-                      </tbody>
-                    </table>
+                            {/* Overall Average */}
+                            <tr className="bg-gradient-to-r from-purple-700 to-indigo-750 font-black text-white text-[11.5px] border-t-2 border-purple-800">
+                              <td className="py-3 px-3 bg-purple-850 text-white font-black text-[11px] border-r border-purple-800 text-center font-sans tracking-wide">
+                                {integratedStats.korean.overallAverage.label}
+                              </td>
+                              {integratedStats.korean.overallAverage.values.map((val, vIdx) => (
+                                <td key={vIdx} className="py-3 px-2 text-center font-mono text-[12px] text-white font-black">
+                                  {val > 0 ? `${val}타` : '-'}
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* 2. ENGLISH SECTION (PLACED SECOND) - SEAMLESS ELEGANT INDIGO */}
+                    <div className="border border-stone-200 rounded-2xl p-4 bg-stone-55/10 space-y-3">
+                      <div className="flex items-center gap-2 border-b border-stone-200 pb-2">
+                        <span className="w-2.5 h-2.5 bg-gradient-to-tr from-indigo-600 to-sky-500 rounded-full animate-pulse" />
+                        <h5 className="text-xs font-black text-stone-850 tracking-wider flex items-center gap-1">
+                          영어 타수 현황판 <span className="text-[10px] text-indigo-600 font-bold font-mono">(English Typing Speed)</span>
+                        </h5>
+                      </div>
+                      
+                      <div className="overflow-x-auto rounded-xl border border-stone-200 shadow-2xs">
+                        <table className="w-full text-left text-xs text-stone-700 border-collapse table-auto">
+                          <thead>
+                            <tr className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 text-[11px]">
+                              <th className="py-3 px-3 text-center border-r border-stone-200 font-black">학년/학과</th>
+                              {integratedStats.months.map((m, idx) => (
+                                <th key={idx} className="py-3 px-2 text-center font-black">{m}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-150">
+                            {/* 12 Departments */}
+                            {integratedStats.english.rows.map((row, rIdx) => (
+                              <tr key={rIdx} className="hover:bg-indigo-50/20 transition-colors">
+                                <td className="py-2.5 px-3 bg-stone-50 text-stone-800 font-bold text-[11px] border-r border-stone-150 font-sans truncate text-center">
+                                  {row.label}
+                                </td>
+                                {row.values.map((val, vIdx) => (
+                                  <td key={vIdx} className="py-2.5 px-2 text-center font-mono text-[12px]">
+                                    {val > 0 ? (
+                                      <span className="font-bold text-indigo-950">{val}타</span>
+                                    ) : (
+                                      <span className="text-stone-300">-</span>
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+
+                            {/* Spacer line */}
+                            <tr className="bg-stone-100/40">
+                              <td colSpan={7} className="py-[1px] px-0 bg-stone-200"></td>
+                            </tr>
+
+                            {/* Grade Averages */}
+                            {integratedStats.english.gradeAverages.map((row, rIdx) => (
+                              <tr key={rIdx} className="bg-indigo-50/35 hover:bg-indigo-50/50 transition-colors border-t border-stone-200 font-bold">
+                                <td className="py-2.5 px-3 bg-indigo-100/20 text-indigo-800 font-black text-[11px] border-r border-stone-150 text-center font-sans">
+                                  {row.label}
+                                </td>
+                                {row.values.map((val, vIdx) => (
+                                  <td key={vIdx} className="py-2.5 px-2 text-center font-mono text-[12px] text-indigo-900 font-extrabold">
+                                    {val > 0 ? `${val}타` : '-'}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+
+                            {/* Overall Average */}
+                            <tr className="bg-gradient-to-r from-indigo-700 to-sky-700 font-black text-white text-[11.5px] border-t-2 border-indigo-700">
+                              <td className="py-3 px-3 bg-indigo-850 text-white font-black text-[11px] border-r border-indigo-700 text-center font-sans tracking-wide">
+                                {integratedStats.english.overallAverage.label}
+                              </td>
+                              {integratedStats.english.overallAverage.values.map((val, vIdx) => (
+                                <td key={vIdx} className="py-3 px-2 text-center font-mono text-[12px] text-white font-black">
+                                  {val > 0 ? `${val}타` : '-'}
+                                </td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
+              )}
 
-                {/* 2. ENGLISH SECTION (PLACED SECOND) */}
-                <div className="border border-stone-200/85 rounded-2xl p-3 bg-stone-50/10 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-stone-200/50 pb-2">
-                    <span className="w-2.5 h-2.5 bg-indigo-550 bg-gradient-to-tr from-indigo-600 to-sky-500 rounded-full animate-pulse" />
-                    <h5 className="text-xs font-black text-stone-800 tracking-wider flex items-center gap-1">
-                      영어 타자 현황판 <span className="text-[10px] text-indigo-600 font-bold font-mono">(English Speed)</span>
-                    </h5>
-                  </div>
-                  
-                  <div className="overflow-x-auto rounded-xl border border-stone-200 shadow-3xs">
-                    <table className="w-full text-left text-xs text-stone-700 border-collapse table-fixed min-w-[420px]">
-                      <thead>
-                        <tr className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 text-[10.5px]">
-                          <th className="py-2 px-1 w-[80px] text-center border-r border-stone-200 font-black">학년/학과</th>
-                          {integratedStats.months.map((m, idx) => (
-                            <th key={idx} className="py-2 px-0.5 text-center font-black">{m}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-150">
-                        {/* 12 Departments */}
-                        {integratedStats.english.rows.map((row, rIdx) => (
-                          <tr key={rIdx} className="hover:bg-indigo-50/20 transition-colors">
-                            <td className="py-1.5 px-1 bg-stone-50 text-stone-800 font-bold text-[10px] border-r border-stone-150 font-sans truncate text-center">
-                              {row.label}
-                            </td>
-                            {row.values.map((val, vIdx) => (
-                              <td key={vIdx} className="py-1.5 px-0.5 text-center font-mono text-[11px]">
-                                {val > 0 ? (
-                                  <span className="font-bold text-indigo-950">{val}타</span>
-                                ) : (
-                                  <span className="text-stone-300">-</span>
-                                )}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-
-                        {/* Spacer line */}
-                        <tr className="bg-stone-100/40">
-                          <td colSpan={7} className="py-[1px] px-0 bg-stone-200"></td>
-                        </tr>
-
-                        {/* Grade Averages */}
-                        {integratedStats.english.gradeAverages.map((row, rIdx) => (
-                          <tr key={rIdx} className="bg-indigo-50/35 hover:bg-indigo-50/50 transition-colors border-t border-stone-200 font-bold">
-                            <td className="py-1.5 px-1 bg-indigo-100/20 text-indigo-800 font-black text-[10px] border-r border-stone-150 text-center font-sans">
-                              {row.label}
-                            </td>
-                            {row.values.map((val, vIdx) => (
-                              <td key={vIdx} className="py-1.5 px-0.5 text-center font-mono text-[11px] text-indigo-900 font-extrabold">
-                                {val > 0 ? `${val}타` : '-'}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-
-                        {/* Overall Average */}
-                        <tr className="bg-indigo-650 font-black text-white text-[11px] border-t-2 border-indigo-700">
-                          <td className="py-2 px-1 bg-indigo-700/90 text-white font-black text-[10px] border-r border-indigo-700 text-center font-sans tracking-wide">
-                            {integratedStats.english.overallAverage.label}
-                          </td>
-                          {integratedStats.english.overallAverage.values.map((val, vIdx) => (
-                            <td key={vIdx} className="py-2 px-0.5 text-center font-mono text-[11.5px] text-white font-black">
-                              {val > 0 ? `${val}타` : '-'}
-                            </td>
-                          ))}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-              </div>
             </div>
           )}
 

@@ -11,6 +11,8 @@ interface StudentCardsProps {
   stats: StudentStats;
   title: string;
   type: 'english' | 'korean';
+  gradeAverage?: number;
+  schoolAverage?: number;
 }
 
 const getRankColorClasses = (level: string) => {
@@ -33,7 +35,7 @@ const getRankColorClasses = (level: string) => {
   return 'bg-gray-50 text-gray-600 border-gray-200 ring-gray-50';
 };
 
-export const StudentStatsCard: React.FC<StudentCardsProps> = ({ stats, title, type }) => {
+export const StudentStatsCard: React.FC<StudentCardsProps> = ({ stats, title, type, gradeAverage, schoolAverage }) => {
   const { latestSpeed, maxSpeed, growth, currentLevel, nextLevel, nextLevelNeeded, percentToNext } = stats;
 
   const isPositiveGrowth = growth > 0;
@@ -147,6 +149,29 @@ export const StudentStatsCard: React.FC<StudentCardsProps> = ({ stats, title, ty
             <span className="text-xs text-emerald-600 font-bold block">
               🎉 최고 등급 달성! 타자 성장 마스터완료
             </span>
+          </div>
+        )}
+
+        {/* 📊 Classmate and School Averages comparison section */}
+        {(gradeAverage !== undefined || schoolAverage !== undefined) && (
+          <div className="mt-2 pt-4 border-t border-stone-100 flex flex-col gap-2 font-sans">
+            <p className="text-[10px] font-extrabold text-stone-400 uppercase tracking-widest leading-none mb-1">
+              📈 학년 및 전교생 성적 비교
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="p-2 py-1.5 bg-slate-50 border border-slate-100 rounded-xl">
+                <span className="text-[9.5px] text-stone-450 font-bold block">학년 전체 평균</span>
+                <span className="text-[13px] font-black text-indigo-700 font-mono">
+                  {gradeAverage !== undefined && gradeAverage > 0 ? `${gradeAverage} 타/분` : '-'}
+                </span>
+              </div>
+              <div className="p-2 py-1.5 bg-slate-50 border border-slate-100 rounded-xl">
+                <span className="text-[9.5px] text-stone-450 font-bold block">전교생 평균</span>
+                <span className="text-[13px] font-black text-violet-750 font-mono">
+                  {schoolAverage !== undefined && schoolAverage > 0 ? `${schoolAverage} 타/분` : '-'}
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </div>
