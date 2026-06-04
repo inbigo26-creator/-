@@ -284,9 +284,14 @@ function getAllDataForSystem() {
     // 헤더에서 각 월(예: 5월, 6월, 7월 등 가로 컬럼) 감지
     var horizontalMonths = [];
     for (var col = 0; col < headers.length; col++) {
+      if (col === idxId || col === idxName) continue;
       var h = String(headers[col] || '').trim();
-      if (/^\\d+월$/.test(h) || (h.indexOf('월') !== -1 && /\\d+/.test(h))) {
-        horizontalMonths.push({ monthName: h, index: col });
+      var numMatch = h.match(/\\d+/);
+      if (numMatch) {
+        var numVal = parseInt(numMatch[0], 10);
+        if (numVal >= 1 && numVal <= 12) {
+          horizontalMonths.push({ monthName: numVal + '월', index: col });
+        }
       }
     }
 

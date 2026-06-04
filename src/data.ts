@@ -359,7 +359,7 @@ export async function fetchSpreadsheetData(
             rows = data.values || [];
           } else {
             // Method 2: Public sheet fetching viewer endpoint when shared as "Anyone with the link can view"
-            const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(`'${candidateName}'`)}&${cacheBust}`;
+            const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(candidateName)}&${cacheBust}`;
             const res = await fetch(url);
             
             if (!res.ok) {
@@ -405,19 +405,17 @@ export async function fetchSpreadsheetData(
               continue; // try next candidate
             }
 
-            // Detect horizontal month columns (e.g. 5월, 6월, 7월, 8월, 9월, 10월, etc. or just 5, 6, 7 under horizontal)
+            // Detect horizontal month columns (e.g. 5월, 6월, 7월, 8월, 9월, 10월, 5, 3월 한타, 한타 3월 etc.)
             const horizontalMonths: { monthName: string; index: number }[] = [];
             headers.forEach((header, index) => {
               const hTrimmed = String(header || '').trim();
               if (index === idxId || index === idxName || index === idxGrade || index === idxDept) {
                 return;
               }
-              // Match pattern like "5월", "10월" or simple numeric strings between 1 and 12
-              if (/^\d+월$/.test(hTrimmed) || (hTrimmed.includes('월') && /\d+/.test(hTrimmed))) {
-                horizontalMonths.push({ monthName: hTrimmed, index });
-              } else if (/^\d+$/.test(hTrimmed)) {
-                // If it's a simple number (e.g. 5, 6), append "월" to normalize it
-                const numVal = parseInt(hTrimmed, 10);
+              // Extract the first sequence of digits to check if it represents a valid month (1~12)
+              const numericMatch = hTrimmed.match(/\d+/);
+              if (numericMatch) {
+                const numVal = parseInt(numericMatch[0], 10);
                 if (numVal >= 1 && numVal <= 12) {
                   horizontalMonths.push({ monthName: `${numVal}월`, index });
                 }
