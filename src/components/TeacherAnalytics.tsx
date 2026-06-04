@@ -4,7 +4,8 @@ import { getMonthNumber, parseStudentIdInfo } from '../data';
 import { 
   Award, TrendingUp, BarChart2, CheckCircle, Users, Lightbulb, 
   Settings, HelpCircle, Flame, Calendar, Trophy, AlertCircle, 
-  ChevronRight, RefreshCw, Star, Info, UserCheck, ShieldAlert
+  ChevronRight, RefreshCw, Star, Info, UserCheck, ShieldAlert,
+  Search
 } from 'lucide-react';
 
 interface TeacherAnalyticsProps {
@@ -67,6 +68,12 @@ export function TeacherAnalytics({
 }: TeacherAnalyticsProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('achievement');
   const [selectedMonth, setSelectedMonth] = useState<string>('6월');
+
+  // Bottom student grid lookup filters
+  const [filterGrade, setFilterGrade] = useState<string>('all');
+  const [filterDept, setFilterDept] = useState<string>('all');
+  const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Unified student base list (to prevent omissions, we union authDb + raw record student IDs)
   const students = useMemo(() => {
@@ -148,6 +155,28 @@ export function TeacherAnalytics({
       // Final Certified Level is governed by the lower denominator
       const finalPoints = Math.min(korPoints, engPoints);
 
+      // Determine month of achieving this level
+      let levelAchievedMonth = '-';
+      if (finalPoints > 0) {
+        for (const m of sortedMonths) {
+          // English speed in or before month m
+          const engRecsUpToM = sEng.filter(r => getMonthNumber(r.month) <= getMonthNumber(m));
+          const engSpeedAtM = engRecsUpToM.length > 0 ? engRecsUpToM[engRecsUpToM.length - 1].speed : 0;
+          
+          // Korean speed in or before month m
+          const korRecsUpToM = sKor.filter(r => getMonthNumber(r.month) <= getMonthNumber(m));
+          const korSpeedAtM = korRecsUpToM.length > 0 ? korRecsUpToM[korRecsUpToM.length - 1].speed : 0;
+          
+          const ep = getEnglishLevelPoints(engSpeedAtM);
+          const kp = getKoreanLevelPoints(korSpeedAtM);
+          
+          if (Math.min(ep, kp) >= finalPoints) {
+            levelAchievedMonth = m;
+            break;
+          }
+        }
+      }
+
       return {
         ...s,
         korSpeed,
@@ -155,10 +184,47 @@ export function TeacherAnalytics({
         korPoints,
         engPoints,
         finalPoints,
-        isCertified: finalPoints > 0
+        isCertified: finalPoints > 0,
+        levelAchievedMonth
       };
     });
-  }, [students, englishDb, koreanDb]);
+  }, [students, englishDb, koreanDb, sortedMonths]);
+
+  const availableDepts = useMemo(() => {
+    return Array.from(new Set(studentCertificates.map(s => s.department))).filter(Boolean);
+  }, [studentCertificates]);
+
+  const availableAchievementMonths = useMemo(() => {
+    const monthsSet = new Set<string>();
+    studentCertificates.forEach(s => {
+      if (s.levelAchievedMonth && s.levelAchievedMonth !== '-') {
+        monthsSet.add(s.levelAchievedMonth);
+      }
+    });
+    return Array.from(monthsSet).sort((a,b) => getMonthNumber(a) - getMonthNumber(b));
+  }, [studentCertificates]);
+
+  // Filtered student list for bottom grid
+  const filteredStudents = useMemo(() => {
+    return studentCertificates.filter(s => {
+      if (filterGrade !== 'all' && s.grade !== filterGrade) return false;
+      if (filterDept !== 'all' && s.department !== filterDept) return false;
+      if (filterMonth !== 'all') {
+        if (filterMonth === '미달') {
+          if (s.levelAchievedMonth !== '-') return false;
+        } else {
+          if (s.levelAchievedMonth !== filterMonth) return false;
+        }
+      }
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        const matchesName = s.name.toLowerCase().includes(q);
+        const matchesId = s.studentId.includes(q);
+        if (!matchesName && !matchesId) return false;
+      }
+      return true;
+    });
+  }, [studentCertificates, filterGrade, filterDept, filterMonth, searchQuery]);
 
   // 🟠 AGGREGATES: SCHOOL, GRADE AND DEPARTMENT STATISTICS
   const aggregateStats = useMemo(() => {
@@ -200,6 +266,45 @@ export function TeacherAnalytics({
       return { department: d, total, certified, rate, korSpeedAvg, engSpeedAvg };
     }).sort((a, b) => b.rate - a.rate); // Sort by certified achievement rate descending
 
+    // 🏆 Class-level Unified rankings: Grade & Dept combinations (3 Grades * 4 Main Departments = 12 combinations)
+    const activeGrades = ['1', '2', '3'];
+    const activeDepts = ['항공서비스', '부사관경영', 'SNS마케팅', '콘텐츠디자인'];
+    const classCombinedStats: {
+      grade: string;
+      department: string;
+      displayName: string;
+      total: number;
+      certified: number;
+      rate: number;
+      korSpeedAvg: number;
+      engSpeedAvg: number;
+    }[] = [];
+
+    activeGrades.forEach(g => {
+      activeDepts.forEach(d => {
+        const list = studentCertificates.filter(s => s.grade === g && s.department === d);
+        const total = list.length;
+        const certified = list.filter(s => s.isCertified).length;
+        const rateVal = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
+        const korSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.korSpeed, 0) / total) : 0;
+        const engSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.engSpeed, 0) / total) : 0;
+
+        classCombinedStats.push({
+          grade: g,
+          department: d,
+          displayName: `${g}학년 ${d}`,
+          total,
+          certified,
+          rate: rateVal,
+          korSpeedAvg,
+          engSpeedAvg
+        });
+      });
+    });
+
+    // Sort combinations by rate descending, and then by total count as fallback order
+    classCombinedStats.sort((a, b) => b.rate - a.rate || b.total - a.total || a.displayName.localeCompare(b.displayName));
+
     // ③ FAILURE REASON ANALYTICS (Bottlenecks)
     const fails = studentCertificates.filter(s => !s.isCertified);
     const totalFails = fails.length;
@@ -227,6 +332,7 @@ export function TeacherAnalytics({
       failCount,
       gradeStats,
       deptStats,
+      combinedStats: classCombinedStats,
       bottleneck: {
         korCount: korBottleneckCount,
         engCount: engBottleneckCount,
@@ -643,81 +749,60 @@ export function TeacherAnalytics({
 
               {/* Grid 2 Column: Left Grade/Dept Rates | Right Failure Reasons */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                {/* 1. Grade comparative & Dept list */}
+
+                {/* 1. Grade & Department Combined Rankings (12 Categories) */}
                 <div className="space-y-6">
                   
-                  {/* Grade Card */}
+                  {/* 통합 학년/학과별 12개 분류 랭킹 보드 */}
                   <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-4 shadow-2xs">
                     <div className="flex justify-between items-center pb-2 border-b border-stone-100">
                       <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
-                        <Star className="h-4 w-4 text-amber-500" />
-                        학년별 수련 및 인증서 달성률 비교
+                        <Trophy className="h-4 w-4 text-amber-500 animate-bounce" />
+                        학년·학과별 통합 수련 랭킹 (12클래스 전체 순위)
                       </h4>
-                      <span className="text-[10px] font-bold text-stone-400">최근 기준</span>
+                      <span className="text-[9.5px] bg-indigo-50 text-indigo-750 border border-indigo-100 px-2.5 py-1 rounded-lg font-bold">달성률 기준 정렬</span>
                     </div>
 
-                    <div className="space-y-3.5">
-                      {aggregateStats.gradeStats.map((g, idx) => (
-                        <div key={idx} className="space-y-1">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-stone-700">{g.grade}학년 (총 {g.total}명)</span>
-                            <span className="font-mono font-black text-indigo-700">{g.rate}% 합격 <span className="text-stone-400 font-normal">({g.certified}명)</span></span>
-                          </div>
-                          
-                          <div className="h-5 w-full bg-stone-100 rounded-full overflow-hidden relative flex">
-                            <div 
-                              className="h-full bg-indigo-600 rounded-full transition-all flex items-center justify-end pr-2" 
-                              style={{ width: `${g.rate}%` }}
-                            >
-                              {g.rate > 10 && <span className="text-[8.5px] font-mono font-black text-white">{g.rate}%</span>}
-                            </div>
-                          </div>
-
-                          <div className="flex gap-4 text-[10px] text-stone-400 font-mono">
-                            <span>한글 평균: <strong className="text-stone-605">{g.korSpeedAvg}타</strong></span>
-                            <span>영어 평균: <strong className="text-stone-605">{g.engSpeedAvg}타</strong></span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Dept Card */}
-                  <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-4 shadow-2xs">
-                    <div className="flex justify-between items-center pb-2 border-b border-stone-100">
-                      <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
-                        <Users className="h-4 w-4 text-indigo-500" />
-                        학과별 타자 역량 및 '인증서 달성률' 경쟁 랭킹
-                      </h4>
-                      <span className="text-[9.5px] px-2 py-0.5 bg-indigo-50 text-indigo-600 font-bold rounded-md">과별 경쟁 유도</span>
-                    </div>
-
-                    <div className="space-y-3.5">
-                      {aggregateStats.deptStats.map((d, idx) => {
-                        const maxRate = Math.max(...aggregateStats.deptStats.map(x => x.rate)) || 100;
-                        const relativeWidth = Math.max(10, Math.round((d.rate / maxRate) * 100));
+                    <div className="divide-y divide-stone-100 max-h-[460px] overflow-y-auto pr-1 space-y-2.5">
+                      {aggregateStats.combinedStats.map((item, idx) => {
+                        const medalEmoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
                         
                         return (
-                          <div key={idx} className="space-y-1">
+                          <div key={idx} className="pt-2.5 first:pt-0 space-y-1">
                             <div className="flex justify-between items-center text-xs">
                               <span className="flex items-center gap-1.5">
-                                <span className="w-4 h-4 rounded bg-stone-100 border text-[9.5px] font-black text-stone-600 flex items-center justify-center">{idx + 1}</span>
-                                <span className="font-extrabold text-stone-800">{d.department}</span>
+                                <span className={`w-5 h-5 rounded-md border text-[10px] font-black flex items-center justify-center ${
+                                  idx === 0 ? 'bg-amber-100 border-amber-200 text-amber-850' : 
+                                  idx === 1 ? 'bg-slate-100 border-slate-200 text-slate-750' : 
+                                  idx === 2 ? 'bg-orange-50 border-orange-100 text-orange-750' : 
+                                  'bg-stone-50 border-stone-150 text-stone-600'
+                                }`}>
+                                  {idx + 1}
+                                </span>
+                                <span className="font-extrabold text-stone-800 text-[12.5px]">
+                                  {item.displayName} {medalEmoji}
+                                </span>
                               </span>
-                              <span className="font-mono font-extrabold text-blue-700">{d.rate}% 인증 <span className="text-[10px] text-stone-400">({d.certified}명/{d.total}명)</span></span>
+                              <span className="font-mono font-extrabold text-indigo-700 bg-indigo-50/50 px-2 py-0.5 rounded border border-indigo-100/50">
+                                {item.rate}% 인증 <span className="text-stone-400 font-normal">({item.certified}/{item.total}명)</span>
+                              </span>
                             </div>
 
                             <div className="h-2 w-full bg-slate-50 border border-slate-100 rounded-full overflow-hidden flex">
                               <div 
-                                className={`h-full rounded-full transition-all ${idx === 0 ? 'bg-gradient-to-r from-indigo-500 to-indigo-600' : 'bg-slate-400'}`} 
-                                style={{ width: `${d.rate}%` }}
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  idx === 0 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
+                                  idx === 1 ? 'bg-gradient-to-r from-slate-400 to-slate-500' :
+                                  idx === 2 ? 'bg-gradient-to-r from-orange-400 to-orange-500' :
+                                  'bg-indigo-600/80'
+                                }`} 
+                                style={{ width: `${item.rate}%` }}
                               />
                             </div>
 
-                            <div className="flex justify-between text-[9.5px] text-stone-400 font-mono">
-                              <span>한/영 평균: {d.korSpeedAvg}타 / {d.engSpeedAvg}타</span>
-                              <span className="font-sans text-[9px]">인증 성공률 {idx === 0 ? '👑 전교 1위' : `${idx + 1}위`}</span>
+                            <div className="flex justify-between text-[10px] text-stone-450 font-mono pl-6">
+                              <span>한영 평균 타수: {item.korSpeedAvg}타 / {item.engSpeedAvg}타</span>
+                              <span className="text-[9px] font-sans text-stone-400">총 {item.total}명</span>
                             </div>
                           </div>
                         );
@@ -801,13 +886,13 @@ export function TeacherAnalytics({
                           {/* Both fail bottle */}
                           <div className="space-y-1">
                             <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                              <span>한글 & 영어 동시 미달 (기초 미달형)</span>
-                              <span className="font-mono text-rose-650">{aggregateStats.bottleneck.bothRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.bothCount}명)</span></span>
+                              <span>한글/영어 모두 미달 (복합 누적 요인)</span>
+                              <span className="font-mono text-rose-600">{aggregateStats.bottleneck.bothRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.bothCount}명)</span></span>
                             </div>
                             <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
                               <div className="h-full bg-stone-400 rounded-full" style={{ width: `${aggregateStats.bottleneck.bothRate}%` }} />
                             </div>
-                            <p className="text-[10px] text-stone-400">한글 150타 및 영어 100타 장벽을 둘 다 넘지 못한 핵심 지도군</p>
+                            <p className="text-[10px] text-stone-400">한글(150타 미만) 및 영어(100타 미만) 둘 다 최저 미충족</p>
                           </div>
 
                         </div>
@@ -822,19 +907,19 @@ export function TeacherAnalytics({
                       인비 챌린지 최종 자격급수 전교 보유 통계
                     </h4>
                     <div className="grid grid-cols-4 gap-2 text-center">
-                      <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl">
+                      <div className="p-3 bg-rose-50 border border-slate-100 rounded-xl animate-fade-in">
                         <span className="text-[10.5px] font-bold text-rose-600 block">1급인증 🥇</span>
                         <span className="text-lg font-black text-rose-800 font-mono mt-0.5 inline-block">{aggregateStats.level1Count}명</span>
                       </div>
-                      <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                      <div className="p-3 bg-amber-50 border border-slate-100 rounded-xl animate-fade-in">
                         <span className="text-[10.5px] font-bold text-amber-600 block">2급인증 🥈</span>
                         <span className="text-lg font-black text-amber-800 font-mono mt-0.5 inline-block">{aggregateStats.level2Count}명</span>
                       </div>
-                      <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                      <div className="p-3 bg-emerald-50 border border-slate-100 rounded-xl animate-fade-in">
                         <span className="text-[10.5px] font-bold text-emerald-600 block">3급인증 🥉</span>
                         <span className="text-lg font-black text-emerald-800 font-mono mt-0.5 inline-block">{aggregateStats.level3Count}명</span>
                       </div>
-                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl animate-fade-in">
                         <span className="text-[10.5px] font-bold text-slate-550 block">미통과 🚫</span>
                         <span className="text-lg font-black text-slate-700 font-mono mt-0.5 inline-block">{aggregateStats.failCount}명</span>
                       </div>
@@ -846,47 +931,179 @@ export function TeacherAnalytics({
               </div>
 
               {/* Student detail lookup table inside teacher area */}
-              <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-4 shadow-2xs overflow-hidden">
-                <div className="flex justify-between items-center flex-wrap gap-2 pb-2 border-b border-stone-100">
-                  <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase">
-                    학급별 학생 타자성적 및 등급 대조 명부
-                  </h4>
-                  <p className="text-[11px] text-stone-400 font-medium">총 {studentCertificates.length}명의 데이터 연결</p>
+              <div id="student-record-master" className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-6 shadow-2xs overflow-hidden">
+                
+                {/* Header with KPI count */}
+                <div className="flex justify-between items-center flex-wrap gap-3 pb-3 border-b border-stone-100">
+                  <div className="space-y-1">
+                    <h4 className="text-[13px] font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
+                      <UserCheck className="h-4 w-4 text-indigo-600" />
+                      학급별 학생 자격증 및 등급 대조 명부
+                    </h4>
+                    <p className="text-[11px] text-stone-400">교내 전체 수련생의 한글/영어 누적 최고 성적 대조서입니다.</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] text-stone-400 font-bold block">조건 필터링 결과</span>
+                    <strong className="text-lg font-mono font-black text-indigo-700">{filteredStudents.length} </strong>
+                    <span className="text-xs text-stone-500 font-bold">/ {studentCertificates.length}명</span>
+                  </div>
                 </div>
 
-                <div className="overflow-x-auto min-w-full">
+                {/* Unified Interactive Filter Console */}
+                <div className="p-4 bg-stone-50 rounded-xl border border-stone-200 space-y-3">
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    
+                    {/* Grade Selector Group */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block">학년 선택 필터</span>
+                      <div className="flex gap-1">
+                        {['all', '1', '2', '3'].map((g) => (
+                          <button
+                            key={g}
+                            onClick={() => setFilterGrade(g)}
+                            className={`flex-1 py-1.5 text-xs font-black rounded-lg border transition-all ${
+                              filterGrade === g 
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' 
+                                : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'
+                            }`}
+                          >
+                            {g === 'all' ? '전체' : `${g}학년`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Department Dropdown / Badges */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block">학과 선택 필터</span>
+                      <select
+                        value={filterDept}
+                        onChange={(e) => setFilterDept(e.target.value)}
+                        className="w-full bg-white border border-stone-200 rounded-lg p-1.5 text-xs font-bold text-stone-700 focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="all">전체 학과</option>
+                        {availableDepts.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Achievement Month Filter */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block">인증 달성월 필터</span>
+                      <select
+                        value={filterMonth}
+                        onChange={(e) => setFilterMonth(e.target.value)}
+                        className="w-full bg-white border border-stone-200 rounded-lg p-1.5 text-xs font-bold text-stone-700 focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="all">전체 (달성+미달)</option>
+                        <option value="미달">미달성 상태</option>
+                        {availableAchievementMonths.map((m) => (
+                          <option key={m} value={m}>{m} 달성자</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Search Field */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block">이름 / 학번 검색</span>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-stone-400">
+                          <Search className="h-3.5 w-3.5" />
+                        </span>
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="학생 이름 또는 학번 검색..."
+                          className="w-full pl-8 pr-3 py-1.5 text-xs border border-stone-200 rounded-lg bg-white placeholder-stone-400 text-stone-700 focus:outline-none focus:border-indigo-500 font-bold font-sans"
+                        />
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+
+                <div className="overflow-x-auto min-w-full rounded-xl border border-stone-100 font-sans">
                   <table className="w-full text-xs text-left text-stone-600">
-                    <thead className="bg-stone-50 text-[10.5px] text-stone-400 uppercase tracking-wider border-b">
+                    <thead className="bg-stone-50 text-[10px] text-stone-400 uppercase tracking-wider border-b border-stone-100">
                       <tr>
-                        <th className="py-2.5 px-3">학번</th>
+                        <th className="py-2.5 px-3 text-center">학번</th>
                         <th className="py-2.5 px-3">이름</th>
-                        <th className="py-2.5 px-3">학과</th>
+                        <th className="py-2.5 px-3">학년/학과</th>
                         <th className="py-2.5 px-3">한글 타수(급수)</th>
                         <th className="py-2.5 px-3">영어 타수(급수)</th>
-                        <th className="py-2.5 px-3 text-right">최종 인증</th>
+                        <th className="py-2.5 px-3 text-center">최종 인증 획득월</th>
+                        <th className="py-2.5 px-3 text-right">최종 인증 등급 (급수 및 타수)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
-                      {studentCertificates.map((s, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="py-2 px-3 font-mono text-stone-900 font-extrabold">{s.studentId}</td>
-                          <td className="py-2 px-3 font-bold text-stone-800">{s.name}</td>
-                          <td className="py-2 px-3">{s.department}</td>
-                          <td className="py-2 px-3">
-                            <span className="font-mono font-bold text-amber-700">{s.korSpeed}타</span>
-                            <span className="ml-1 text-[9px] text-stone-400 font-sans">({getLevelName(s.korPoints)})</span>
-                          </td>
-                          <td className="py-2 px-3">
-                            <span className="font-mono font-bold text-violet-750">{s.engSpeed}타</span>
-                            <span className="ml-1 text-[9px] text-stone-400 font-sans">({getLevelName(s.engPoints)})</span>
-                          </td>
-                          <td className="py-2 px-3 text-right">
-                            <span className={`inline-block px-2.5 py-1 text-[10.2px] font-black border rounded-lg ${getLevelColorBadge(s.finalPoints)}`}>
-                              {s.finalPoints > 0 ? `${getLevelName(s.finalPoints)} 인증 🎉` : '미달'}
-                            </span>
+                    <tbody className="divide-y divide-stone-100">
+                      {filteredStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-12 text-center text-stone-400 font-semibold">
+                            지정한 조건 조회의 필터 결과와 부합하는 학생이 없습니다.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        filteredStudents.map((s, idx) => {
+                          let displayFinal = '';
+                          if (s.finalPoints === 3) displayFinal = '🥇 타자 1급 (한350+/영200+)';
+                          else if (s.finalPoints === 2) displayFinal = '🥈 타자 2급 (한250+/영150+)';
+                          else if (s.finalPoints === 1) displayFinal = '🥉 타자 3급 (한150+/영100+)';
+                          else displayFinal = '미달 (수련 중)';
+
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                              <td className="py-2.5 px-3 text-center font-mono text-stone-900 font-extrabold">{s.studentId}</td>
+                              <td className="py-2.5 px-3 font-bold text-stone-850 text-[13px]">{s.name}</td>
+                              <td className="py-2.5 px-3 text-stone-500 font-medium">{s.grade}학년 / {s.department}</td>
+                              <td className="py-2.5 px-3">
+                                <span className="font-mono font-bold text-amber-700 text-[12.5px]">{s.korSpeed}타</span>
+                                <span className={`ml-1 px-1.5 py-0.2 text-[9.5px] rounded-md font-bold ${
+                                  s.korPoints === 3 ? 'bg-amber-50 text-amber-700' :
+                                  s.korPoints === 2 ? 'bg-slate-100 text-slate-700' :
+                                  s.korPoints === 1 ? 'bg-orange-50 text-orange-700' :
+                                  'bg-stone-100 text-stone-400'
+                                }`}>
+                                  {getLevelName(s.korPoints)}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="font-mono font-bold text-violet-755 text-[12.5px]">{s.engSpeed}타</span>
+                                <span className={`ml-1 px-1.5 py-0.2 text-[9.5px] rounded-md font-bold ${
+                                  s.engPoints === 3 ? 'bg-amber-50 text-amber-700' :
+                                  s.engPoints === 2 ? 'bg-slate-105 text-slate-700' :
+                                  s.engPoints === 1 ? 'bg-orange-50 text-orange-705' :
+                                  'bg-stone-100 text-stone-400'
+                                }`}>
+                                  {getLevelName(s.engPoints)}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                {s.levelAchievedMonth !== '-' ? (
+                                  <span className="font-black text-indigo-755 bg-indigo-50 border border-indigo-100/60 px-2 py-0.5 rounded-md text-[10.5px]">
+                                    {s.levelAchievedMonth} 달성
+                                  </span>
+                                ) : (
+                                  <span className="text-stone-350 text-[11px]">-</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <span className={`inline-block px-3 py-1.5 font-black rounded-lg border text-[13.5px] leading-tight ${
+                                  s.finalPoints === 3 ? 'bg-amber-50 text-amber-850 border-amber-200' :
+                                  s.finalPoints === 2 ? 'bg-slate-50 text-slate-800 border-slate-200' :
+                                  s.finalPoints === 1 ? 'bg-orange-50/80 text-orange-850 border-orange-200' :
+                                  'bg-stone-50 text-stone-400 border-stone-200/80'
+                                }`}>
+                                  {displayFinal}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>

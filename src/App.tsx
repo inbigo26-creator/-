@@ -445,8 +445,8 @@ export default function App() {
                       </div>
                     </div>
                     <h2 className="text-2xl font-black tracking-tight text-stone-900 leading-tight">2026 Speed-Up 인비 타자 챌린지</h2>
-                    <p className="text-lg sm:text-xl text-emerald-655 font-extrabold mt-1.5 leading-snug">
-                      디지털 읽걷쓰 성장 프로젝트
+                    <p className="text-2xl sm:text-[27px] text-emerald-700 font-extrabold mt-2 tracking-tight leading-snug">
+                      디지털 읽걷쓰 성장 프로젝트 🌱
                     </p>
                   </div>
 

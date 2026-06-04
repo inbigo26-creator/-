@@ -326,187 +326,199 @@ export async function fetchSpreadsheetData(
     const sheetsToFetch = ['students_auth', 'english_all', 'korean_all', 'level_rule'];
     const results: { [key: string]: any[] } = {};
 
-    for (const sheetName of sheetsToFetch) {
-      results[sheetName] = [];
-      try {
-        let rows: string[][] = [];
-        const cacheBust = `t=${Date.now()}`;
+    const fallbackNamesMap: { [key: string]: string[] } = {
+      'students_auth': ['students_auth', 'student_auth', 'students', 'auth', '인증', '학생명부', '학생_auth'],
+      'english_all': ['english_all', 'english', '영어_all', '영어', '영어타자', 'englishes', 'eng_all'],
+      'korean_all': ['korean_all', 'korean', '한글_all', '한글', '한글타자', 'koreans', 'kor_all'],
+      'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준']
+    };
 
-        if (accessToken) {
-          // Method 1: Private sheet fetching utilizing Google Sheets API v4 with active OAuth Token
-          const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}?valueRenderOption=FORMATTED_VALUE&${cacheBust}`;
-          const res = await fetch(url, {
-            headers: { Authorization: `Bearer ${accessToken}` }
-          });
-          
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            console.error(`Sheet standard API read failed for "${sheetName}":`, errData);
-            throw new Error(`[${sheetName}] 시트를 찾을 수 없거나 접근 권한이 없습니다. (API Code: ${res.status})`);
-          }
-          
-          const data = await res.json();
-          rows = data.values || [];
-        } else {
-          // Method 2: Public sheet fetching viewer endpoint when shared as "Anyone with the link can view"
-          const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&${cacheBust}`;
-          const res = await fetch(url);
-          
-          if (!res.ok) {
-            throw new Error(`[${sheetName}] 웹 뷰(CSV) 조회 불가. 스프레드시트 공유 범위를 '링크가 있는 모든 사용자(뷰어)'로 설정했는지 확인해주세요.`);
-          }
-          
-          const csvText = await res.text();
-          rows = parseCSV(csvText);
-        }
+    for (const sheetKey of sheetsToFetch) {
+      results[sheetKey] = [];
+      const candidates = fallbackNamesMap[sheetKey] || [sheetKey];
+      let loadedSuccessfully = false;
+      let lastErrorMessage = '';
 
-        if (rows.length < 2) {
-          // Empty or header-only sheet
-          continue;
-        }
+      for (const candidateName of candidates) {
+        try {
+          let rows: string[][] = [];
+          const cacheBust = `t=${Date.now()}`;
 
-        // Clean headers
-        const headers = rows[0].map(h => String(h || '').trim());
-        
-        if (sheetName === 'students_auth') {
-          // Parse columns: 학번, 이름, 인증번호
-          const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
-          const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
-          const idxPin = findIndexByNames(headers, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
-
-          if (idxId === -1 || idxName === -1 || idxPin === -1) {
-            const missing = [];
-            if (idxId === -1) missing.push('학번');
-            if (idxName === -1) missing.push('이름');
-            if (idxPin === -1) missing.push('인증번호');
-            throw new Error(`'students_auth' 시트의 필수 컬럼 헤더(${missing.join(', ')})를 찾을 수 없습니다. 예: 헤더명이 정확한지 확인 바랍니다.`);
-          }
-
-          results[sheetName] = rows.slice(1).map(row => ({
-            studentId: cleanCodeValue(row[idxId]),
-            name: cleanCellValue(row[idxName]),
-            pin: cleanCodeValue(row[idxPin])
-          })).filter(item => item.studentId && item.pin);
-
-        } else if (sheetName === 'english_all' || sheetName === 'korean_all') {
-          // Parse columns: 학번, 이름, 학년, 과
-          const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
-          const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
-          const idxGrade = findIndexByNames(headers, ['학년', 'grade', '반/학년']);
-          const idxDept = findIndexByNames(headers, ['과', '학과', '계열', 'dept', '전공']);
-
-          if (idxId === -1 || idxName === -1) {
-            const missing = [];
-            if (idxId === -1) missing.push('학번');
-            if (idxName === -1) missing.push('이름');
-            throw new Error(`'${sheetName}' 시트의 필수 컬럼 헤더(${missing.join(', ')})를 찾을 수 없습니다.`);
-          }
-
-          // Detect horizontal month columns (e.g. 5월, 6월, 7월, 8월, 9월, 10월, etc.)
-          const horizontalMonths: { monthName: string; index: number }[] = [];
-          headers.forEach((header, index) => {
-            const hTrimmed = String(header || '').trim();
-            // Match pattern like "5월", "10월" or contains month numbering
-            if (/^\d+월$/.test(hTrimmed) || (hTrimmed.includes('월') && /\d+/.test(hTrimmed))) {
-              horizontalMonths.push({ monthName: hTrimmed, index });
+          if (accessToken) {
+            // Method 1: Private sheet fetching utilizing Google Sheets API v4 with active OAuth Token
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(candidateName)}?valueRenderOption=FORMATTED_VALUE&${cacheBust}`;
+            const res = await fetch(url, {
+              headers: { Authorization: `Bearer ${accessToken}` }
+            });
+            
+            if (!res.ok) {
+              throw new Error(`[${candidateName}] 시트를 찾을 수 없거나 접근 권한이 없습니다.`);
             }
-          });
+            
+            const data = await res.json();
+            rows = data.values || [];
+          } else {
+            // Method 2: Public sheet fetching viewer endpoint when shared as "Anyone with the link can view"
+            const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(candidateName)}&${cacheBust}`;
+            const res = await fetch(url);
+            
+            if (!res.ok) {
+              throw new Error(`[${candidateName}] 웹 뷰(CSV) 조회 불가.`);
+            }
+            
+            const csvText = await res.text();
+            rows = parseCSV(csvText);
+          }
 
-          const isHorizontal = horizontalMonths.length > 0;
-          const parsedRecords: TypingRecord[] = [];
+          if (rows.length < 2) {
+            // Empty or header-only sheet - try next candidate
+            continue;
+          }
 
-          if (isHorizontal) {
-            // 1. HORIZONTAL PIVOT: Pivot columns (5월, 6월...) into individual records
-            rows.slice(1).forEach(row => {
-              const studentId = cleanCodeValue(row[idxId]);
-              const name = cleanCellValue(row[idxName]);
-              
-              if (!studentId) return;
+          // Clean headers
+          const headers = rows[0].map(h => String(h || '').trim());
+          
+          if (sheetKey === 'students_auth') {
+            // Parse columns: 학번, 이름, 인증번호
+            const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+            const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
+            const idxPin = findIndexByNames(headers, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
 
-              // Extract dynamically based on 5-digit studentId rule
-              const studentInfo = parseStudentIdInfo(studentId);
-              const grade = studentInfo.grade;
-              const department = studentInfo.department;
+            if (idxId === -1 || idxName === -1 || idxPin === -1) {
+              continue; // try next candidate if headers don't match
+            }
 
-              horizontalMonths.forEach(({ monthName, index }) => {
-                const speedRaw = row[index];
-                if (speedRaw !== undefined && speedRaw !== null) {
-                  const cleanedSpeed = cleanCodeValue(speedRaw);
-                  if (cleanedSpeed !== '') { // Create records only for months where there is record data
-                    const speedVal = parseInt(cleanedSpeed, 10);
-                    if (!isNaN(speedVal)) {
-                      parsedRecords.push({
-                        studentId,
-                        name,
-                        grade,
-                        department,
-                        month: monthName,
-                        speed: speedVal,
-                        type: sheetName === 'english_all' ? 'english' : 'korean'
-                      });
+            results[sheetKey] = rows.slice(1).map(row => ({
+              studentId: cleanCodeValue(row[idxId]),
+              name: cleanCellValue(row[idxName]),
+              pin: cleanCodeValue(row[idxPin])
+            })).filter(item => item.studentId && item.pin);
+
+          } else if (sheetKey === 'english_all' || sheetKey === 'korean_all') {
+            // Parse columns: 학번, 이름, 학년, 과
+            const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+            const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
+            const idxGrade = findIndexByNames(headers, ['학년', 'grade', '반/학년']);
+            const idxDept = findIndexByNames(headers, ['과', '학과', '계열', 'dept', '전공']);
+
+            if (idxId === -1 || idxName === -1) {
+              continue; // try next candidate
+            }
+
+            // Detect horizontal month columns (e.g. 5월, 6월, 7월, 8월, 9월, 10월, etc. or just 5, 6, 7 under horizontal)
+            const horizontalMonths: { monthName: string; index: number }[] = [];
+            headers.forEach((header, index) => {
+              const hTrimmed = String(header || '').trim();
+              if (index === idxId || index === idxName || index === idxGrade || index === idxDept) {
+                return;
+              }
+              // Match pattern like "5월", "10월" or simple numeric strings between 1 and 12
+              if (/^\d+월$/.test(hTrimmed) || (hTrimmed.includes('월') && /\d+/.test(hTrimmed))) {
+                horizontalMonths.push({ monthName: hTrimmed, index });
+              } else if (/^\d+$/.test(hTrimmed)) {
+                // If it's a simple number (e.g. 5, 6), append "월" to normalize it
+                const numVal = parseInt(hTrimmed, 10);
+                if (numVal >= 1 && numVal <= 12) {
+                  horizontalMonths.push({ monthName: `${numVal}월`, index });
+                }
+              }
+            });
+
+            const isHorizontal = horizontalMonths.length > 0;
+            const parsedRecords: TypingRecord[] = [];
+
+            if (isHorizontal) {
+              // 1. HORIZONTAL PIVOT: Pivot columns into individual records
+              rows.slice(1).forEach(row => {
+                const studentId = cleanCodeValue(row[idxId]);
+                const name = cleanCellValue(row[idxName]);
+                
+                if (!studentId) return;
+
+                const studentInfo = parseStudentIdInfo(studentId);
+                const grade = studentInfo.grade;
+                const department = studentInfo.department;
+
+                horizontalMonths.forEach(({ monthName, index }) => {
+                  const speedRaw = row[index];
+                  if (speedRaw !== undefined && speedRaw !== null) {
+                    const cleanedSpeed = cleanCodeValue(speedRaw);
+                    if (cleanedSpeed !== '') {
+                      const speedVal = parseInt(cleanedSpeed, 10);
+                      if (!isNaN(speedVal)) {
+                        parsedRecords.push({
+                          studentId,
+                          name,
+                          grade,
+                          department,
+                          month: monthName,
+                          speed: speedVal,
+                          type: sheetKey === 'english_all' ? 'english' : 'korean'
+                        });
+                      }
                     }
                   }
-                }
+                });
               });
-            });
-            results[sheetName] = parsedRecords;
-          } else {
-            // 2. VERTICAL STANDARD PARSING
-            const idxMonth = findIndexByNames(headers, ['월', '시기', 'month', '구분']);
-            const speedHeader = sheetName === 'english_all' ? '영타' : '한타';
-            const idxSpeed = findIndexByNames(headers, [speedHeader, sheetName === 'english_all' ? '영어' : '한글', 'speed', '타수']);
+              results[sheetKey] = parsedRecords;
+            } else {
+              // 2. VERTICAL STANDARD PARSING
+              const idxMonth = findIndexByNames(headers, ['월', '시기', 'month', '구분']);
+              const speedHeader = sheetKey === 'english_all' ? '영타' : '한타';
+              const idxSpeed = findIndexByNames(headers, [speedHeader, sheetKey === 'english_all' ? '영어' : '한글', 'speed', '타수']);
 
-            if (idxSpeed === -1 || idxMonth === -1) {
-              const missing = [];
-              if (idxMonth === -1) missing.push('월(또는 각 월별 가로 컬럼)');
-              if (idxSpeed === -1) missing.push(speedHeader);
-              throw new Error(`'${sheetName}' 시트의 필수 컬럼 헤더(${missing.join(', ')})를 찾을 수 없습니다. (스프레드시트에 '5월', '6월' 같은 열을 만드시거나 '월'과 '${speedHeader}' 열을 갖춰 주십시오.)`);
+              if (idxSpeed === -1 || idxMonth === -1) {
+                continue; // try next candidate (maybe vertical headers failed to match)
+              }
+
+              results[sheetKey] = rows.slice(1).map(row => {
+                const studentId = cleanCodeValue(row[idxId]);
+                const studentInfo = parseStudentIdInfo(studentId);
+                return {
+                  studentId,
+                  name: cleanCellValue(row[idxName]),
+                  grade: studentInfo.grade,
+                  department: studentInfo.department,
+                  month: cleanCellValue(row[idxMonth]),
+                  speed: parseInt(cleanCodeValue(row[idxSpeed]), 10) || 0,
+                  type: sheetKey === 'english_all' ? 'english' : 'korean'
+                };
+              }).filter(item => item.studentId && item.month);
             }
 
-            results[sheetName] = rows.slice(1).map(row => {
-              const studentId = cleanCodeValue(row[idxId]);
-              const studentInfo = parseStudentIdInfo(studentId);
-              return {
-                studentId,
-                name: cleanCellValue(row[idxName]),
-                grade: studentInfo.grade,
-                department: studentInfo.department,
-                month: cleanCellValue(row[idxMonth]),
-                speed: parseInt(cleanCodeValue(row[idxSpeed]), 10) || 0,
-                type: sheetName === 'english_all' ? 'english' : 'korean'
-              };
-            }).filter(item => item.studentId && item.month);
+          } else if (sheetKey === 'level_rule') {
+            // Parse columns: 타입, 급수, 최소값
+            const idxType = findIndexByNames(headers, ['타입', '구분', '종류', 'type', '언어']);
+            const idxLevel = findIndexByNames(headers, ['급수', '등급', '레벨', 'level']);
+            const idxMin = findIndexByNames(headers, ['최소값', '기준', '타수', '최소', 'min', '최저']);
+
+            if (idxType === -1 || idxLevel === -1 || idxMin === -1) {
+              continue; // try next candidate
+            }
+
+            results[sheetKey] = rows.slice(1).map(row => ({
+              type: cleanCellValue(row[idxType]),
+              level: cleanCellValue(row[idxLevel]),
+              minVal: parseInt(cleanCodeValue(row[idxMin]), 10) || 0
+            })).filter(item => item.type && item.level);
           }
 
-        } else if (sheetName === 'level_rule') {
-          // Parse columns: 타입, 급수, 최소값
-          const idxType = findIndexByNames(headers, ['타입', '구분', '종류', 'type', '언어']);
-          const idxLevel = findIndexByNames(headers, ['급수', '등급', '레벨', 'level']);
-          const idxMin = findIndexByNames(headers, ['최소값', '기준', '타수', '최소', 'min', '최저']);
+          // If we reached here without error, we loaded the sheet successfully!
+          loadedSuccessfully = true;
+          break; // break candidate loop for this sheetKey
 
-          if (idxType === -1 || idxLevel === -1 || idxMin === -1) {
-            const missing = [];
-            if (idxType === -1) missing.push('타입');
-            if (idxLevel === -1) missing.push('급수');
-            if (idxMin === -1) missing.push('최소값');
-            throw new Error(`'level_rule' 시트의 필수 컬럼 헤더(${missing.join(', ')})를 찾을 수 없습니다.`);
-          }
-
-          results[sheetName] = rows.slice(1).map(row => ({
-            type: cleanCellValue(row[idxType]),
-            level: cleanCellValue(row[idxLevel]),
-            minVal: parseInt(cleanCodeValue(row[idxMin]), 10) || 0
-          })).filter(item => item.type && item.level);
+        } catch (err: any) {
+          lastErrorMessage = err.message || 'Unknown error';
+          // continue candidate loop
         }
+      }
 
-      } catch (err: any) {
-        console.error(`Error parsing sheet "${sheetName}":`, err);
-        // Critical sheet must propagate error
-        if (sheetName === 'students_auth') {
-          throw new Error(`[학생 명부 로드 오류] ${err.message || '인증 시트를 불러오지 못했습니다.'}`);
+      if (!loadedSuccessfully) {
+        console.error(`Failed to load sheet ${sheetKey} after trying all candidates: ${lastErrorMessage}`);
+        if (sheetKey === 'students_auth') {
+          throw new Error(`[학생 명부 로드 오류] ${lastErrorMessage || '인증 시트를 불러오지 못했습니다.'}`);
         } else {
-          // Non-critical sheet failures are gracefully defaulted
-          results[sheetName] = [];
+          results[sheetKey] = [];
         }
       }
     }

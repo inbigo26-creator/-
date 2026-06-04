@@ -722,6 +722,24 @@ function getStudentTypingData(studentId, pin) {
         {/* Modal Body */}
         <div className="p-6 space-y-6 flex-1 overflow-y-auto max-h-[70vh]">
           
+          {/* 📱 모바일 및 전 기기 연동 가이드 배너 */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-3">
+            <span className="font-black text-emerald-850 flex items-center gap-1.5 text-xs sm:text-sm">
+              <span>📱</span> 모바일 / 외부 디바이스 실시간 연동 가이드
+            </span>
+            <p className="text-[11.8px] text-emerald-800 leading-relaxed font-semibold">
+              PC뿐만 아니라 <strong>스마트폰, 태블릿 등 어느 디바이스에서 접속</strong>하더라도 연동된 구글 스프레드시트 기록을 완벽하게 동기화하고 조회하기 위해서는 아래 <strong>두 가지 방법 중 하나를 필수로 완료</strong>해 주셔야 합니다:
+            </p>
+            <ul className="list-decimal list-inside text-[11px] text-emerald-700 space-y-2 font-medium pl-1">
+              <li>
+                <strong className="text-emerald-900">구글 시트 공유 권한 개방 (가장 간편):</strong> 연동한 구글 스프레드시트 우측 상단 <strong className="text-emerald-950 font-black">[공유]</strong> 버튼을 누르고, 일반 액세스 설정을 <strong>'링크가 있는 모든 사용자 / 뷰어'</strong>로 지정해 주세요. 스마트폰 폰 화면에서도 즉시 실시간 연동이 정상 작동합니다.
+              </li>
+              <li>
+                <strong className="text-emerald-900">앱스 스크립트 웹 앱 주소 연동 (최고 보안):</strong> 시트를 완전 비공개 모드로 유지하면서 조회를 지원하려면, 아래 <strong>[구글 Apps Script 독립 배포 코드 추출기]</strong> 탭을 클릭하여 코드를 복사해 배포한 후, 부여받은 Web App URL을 ⚡ 입력칸에 붙여넣어 주십시오. CORS 우회를 통해 모바일 통신 제한을 안전하게 뚫고 0.1초 고속 조회를 제공합니다.
+              </li>
+            </ul>
+          </div>
+          
           {/* Step 1: 구글 스프레드시트 토글 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
