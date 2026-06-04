@@ -104,15 +104,15 @@ export function parseStudentIdInfo(studentId: string): { grade: string; classNum
     }
   }
 
-  // 1,2반 -> 항공과, 3,4반 -> 부사관과, 5,6반 -> SNS과, 7,8반 -> 콘텐츠과
+  // 1,2반 -> 항공서비스, 3,4반 -> 부사관경영, 5,6반 -> SNS마케팅, 7,8반 -> 콘텐츠디자인
   if (classNum === 1 || classNum === 2) {
-    department = '항공과';
+    department = '항공서비스';
   } else if (classNum === 3 || classNum === 4) {
-    department = '부사관과';
+    department = '부사관경영';
   } else if (classNum === 5 || classNum === 6) {
-    department = 'SNS과';
+    department = 'SNS마케팅';
   } else if (classNum === 7 || classNum === 8) {
-    department = '콘텐츠과';
+    department = '콘텐츠디자인';
   } else {
     department = '기타';
   }
@@ -546,9 +546,13 @@ export function calculateStudentStats(
   allLevels: LevelRule[],
   type: 'english' | 'korean'
 ): StudentStats {
+  // Normalize IDs to prevent exact-string mismatch due to spacing, types, or float artifacts (.0)
+  const norm = (id: string) => String(id || '').trim().replace(/[^0-9A-Za-z]/g, '');
+  const targetIdNorm = norm(studentId);
+
   // Filter for matching student and record type
   const targetTypeStr = type === 'english' ? 'english' : 'korean';
-  const rawRecords = allRecords.filter(r => r.studentId === studentId && r.type === targetTypeStr);
+  const rawRecords = allRecords.filter(r => norm(r.studentId) === targetIdNorm && r.type === targetTypeStr);
   
   // Sort chronologically (March -> October, etc.)
   const history = sortRecordsByMonth(rawRecords);

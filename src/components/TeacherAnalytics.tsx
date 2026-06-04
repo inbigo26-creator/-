@@ -586,7 +586,7 @@ export function TeacherAnalytics({
   const integratedStats = useMemo(() => {
     const listMonths = ['5월', '6월', '7월', '8월', '9월', '10월'];
     const listGrades = ['1', '2', '3'];
-    const listDepts = ['항공과', '부사관과', 'SNS과', '콘텐츠과'];
+    const listDepts = ['항공서비스', '부사관경영', 'SNS마케팅', '콘텐츠디자인'];
 
     const getAverageForCell = (lang: 'english' | 'korean', grade: string, dept: string, mStr: string) => {
       const db = lang === 'english' ? englishDb : koreanDb;
@@ -621,6 +621,15 @@ export function TeacherAnalytics({
       return Math.round(sum / filtered.length);
     };
 
+    // Compact layout mapping
+    const mapDisplayName = (d: string) => {
+      if (d === '항공서비스') return '항공';
+      if (d === '부사관경영') return '부사관';
+      if (d === 'SNS마케팅') return 'SNS';
+      if (d === '콘텐츠디자인') return '콘텐츠';
+      return d;
+    };
+
     // Prepare grid data for english and korean
     const compileGrid = (lang: 'english' | 'korean') => {
       const rows: { grade: string; dept: string; label: string; values: number[] }[] = [];
@@ -632,7 +641,7 @@ export function TeacherAnalytics({
           rows.push({
             grade: g,
             dept: d,
-            label: `${g}학년 ${d}`,
+            label: `${g}학년 ${mapDisplayName(d)}`,
             values
           });
         });
@@ -1453,7 +1462,7 @@ export function TeacherAnalytics({
                   <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-rose-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                       <Star className="h-4 w-4" />
-                      한글 타자 누적 최고 속도 우수생 (최종 3명)
+                      한글 타자 최고 타수 (최종 3명)
                     </h4>
 
                     <div className="space-y-2.5">
@@ -1478,7 +1487,7 @@ export function TeacherAnalytics({
                   <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-indigo-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                       <Star className="h-4 w-4" />
-                      영어 타자 누적 최고 속도 우수생 (최종 3명)
+                      영어 타자 최고 타수 (최종 3명)
                     </h4>
 
                     <div className="space-y-2.5">
@@ -1508,7 +1517,7 @@ export function TeacherAnalytics({
                   <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                       <TrendingUp className="h-4 w-4" />
-                      한글 수련 종합 최다 향상 성장 우수생 (최종 3명)
+                      한글 타자 최고 향상 (최종 3명)
                     </h4>
 
                     <div className="space-y-2.5">
@@ -1540,7 +1549,7 @@ export function TeacherAnalytics({
                   <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                       <TrendingUp className="h-4 w-4" />
-                      영어 수련 종합 최다 향상 성장 우수생 (최종 3명)
+                      영어 타자 최고 향상 (최종 3명)
                     </h4>
 
                     <div className="space-y-2.5">
@@ -1653,32 +1662,32 @@ export function TeacherAnalytics({
 
                           return (
                             <>
-                              {/* Han/Kor Area and Line */}
-                              <path d={`${korD} L 100 100 L 0 100 Z`} fill="url(#amberGrad)" opacity="0.08" />
-                              <path d={korD} fill="none" stroke="#d97706" strokeWidth="3" strokeLinecap="round" />
+                              {/* Han/Kor Area and Line - styled beautifully in violet */}
+                              <path d={`${korD} L 100 100 L 0 100 Z`} fill="url(#violetLinearGrad)" opacity="0.08" />
+                              <path d={korD} fill="none" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" />
 
-                              {/* Eng Area and Line */}
-                              <path d={`${engD} L 100 100 L 0 100 Z`} fill="url(#violetGrad)" opacity="0.08" />
-                              <path d={engD} fill="none" stroke="#6d28d9" strokeWidth="3" strokeLinecap="round" />
+                              {/* Eng Area and Line - styled in indigo */}
+                              <path d={`${engD} L 100 100 L 0 100 Z`} fill="url(#indigoLinearGrad)" opacity="0.08" />
+                              <path d={engD} fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" />
 
-                              {/* Interactive dots for Amber */}
+                              {/* Interactive dots for Violet (Han) */}
                               {korPoints.map((p, idx) => (
-                                <circle key={`k-${idx}`} cx={p.x} cy={p.y} r="4" fill="#d97706" stroke="white" strokeWidth="2" />
+                                <circle key={`k-${idx}`} cx={p.x} cy={p.y} r="4" fill="#7c3aed" stroke="white" strokeWidth="2" />
                               ))}
 
-                              {/* Interactive dots for Violet */}
+                              {/* Interactive dots for Indigo (Eng) */}
                               {engPoints.map((p, idx) => (
-                                <circle key={`e-${idx}`} cx={p.x} cy={p.y} r="4" fill="#6d28d9" stroke="white" strokeWidth="2" />
+                                <circle key={`e-${idx}`} cx={p.x} cy={p.y} r="4" fill="#4f46e5" stroke="white" strokeWidth="2" />
                               ))}
 
                               {/* Grad Gradients */}
                               <defs>
-                                <linearGradient id="amberGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#d97706" />
+                                <linearGradient id="violetLinearGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#7c3aed" />
                                   <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
                                 </linearGradient>
-                                <linearGradient id="violetGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#6d28d9" />
+                                <linearGradient id="indigoLinearGrad" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#4f46e5" />
                                   <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
                                 </linearGradient>
                               </defs>
@@ -1693,8 +1702,8 @@ export function TeacherAnalytics({
                       {growthTrendsTimeline.map((t, idx) => (
                         <div key={idx} className="text-center">
                           <div className="flex flex-col gap-0.5 mb-1 items-center justify-center">
-                            <span className="text-amber-700 font-extrabold">한: {t.korAvg}타</span>
-                            <span className="text-violet-700 font-extrabold">영: {t.engAvg}타</span>
+                            <span className="text-violet-700 font-extrabold">한: {t.korAvg}타</span>
+                            <span className="text-indigo-700 font-extrabold">영: {t.engAvg}타</span>
                           </div>
                           <span className="text-stone-400 font-bold block">{t.month}</span>
                         </div>
@@ -1704,12 +1713,12 @@ export function TeacherAnalytics({
 
                   {/* Legends visual indicator */}
                   <div className="flex gap-4 justify-center text-xs">
-                    <span className="flex items-center gap-1.5 text-amber-700 font-bold">
-                      <span className="w-3 h-3 bg-amber-600 rounded-full" />
+                    <span className="flex items-center gap-1.5 text-violet-700 font-bold">
+                      <span className="w-3 h-3 bg-violet-600 rounded-full" />
                       전교생 한글 타자 평균
                     </span>
-                    <span className="flex items-center gap-1.5 text-violet-700 font-bold">
-                      <span className="w-3 h-3 bg-violet-700 rounded-full" />
+                    <span className="flex items-center gap-1.5 text-indigo-700 font-bold">
+                      <span className="w-3 h-3 bg-indigo-700 rounded-full" />
                       전교생 영어 타자 평균
                     </span>
                   </div>
@@ -1730,30 +1739,103 @@ export function TeacherAnalytics({
                   </h4>
                   <p className="text-[10.5px] text-stone-400 font-medium">단일 화면 내 컴팩트 뷰로 세로 학과 조합 및 가로 월별 실시간 평균 수집 성적을 모니터링합니다.</p>
                 </div>
-                <div className="shrink-0 text-right bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl font-sans text-[10px] text-indigo-700/95 font-bold">
-                  <span>순위 배제 및 단순 성적 대조 모드</span>
+                <div className="shrink-0 text-right bg-violet-50 border border-violet-100 px-3 py-1.5 rounded-xl font-sans text-[10px] text-violet-700/95 font-bold">
+                  <span>2026 전체 타자 통계</span>
                 </div>
               </div>
 
-              {/* Grid with English & Korean tables side-by-side on large screens, stacked on small */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Grid with Korean & English tables side-by-side on large screens, stacked on small */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 col-span-2">
                 
-                {/* 1. ENGLISH SECTION */}
-                <div className="border border-stone-200/80 rounded-2xl p-4 bg-stone-50/15 space-y-3">
+                {/* 1. KOREAN SECTION (PLACED FIRST) */}
+                <div className="border border-stone-200/85 rounded-2xl p-3 bg-stone-50/10 space-y-3">
                   <div className="flex items-center gap-2 border-b border-stone-200/50 pb-2">
-                    <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full" />
-                    <h5 className="text-xs font-black text-stone-800 tracking-wider">
-                      영어 수련 타수 현황판 (English Speed)
+                    <span className="w-2.5 h-2.5 bg-gradient-to-tr from-violet-600 to-fuchsia-500 rounded-full animate-pulse" />
+                    <h5 className="text-xs font-black text-stone-800 tracking-wider flex items-center gap-1">
+                      한글 타자 현황판 <span className="text-[10px] text-violet-600 font-bold font-mono">(Korean Speed)</span>
                     </h5>
                   </div>
                   
                   <div className="overflow-x-auto rounded-xl border border-stone-200 shadow-3xs">
-                    <table className="w-full text-left text-xs text-stone-700 border-collapse table-fixed min-w-[500px]">
+                    <table className="w-full text-left text-xs text-stone-700 border-collapse table-fixed min-w-[420px]">
                       <thead>
-                        <tr className="bg-stone-100/80 text-stone-600 font-bold border-b border-stone-200 text-[10.5px]">
-                          <th className="py-2 px-2 w-[110px] text-center border-r border-stone-200 font-black">대상 학학과</th>
+                        <tr className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 text-[10.5px]">
+                          <th className="py-2 px-1 w-[80px] text-center border-r border-stone-200 font-black">학년/학과</th>
                           {integratedStats.months.map((m, idx) => (
-                            <th key={idx} className="py-2 px-1 text-center font-black">{m}</th>
+                            <th key={idx} className="py-2 px-0.5 text-center font-black">{m}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-150">
+                        {/* 12 Departments */}
+                        {integratedStats.korean.rows.map((row, rIdx) => (
+                          <tr key={rIdx} className="hover:bg-violet-50/30 transition-colors">
+                            <td className="py-1.5 px-1 bg-stone-50 text-stone-800 font-bold text-[10px] border-r border-stone-150 font-sans truncate text-center">
+                              {row.label}
+                            </td>
+                            {row.values.map((val, vIdx) => (
+                              <td key={vIdx} className="py-1.5 px-0.5 text-center font-mono text-[11px]">
+                                {val > 0 ? (
+                                  <span className="font-bold text-violet-950">{val}타</span>
+                                ) : (
+                                  <span className="text-stone-300">-</span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+
+                        {/* Spacer line */}
+                        <tr className="bg-stone-100/40">
+                          <td colSpan={7} className="py-[1px] px-0 bg-stone-200"></td>
+                        </tr>
+
+                        {/* Grade Averages */}
+                        {integratedStats.korean.gradeAverages.map((row, rIdx) => (
+                          <tr key={rIdx} className="bg-violet-50/40 hover:bg-violet-50/60 transition-colors border-t border-stone-200 font-bold">
+                            <td className="py-1.5 px-1 bg-violet-100/20 text-violet-800 font-black text-[10px] border-r border-stone-150 text-center font-sans">
+                              {row.label}
+                            </td>
+                            {row.values.map((val, vIdx) => (
+                              <td key={vIdx} className="py-1.5 px-0.5 text-center font-mono text-[11px] text-violet-900 font-extrabold">
+                                {val > 0 ? `${val}타` : '-'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+
+                        {/* Overall Average */}
+                        <tr className="bg-violet-650 font-black text-white text-[11px] border-t-2 border-violet-700">
+                          <td className="py-2 px-1 bg-violet-700/90 text-white font-black text-[10px] border-r border-violet-700 text-center font-sans tracking-wide">
+                            {integratedStats.korean.overallAverage.label}
+                          </td>
+                          {integratedStats.korean.overallAverage.values.map((val, vIdx) => (
+                            <td key={vIdx} className="py-2 px-0.5 text-center font-mono text-[11.5px] text-white font-black">
+                              {val > 0 ? `${val}타` : '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2. ENGLISH SECTION (PLACED SECOND) */}
+                <div className="border border-stone-200/85 rounded-2xl p-3 bg-stone-50/10 space-y-3">
+                  <div className="flex items-center gap-2 border-b border-stone-200/50 pb-2">
+                    <span className="w-2.5 h-2.5 bg-indigo-550 bg-gradient-to-tr from-indigo-600 to-sky-500 rounded-full animate-pulse" />
+                    <h5 className="text-xs font-black text-stone-800 tracking-wider flex items-center gap-1">
+                      영어 타자 현황판 <span className="text-[10px] text-indigo-600 font-bold font-mono">(English Speed)</span>
+                    </h5>
+                  </div>
+                  
+                  <div className="overflow-x-auto rounded-xl border border-stone-200 shadow-3xs">
+                    <table className="w-full text-left text-xs text-stone-700 border-collapse table-fixed min-w-[420px]">
+                      <thead>
+                        <tr className="bg-stone-50 text-stone-600 font-bold border-b border-stone-200 text-[10.5px]">
+                          <th className="py-2 px-1 w-[80px] text-center border-r border-stone-200 font-black">학년/학과</th>
+                          {integratedStats.months.map((m, idx) => (
+                            <th key={idx} className="py-2 px-0.5 text-center font-black">{m}</th>
                           ))}
                         </tr>
                       </thead>
@@ -1761,13 +1843,13 @@ export function TeacherAnalytics({
                         {/* 12 Departments */}
                         {integratedStats.english.rows.map((row, rIdx) => (
                           <tr key={rIdx} className="hover:bg-indigo-50/20 transition-colors">
-                            <td className="py-1.5 px-2 bg-stone-50 text-stone-800 font-medium text-[10.5px] border-r border-stone-200 font-sans truncate text-center">
+                            <td className="py-1.5 px-1 bg-stone-50 text-stone-800 font-bold text-[10px] border-r border-stone-150 font-sans truncate text-center">
                               {row.label}
                             </td>
                             {row.values.map((val, vIdx) => (
-                              <td key={vIdx} className="py-1.5 px-1 text-center font-mono text-[11px]">
+                              <td key={vIdx} className="py-1.5 px-0.5 text-center font-mono text-[11px]">
                                 {val > 0 ? (
-                                  <span className="font-semibold text-stone-950">{val}타</span>
+                                  <span className="font-bold text-indigo-950">{val}타</span>
                                 ) : (
                                   <span className="text-stone-300">-</span>
                                 )}
@@ -1784,11 +1866,11 @@ export function TeacherAnalytics({
                         {/* Grade Averages */}
                         {integratedStats.english.gradeAverages.map((row, rIdx) => (
                           <tr key={rIdx} className="bg-indigo-50/35 hover:bg-indigo-50/50 transition-colors border-t border-stone-200 font-bold">
-                            <td className="py-1.5 px-2 bg-indigo-55/35 text-indigo-800 font-bold text-[10.5px] border-r border-stone-200 text-center font-sans">
+                            <td className="py-1.5 px-1 bg-indigo-100/20 text-indigo-800 font-black text-[10px] border-r border-stone-150 text-center font-sans">
                               {row.label}
                             </td>
                             {row.values.map((val, vIdx) => (
-                              <td key={vIdx} className="py-1.5 px-1 text-center font-mono text-[11px] text-indigo-900 font-black">
+                              <td key={vIdx} className="py-1.5 px-0.5 text-center font-mono text-[11px] text-indigo-900 font-extrabold">
                                 {val > 0 ? `${val}타` : '-'}
                               </td>
                             ))}
@@ -1796,85 +1878,12 @@ export function TeacherAnalytics({
                         ))}
 
                         {/* Overall Average */}
-                        <tr className="bg-indigo-600 font-black text-white text-[11px] border-t-2 border-indigo-700">
-                          <td className="py-2 px-2 bg-indigo-700/80 text-white font-black text-[10.5px] border-r border-indigo-700 text-center font-sans uppercase">
+                        <tr className="bg-indigo-650 font-black text-white text-[11px] border-t-2 border-indigo-700">
+                          <td className="py-2 px-1 bg-indigo-700/90 text-white font-black text-[10px] border-r border-indigo-700 text-center font-sans tracking-wide">
                             {integratedStats.english.overallAverage.label}
                           </td>
                           {integratedStats.english.overallAverage.values.map((val, vIdx) => (
-                            <td key={vIdx} className="py-2 px-1 text-center font-mono text-[11.5px] text-white font-black">
-                              {val > 0 ? `${val}타` : '-'}
-                            </td>
-                          ))}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 2. KOREAN SECTION */}
-                <div className="border border-stone-200/80 rounded-2xl p-4 bg-stone-50/15 space-y-3">
-                  <div className="flex items-center gap-2 border-b border-stone-200/50 pb-2">
-                    <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                    <h5 className="text-xs font-black text-stone-800 tracking-wider">
-                      한글 수련 타수 현황판 (Korean Speed)
-                    </h5>
-                  </div>
-                  
-                  <div className="overflow-x-auto rounded-xl border border-stone-200 shadow-3xs">
-                    <table className="w-full text-left text-xs text-stone-700 border-collapse table-fixed min-w-[500px]">
-                      <thead>
-                        <tr className="bg-stone-100/80 text-stone-600 font-bold border-b border-stone-200 text-[10.5px]">
-                          <th className="py-2 px-2 w-[110px] text-center border-r border-stone-200 font-black">대상 학과</th>
-                          {integratedStats.months.map((m, idx) => (
-                            <th key={idx} className="py-2 px-1 text-center font-black">{m}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-150">
-                        {/* 12 Departments */}
-                        {integratedStats.korean.rows.map((row, rIdx) => (
-                          <tr key={rIdx} className="hover:bg-amber-50/20 transition-colors">
-                            <td className="py-1.5 px-2 bg-stone-50 text-stone-800 font-medium text-[10.5px] border-r border-stone-200 font-sans truncate text-center">
-                              {row.label}
-                            </td>
-                            {row.values.map((val, vIdx) => (
-                              <td key={vIdx} className="py-1.5 px-1 text-center font-mono text-[11px]">
-                                {val > 0 ? (
-                                  <span className="font-semibold text-stone-955">{val}타</span>
-                                ) : (
-                                  <span className="text-stone-300">-</span>
-                                )}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-
-                        {/* Spacer line */}
-                        <tr className="bg-stone-100/40">
-                          <td colSpan={7} className="py-[1px] px-0 bg-stone-200"></td>
-                        </tr>
-
-                        {/* Grade Averages */}
-                        {integratedStats.korean.gradeAverages.map((row, rIdx) => (
-                          <tr key={rIdx} className="bg-amber-50/35 hover:bg-amber-50/50 transition-colors border-t border-stone-200 font-bold">
-                            <td className="py-1.5 px-2 bg-amber-55/30 text-amber-800 font-bold text-[10.5px] border-r border-stone-200 text-center font-sans">
-                              {row.label}
-                            </td>
-                            {row.values.map((val, vIdx) => (
-                              <td key={vIdx} className="py-1.5 px-1 text-center font-mono text-[11px] text-amber-900 font-black">
-                                {val > 0 ? `${val}타` : '-'}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-
-                        {/* Overall Average */}
-                        <tr className="bg-amber-600 font-black text-white text-[11px] border-t-2 border-amber-700">
-                          <td className="py-2 px-2 bg-amber-700/80 text-white font-black text-[10.5px] border-r border-amber-700 text-center font-sans uppercase">
-                            {integratedStats.korean.overallAverage.label}
-                          </td>
-                          {integratedStats.korean.overallAverage.values.map((val, vIdx) => (
-                            <td key={vIdx} className="py-2 px-1 text-center font-mono text-[11.5px] text-white font-black">
+                            <td key={vIdx} className="py-2 px-0.5 text-center font-mono text-[11.5px] text-white font-black">
                               {val > 0 ? `${val}타` : '-'}
                             </td>
                           ))}
