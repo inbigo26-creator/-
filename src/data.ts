@@ -359,7 +359,7 @@ export async function fetchSpreadsheetData(
             rows = data.values || [];
           } else {
             // Method 2: Public sheet fetching viewer endpoint when shared as "Anyone with the link can view"
-            const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(candidateName)}&${cacheBust}`;
+            const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(`'${candidateName}'`)}&${cacheBust}`;
             const res = await fetch(url);
             
             if (!res.ok) {

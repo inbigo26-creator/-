@@ -210,8 +210,43 @@ function getAllDataForSystem() {
     levels: []
   };
 
+  var fallbackNamesMap = {
+    'students_auth': ['students_auth', 'student_auth', 'students', 'auth', '인증', '학생명부', '학생_auth'],
+    'english_all': ['english_all', 'english', '영어_all', '영어', '영어타자', 'englishes', 'eng_all'],
+    'korean_all': ['korean_all', 'korean', '한글_all', '한글', '한글타자', 'koreans', 'kor_all'],
+    'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준']
+  };
+
+  function getSheetByPossibleNames(candidates) {
+    if (!ss) return null;
+    var allSheets = ss.getSheets();
+    
+    // 1차: 대소문자 및 특수기호/공백 정밀 일치
+    for (var i = 0; i < candidates.length; i++) {
+      var cand = String(candidates[i]).trim().toLowerCase().replace(/[\s_/-]/g, '');
+      for (var j = 0; j < allSheets.length; j++) {
+        var sClean = String(allSheets[j].getName()).trim().toLowerCase().replace(/[\s_/-]/g, '');
+        if (sClean === cand) {
+          return allSheets[j];
+        }
+      }
+    }
+    
+    // 2차: 느슨한 부분 포함 일치
+    for (var i = 0; i < candidates.length; i++) {
+      var cand = String(candidates[i]).trim().toLowerCase().replace(/[\s_/-]/g, '');
+      for (var j = 0; j < allSheets.length; j++) {
+        var sClean = String(allSheets[j].getName()).trim().toLowerCase().replace(/[\s_/-]/g, '');
+        if (sClean.indexOf(cand) !== -1 || cand.indexOf(sClean) !== -1) {
+          return allSheets[j];
+        }
+      }
+    }
+    return null;
+  }
+
   // 1. students_auth
-  var authSheet = ss.getSheetByName('students_auth');
+  var authSheet = getSheetByPossibleNames(fallbackNamesMap['students_auth']);
   if (authSheet) {
     var values = authSheet.getDataRange().getValues();
     var headers = values[0];
@@ -232,8 +267,8 @@ function getAllDataForSystem() {
   }
 
   // 통합 유연 파싱 헬퍼 (가로 누적/세로 누적 레이아웃 완벽 동시 지원)
-  function parseTypingSheet(sheetName, typeStr) {
-    var sheet = ss.getSheetByName(sheetName);
+  function parseTypingSheet(candidates, typeStr) {
+    var sheet = getSheetByPossibleNames(candidates);
     var dataList = [];
     if (!sheet) return dataList;
 
@@ -315,11 +350,11 @@ function getAllDataForSystem() {
     return dataList;
   }
 
-  result.english = parseTypingSheet('english_all', 'english');
-  result.korean = parseTypingSheet('korean_all', 'korean');
+  result.english = parseTypingSheet(fallbackNamesMap['english_all'], 'english');
+  result.korean = parseTypingSheet(fallbackNamesMap['korean_all'], 'korean');
 
   // 4. level_rule
-  var ruleSheet = ss.getSheetByName('level_rule');
+  var ruleSheet = getSheetByPossibleNames(fallbackNamesMap['level_rule']);
   if (ruleSheet) {
     var values = ruleSheet.getDataRange().getValues();
     var headers = values[0];
