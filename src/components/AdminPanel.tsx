@@ -461,13 +461,13 @@ function parseStudentIdInfoGas(studentId) {
   }
 
   if (classNum === 1 || classNum === 2) {
-    department = '항공서비스과';
+    department = '항공과';
   } else if (classNum === 3 || classNum === 4) {
-    department = '부사관경영과';
+    department = '부사관과';
   } else if (classNum === 5 || classNum === 6) {
-    department = 'SNS마케팅과';
+    department = 'SNS과';
   } else if (classNum === 7 || classNum === 8) {
-    department = '콘텐츠디자인과';
+    department = '콘텐츠과';
   } else {
     department = '기타';
   }

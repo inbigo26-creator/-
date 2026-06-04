@@ -104,15 +104,15 @@ export function parseStudentIdInfo(studentId: string): { grade: string; classNum
     }
   }
 
-  // 1,2반 -> 항공서비스과, 3,4반 -> 부사관경영과, 5,6반 -> SNS마케팅과, 7,8반 -> 콘텐츠디자인과
+  // 1,2반 -> 항공과, 3,4반 -> 부사관과, 5,6반 -> SNS과, 7,8반 -> 콘텐츠과
   if (classNum === 1 || classNum === 2) {
-    department = '항공서비스';
+    department = '항공과';
   } else if (classNum === 3 || classNum === 4) {
-    department = '부사관경영';
+    department = '부사관과';
   } else if (classNum === 5 || classNum === 6) {
-    department = 'SNS마케팅';
+    department = 'SNS과';
   } else if (classNum === 7 || classNum === 8) {
-    department = '콘텐츠디자인';
+    department = '콘텐츠과';
   } else {
     department = '기타';
   }
