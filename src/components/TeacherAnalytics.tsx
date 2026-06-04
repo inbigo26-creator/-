@@ -670,7 +670,7 @@ export function TeacherAnalytics({
           }`}
         >
           <TrendingUp className="h-4 w-4" />
-          <span>우상향 성장 곡선 그래프</span>
+          <span>인비 챌린지 타자 성장 그래프</span>
         </button>
       </div>
 
@@ -904,23 +904,23 @@ export function TeacherAnalytics({
                   {/* Level Distribution Ratios Card */}
                   <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase pb-2 border-b border-stone-100">
-                      인비 챌린지 최종 자격급수 전교 보유 통계
+                      인비 챌린지 최종 자격급수 보유 통계
                     </h4>
                     <div className="grid grid-cols-4 gap-2 text-center">
                       <div className="p-3 bg-rose-50 border border-slate-100 rounded-xl animate-fade-in">
-                        <span className="text-[10.5px] font-bold text-rose-600 block">1급인증 🥇</span>
+                        <span className="text-[10.5px] font-bold text-rose-600 block">1급 인증 🥇</span>
                         <span className="text-lg font-black text-rose-800 font-mono mt-0.5 inline-block">{aggregateStats.level1Count}명</span>
                       </div>
                       <div className="p-3 bg-amber-50 border border-slate-100 rounded-xl animate-fade-in">
-                        <span className="text-[10.5px] font-bold text-amber-600 block">2급인증 🥈</span>
+                        <span className="text-[10.5px] font-bold text-amber-600 block">2급 인증 🥈</span>
                         <span className="text-lg font-black text-amber-800 font-mono mt-0.5 inline-block">{aggregateStats.level2Count}명</span>
                       </div>
                       <div className="p-3 bg-emerald-50 border border-slate-100 rounded-xl animate-fade-in">
-                        <span className="text-[10.5px] font-bold text-emerald-600 block">3급인증 🥉</span>
+                        <span className="text-[10.5px] font-bold text-emerald-600 block">3급 인증 🥉</span>
                         <span className="text-lg font-black text-emerald-800 font-mono mt-0.5 inline-block">{aggregateStats.level3Count}명</span>
                       </div>
                       <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl animate-fade-in">
-                        <span className="text-[10.5px] font-bold text-slate-550 block">미통과 🚫</span>
+                        <span className="text-[10.5px] font-bold text-slate-550 block">급수 없음 🚫</span>
                         <span className="text-lg font-black text-slate-700 font-mono mt-0.5 inline-block">{aggregateStats.failCount}명</span>
                       </div>
                     </div>
@@ -938,9 +938,9 @@ export function TeacherAnalytics({
                   <div className="space-y-1">
                     <h4 className="text-[13px] font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
                       <UserCheck className="h-4 w-4 text-indigo-600" />
-                      학급별 학생 자격증 및 등급 대조 명부
+                      전교(학년/학과) 학생 타자 급수 명단
                     </h4>
-                    <p className="text-[11px] text-stone-400">교내 전체 수련생의 한글/영어 누적 최고 성적 대조서입니다.</p>
+                    <p className="text-[11px] text-stone-400">전체 학생의 한글/영어 누적 최고 성적 대조서입니다.</p>
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-[10px] text-stone-400 font-bold block">조건 필터링 결과</span>
@@ -1049,10 +1049,10 @@ export function TeacherAnalytics({
                       ) : (
                         filteredStudents.map((s, idx) => {
                           let displayFinal = '';
-                          if (s.finalPoints === 3) displayFinal = '🥇 타자 1급 (한350+/영200+)';
-                          else if (s.finalPoints === 2) displayFinal = '🥈 타자 2급 (한250+/영150+)';
-                          else if (s.finalPoints === 1) displayFinal = '🥉 타자 3급 (한150+/영100+)';
-                          else displayFinal = '미달 (수련 중)';
+                          if (s.finalPoints === 3) displayFinal = '🥇 타자 1급';
+                          else if (s.finalPoints === 2) displayFinal = '🥈 타자 2급';
+                          else if (s.finalPoints === 1) displayFinal = '🥉 타자 3급';
+                          else displayFinal = '급수 없음 (연습 중)';
 
                           return (
                             <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
@@ -1123,9 +1123,9 @@ export function TeacherAnalytics({
                   ★ 중복 수령 방지 및 이월 이력 시스템 연동 로직
                 </span>
                 <p className="text-[11.2px] text-amber-800 font-medium leading-relaxed">
-                  매달 시상 시 <strong>이미 이전 달에 한 번이라도 간식을 받은 학생은 순위권에서 강제 배제(Blacklist 적용)</strong>됩니다. 
-                  보상은 후순위 대기 학생(4위, 5위...)에게 공정하게 상속됩니다. 
-                  아래에서 월(5월~10월)을 누르시면 해당 월의 <strong>간식 당첨 학생 6명</strong> 및 사유와 제외된 후보 명단을 입체적으로 확인하실 수 있습니다.
+                  매달 시상 시 <strong>이미 이전 달에 한 번이라도 간식을 받은 학생은 순위권에서 제외</strong>됩니다. 
+                  보상은 다음 순위 학생(4위, 5위...)에게 돌아갑니다. 
+                  아래에서 월(5월~10월)을 누르시면 해당 월의 <strong>간식 당첨 학생 6명</strong> 및 사유와 제외된 후보 명단을 확인하실 수 있습니다.
                 </p>
               </div>
 
