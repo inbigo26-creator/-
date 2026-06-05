@@ -10,7 +10,8 @@ import {
   DEFAULT_SPREADSHEET_ID, 
   getMonthNumber,
   clearDataCache,
-  parseStudentIdInfo
+  parseStudentIdInfo,
+  saveConsentToSpreadsheet
 } from './data';
 import { StudentAuth, TypingRecord, LevelRule, StudentStats } from './types';
 import { StudentStatsCard } from './components/StudentCards';
@@ -55,10 +56,21 @@ export default function App() {
   const [englishDb, setEnglishDb] = useState<TypingRecord[]>([]);
   const [koreanDb, setKoreanDb] = useState<TypingRecord[]>([]);
   const [levelRulesDb, setLevelRulesDb] = useState<LevelRule[]>([]);
+  const [privacyDb, setPrivacyDb] = useState<{ studentId: string; name: string; agreed: boolean }[]>([]);
 
   // Authentication states
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [pendingSession, setPendingSession] = useState<{
+    id: string;
+    name: string;
+    grade: string;
+    department: string;
+    englishStats: StudentStats;
+    koreanStats: StudentStats;
+  } | null>(null);
+  const [privacyCheckboxChecked, setPrivacyCheckboxChecked] = useState(false);
+  const [isSavingConsent, setIsSavingConsent] = useState(false);
   const [studentSession, setStudentSession] = useState<{
     id: string;
     name: string;
@@ -450,6 +462,7 @@ export default function App() {
         setEnglishDb(data.english);
         setKoreanDb(data.korean);
         setLevelRulesDb(data.levels);
+        setPrivacyDb(data.privacy || []);
         
         setSheetMetrics({
           success: true,
@@ -534,6 +547,18 @@ export default function App() {
         koreanStats
       };
 
+      // Check if student has already consented to privacy terms
+      const normId = normalizeValue(currentAuth.studentId);
+      const hasConsented = localStorage.getItem('privacy_consent_' + normId) === 'true' || 
+                           privacyDb.some(p => normalizeValue(p.studentId) === normId);
+
+      if (!hasConsented) {
+        setPendingSession(session);
+        setPrivacyCheckboxChecked(false);
+        setIsAuthenticating(false);
+        return;
+      }
+
       setStudentSession(session);
 
       // Trigger Confetti Celebration for high improvements
@@ -575,6 +600,59 @@ export default function App() {
     setStudentIdInput('');
     setPinInput('');
     setAuthError(null);
+    setPendingSession(null);
+  };
+
+  const handleSaveConsent = async () => {
+    if (!pendingSession) return;
+    setIsSavingConsent(true);
+    try {
+      await saveConsentToSpreadsheet(
+        spreadsheetId,
+        pendingSession.id,
+        pendingSession.name,
+        googleToken,
+        appsScriptUrl
+      );
+
+      const normId = normalizeValue(pendingSession.id);
+      localStorage.setItem('privacy_consent_' + normId, 'true');
+
+      setPrivacyDb(prev => [
+        ...prev,
+        { studentId: pendingSession.id, name: pendingSession.name, agreed: true }
+      ]);
+
+      setStudentSession(pendingSession);
+
+      const topImprovement = Math.max(pendingSession.englishStats.growth, pendingSession.koreanStats.growth);
+      if (topImprovement > 0) {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+        setTimeout(() => {
+          confetti({
+            particleCount: 100,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 }
+          });
+          confetti({
+            particleCount: 100,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 }
+          });
+        }, 300);
+      }
+    } catch (err) {
+      console.error('Failed saving privacy consent:', err);
+    } finally {
+      setIsSavingConsent(false);
+      setPendingSession(null);
+    }
   };
 
   // Called when Teacher connects a spreadsheet
@@ -1156,6 +1234,94 @@ export default function App() {
                 선생님 모드 들어가기 🔓
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🔐 Privacy Consent Modal Popup */}
+      {pendingSession && (
+        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in animate-duration-150">
+          <div className="bg-white rounded-3xl border border-emerald-100 shadow-xl max-w-lg w-full p-6 sm:p-8 space-y-6 relative overflow-hidden animate-scale-up">
+            <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-600" />
+            
+            <div className="flex items-center gap-3 pb-3 border-b border-stone-100">
+              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-black text-slate-950 font-sans tracking-tight">
+                개인정보 수집·이용 동의 안내
+              </h3>
+            </div>
+
+            <div className="space-y-4 text-xs tracking-tight text-stone-605 leading-relaxed font-sans">
+              <p className="font-bold">
+                본 프로그램은 학생들의 타자 능력 향상도 관리를 위해 아래와 같이 최소한의 개인정보를 수집합니다.
+              </p>
+              
+              <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4.5 space-y-2 text-[11px] font-sans shadow-3xs">
+                <div>
+                  <span className="font-black text-stone-900 font-sans">1. 수집 항목: </span>
+                  <span className="font-black text-emerald-800 font-sans">학번, 이름, 생년월일, 매월 타자검정 결과</span>
+                </div>
+                <div>
+                  <span className="font-black text-stone-900 font-sans">2. 수집 목적: </span>
+                  <span className="font-black text-emerald-800 font-sans">사용자 식별, 로그인 서비스 제공, 월별 타자 성적 관리</span>
+                </div>
+                <div>
+                  <span className="font-black text-stone-900 font-sans">3. 보유 기간: </span>
+                  <span className="font-black text-emerald-800 font-sans">해당 학년도 종료 시까지</span>
+                </div>
+              </div>
+
+              <p className="text-[10.5px] font-black text-stone-500 font-sans leading-relaxed">
+                ※ 귀하는 개인정보 수집·이용에 동의하지 않을 권리가 있으며, 동의 거부 시 본 프로그램 이용이 불가능합니다.
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-stone-100 space-y-5">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={privacyCheckboxChecked}
+                  onChange={(e) => setPrivacyCheckboxChecked(e.target.checked)}
+                  className="mt-0.5 h-4.5 w-4.5 rounded-sm border-stone-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                />
+                <span className="text-xs font-black text-stone-900 font-sans">
+                  위 내용을 확인하였으며, 개인정보 수집 및 이용에 동의합니다. (필수)
+                </span>
+              </label>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingSession(null);
+                    setPrivacyCheckboxChecked(false);
+                    setStudentIdInput('');
+                    setPinInput('');
+                  }}
+                  className="flex-1 py-3 text-xs font-bold bg-stone-100 hover:bg-stone-200/80 text-stone-500 rounded-2xl transition-all cursor-pointer"
+                >
+                  동의 거부 (취소)
+                </button>
+                <button
+                  type="button"
+                  disabled={!privacyCheckboxChecked || isSavingConsent}
+                  onClick={handleSaveConsent}
+                  className={`flex-1 py-3 text-xs font-black rounded-2xl transition-all text-white shadow-xs cursor-pointer flex items-center justify-center gap-1.5 ${
+                    privacyCheckboxChecked && !isSavingConsent
+                      ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-98'
+                      : 'bg-stone-300 text-stone-500 cursor-not-allowed'
+                  }`}
+                >
+                  {isSavingConsent ? '저장 중...' : '동의 및 확인'}
+                </button>
+              </div>
+
+              <p className="text-[9.5px] text-stone-400 font-medium text-center leading-normal font-sans">
+                귀하는 동의를 거부할 권리가 있으나, 동의 거부 시 프로그램 이용이 제한될 수 있습니다.
+              </p>
+            </div>
           </div>
         </div>
       )}

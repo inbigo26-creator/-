@@ -245,6 +245,7 @@ let cachedSpreadsheetAuth: StudentAuth[] | null = null;
 let cachedSpreadsheetEnglish: TypingRecord[] | null = null;
 let cachedSpreadsheetKorean: TypingRecord[] | null = null;
 let cachedSpreadsheetLevels: LevelRule[] | null = null;
+let cachedSpreadsheetPrivacy: { studentId: string; name: string; agreed: boolean }[] | null = null;
 
 // Clear cached spreadsheet data
 export function clearDataCache() {
@@ -252,6 +253,7 @@ export function clearDataCache() {
   cachedSpreadsheetEnglish = null;
   cachedSpreadsheetKorean = null;
   cachedSpreadsheetLevels = null;
+  cachedSpreadsheetPrivacy = null;
 }
 
 // Fetch Google Sheets Data
@@ -264,6 +266,7 @@ export async function fetchSpreadsheetData(
     english: TypingRecord[];
     korean: TypingRecord[];
     levels: LevelRule[];
+    privacy: { studentId: string; name: string; agreed: boolean }[];
   }> {
   
   // Return empty/warning data instead of mock demo data if default placeholder is used
@@ -272,7 +275,8 @@ export async function fetchSpreadsheetData(
       auth: [],
       english: [],
       korean: [],
-      levels: SAMPLE_LEVEL_RULES
+      levels: SAMPLE_LEVEL_RULES,
+      privacy: []
     };
   }
 
@@ -282,7 +286,8 @@ export async function fetchSpreadsheetData(
       auth: cachedSpreadsheetAuth,
       english: cachedSpreadsheetEnglish,
       korean: cachedSpreadsheetKorean,
-      levels: cachedSpreadsheetLevels
+      levels: cachedSpreadsheetLevels,
+      privacy: cachedSpreadsheetPrivacy || []
     };
   }
 
@@ -304,12 +309,14 @@ export async function fetchSpreadsheetData(
         cachedSpreadsheetEnglish = json.english || [];
         cachedSpreadsheetKorean = json.korean || [];
         cachedSpreadsheetLevels = json.levels || [];
+        cachedSpreadsheetPrivacy = json.privacy || [];
         
         return {
           auth: cachedSpreadsheetAuth,
           english: cachedSpreadsheetEnglish,
           korean: cachedSpreadsheetKorean,
-          levels: cachedSpreadsheetLevels
+          levels: cachedSpreadsheetLevels,
+          privacy: cachedSpreadsheetPrivacy
         };
       } else if (json && json.success === false) {
         throw new Error(json.message || 'Apps Script 처리 중 오류가 발생했습니다.');
@@ -323,14 +330,15 @@ export async function fetchSpreadsheetData(
   }
 
   try {
-    const sheetsToFetch = ['students_auth', 'english_all', 'korean_all', 'level_rule'];
+    const sheetsToFetch = ['students_auth', 'english_all', 'korean_all', 'level_rule', 'privacy'];
     const results: { [key: string]: any[] } = {};
 
     const fallbackNamesMap: { [key: string]: string[] } = {
       'students_auth': ['students_auth', 'student_auth', 'students', 'auth', '인증', '학생명부', '학생_auth'],
       'english_all': ['english_all', 'english', '영어_all', '영어', '영어타자', 'englishes', 'eng_all'],
       'korean_all': ['korean_all', 'korean', '한글_all', '한글', '한글타자', 'koreans', 'kor_all'],
-      'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준']
+      'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준'],
+      'privacy': ['privacy', '동의', '개인정보', '개인정보동의', 'privacy_consent']
     };
 
     for (const sheetKey of sheetsToFetch) {
@@ -499,6 +507,21 @@ export async function fetchSpreadsheetData(
               level: cleanCellValue(row[idxLevel]),
               minVal: parseInt(cleanCodeValue(row[idxMin]), 10) || 0
             })).filter(item => item.type && item.level);
+          } else if (sheetKey === 'privacy') {
+            // Parse columns: 학번, 이름, 동의 
+            const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+            const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
+            const idxAgreed = findIndexByNames(headers, ['동의', 'consent', 'agreed', '동의여부']);
+
+            if (idxId === -1 || idxName === -1) {
+              continue; // try next candidate
+            }
+
+            results[sheetKey] = rows.slice(1).map(row => ({
+              studentId: cleanCodeValue(row[idxId]),
+              name: cleanCellValue(row[idxName]),
+              agreed: idxAgreed !== -1 ? String(row[idxAgreed] || '').includes('동의') : true
+            })).filter(item => item.studentId);
           }
 
           // If we reached here without error, we loaded the sheet successfully!
@@ -525,12 +548,14 @@ export async function fetchSpreadsheetData(
     cachedSpreadsheetEnglish = results['english_all'];
     cachedSpreadsheetKorean = results['korean_all'];
     cachedSpreadsheetLevels = results['level_rule'];
+    cachedSpreadsheetPrivacy = results['privacy'] || [];
 
     return {
       auth: cachedSpreadsheetAuth || [],
       english: cachedSpreadsheetEnglish || [],
       korean: cachedSpreadsheetKorean || [],
-      levels: cachedSpreadsheetLevels || []
+      levels: cachedSpreadsheetLevels || [],
+      privacy: cachedSpreadsheetPrivacy || []
     };
 
   } catch (error: any) {
@@ -637,4 +662,113 @@ export function calculateStudentStats(
     nextLevelNeeded,
     percentToNext
   };
+}
+
+// Save Privacy Consent back to Spreadsheet
+export async function saveConsentToSpreadsheet(
+  spreadsheetId: string,
+  studentId: string,
+  name: string,
+  googleToken?: string | null,
+  appsScriptUrl?: string | null
+): Promise<boolean> {
+  // Offline or Demo Mode
+  if ((!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') && (!appsScriptUrl || !appsScriptUrl.trim())) {
+    console.log('Consent stored locally in demo/placeholder mode.');
+    return true;
+  }
+
+  const rowData = [studentId, name, '동의'];
+
+  // 1. Save using Apps Script custom action if available
+  if (appsScriptUrl && appsScriptUrl.trim()) {
+    try {
+      const cleanUrl = appsScriptUrl.trim();
+      const fetchUrl = cleanUrl.includes('?')
+        ? `${cleanUrl}&action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent('동의')}&t=${Date.now()}`
+        : `${cleanUrl}?action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent('동의')}&t=${Date.now()}`;
+      
+      const res = await fetch(fetchUrl);
+      if (res.ok) {
+        const json = await res.json().catch(() => ({ success: true }));
+        if (json && json.success !== false) {
+          console.log('Privacy consent logged successfully via Apps Script web app API.');
+          return true;
+        }
+      }
+    } catch (err) {
+      console.error('GAS Apps Script consent append failed - trying native sheets backup...', err);
+    }
+  }
+
+  // 2. Save directly via Google Sheets API (v4) with valid OAuth token
+  if (googleToken) {
+    try {
+      // 2a. Attempt to add Sheet "privacy" request in case it doesn't already exist.
+      // Ignore 400 errors meaning sheet already exists.
+      try {
+        const createUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+        const createRes = await fetch(createUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${googleToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            requests: [
+              {
+                addSheet: {
+                  properties: {
+                    title: 'privacy'
+                  }
+                }
+              }
+            ]
+          })
+        });
+
+        if (createRes.ok) {
+          // Newly created sheet - prepopulate Headers
+          const headerUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/privacy!A1:C1?valueInputOption=USER_ENTERED`;
+          await fetch(headerUrl, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${googleToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              values: [['학번', '이름', '동의']]
+            })
+          });
+        }
+      } catch (createErr) {
+        console.log('Add privacy sheet batchUpdate status:', createErr);
+      }
+
+      // 2b. Append rows
+      const appendUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/privacy:append?valueInputOption=USER_ENTERED`;
+      const appendRes = await fetch(appendUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${googleToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          values: [rowData]
+        })
+      });
+
+      if (appendRes.ok) {
+        console.log('Consent appended successfully to Google Sheets API v4.');
+        return true;
+      } else {
+        const errTxt = await appendRes.text();
+        console.error('Failed appending to privacy sheet direct endpoint:', errTxt);
+      }
+    } catch (err) {
+      console.error('Direct Google Sheets save process failed:', err);
+    }
+  }
+
+  return false;
 }
