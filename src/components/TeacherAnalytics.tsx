@@ -97,6 +97,7 @@ export function TeacherAnalytics({
   const [filterGrade, setFilterGrade] = useState<string>('all');
   const [filterDept, setFilterDept] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [filterLevel, setFilterLevel] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Unified student base list (to prevent omissions, we union authDb + raw record student IDs)
@@ -207,6 +208,8 @@ export function TeacherAnalytics({
         ...s,
         korSpeed,
         engSpeed,
+        maxKorSpeed: sKor.length > 0 ? Math.max(...sKor.map(r => r.speed), 0) : 0,
+        maxEngSpeed: sEng.length > 0 ? Math.max(...sEng.map(r => r.speed), 0) : 0,
         korPoints,
         engPoints,
         finalPoints,
@@ -251,6 +254,13 @@ export function TeacherAnalytics({
           if (s.levelAchievedMonth !== filterMonth) return false;
         }
       }
+      if (filterLevel !== 'all') {
+        // finalPoints matches level (3 = 1급, 2 = 2급, 1 = 3급, 0 = 미달)
+        if (filterLevel === '1' && s.finalPoints !== 3) return false;
+        if (filterLevel === '2' && s.finalPoints !== 2) return false;
+        if (filterLevel === '3' && s.finalPoints !== 1) return false;
+        if (filterLevel === '0' && s.finalPoints !== 0) return false;
+      }
       if (searchQuery.trim() !== '') {
         const q = searchQuery.toLowerCase();
         const matchesName = s.name.toLowerCase().includes(q);
@@ -259,7 +269,7 @@ export function TeacherAnalytics({
       }
       return true;
     });
-  }, [studentCertificates, filterGrade, filterDept, filterMonth, searchQuery]);
+  }, [studentCertificates, filterGrade, filterDept, filterMonth, filterLevel, searchQuery]);
 
   // 🟠 AGGREGATES: SCHOOL, GRADE AND DEPARTMENT STATISTICS
   const aggregateStats = useMemo(() => {
@@ -316,8 +326,8 @@ export function TeacherAnalytics({
       department: string;
       displayName: string;
       total: number;
-      certified: number;
-      rate: number;
+      korRate: number;
+      engRate: number;
       korSpeedAvg: number;
       engSpeedAvg: number;
     }[] = [];
@@ -326,26 +336,29 @@ export function TeacherAnalytics({
       activeDepts.forEach(d => {
         const list = validStudents.filter(s => s.grade === g && isDeptMatch(s.department, d));
         const total = list.length;
-        const certified = list.filter(s => s.isCertified).length;
-        const rateVal = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
-        const korSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.korSpeed, 0) / total) : 0;
-        const engSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.engSpeed, 0) / total) : 0;
+        const korSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.maxKorSpeed, 0) / total) : 0;
+        const engSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.maxEngSpeed, 0) / total) : 0;
+        
+        // Korean certificate achievement is speed >= 150 (Level 3+)
+        const korLevelCount = list.filter(s => s.maxKorSpeed >= 150).length;
+        // English certificate achievement is speed >= 100 (Level 3+)
+        const engLevelCount = list.filter(s => s.maxEngSpeed >= 100).length;
+
+        const korRate = total > 0 ? parseFloat(((korLevelCount / total) * 100).toFixed(1)) : 0;
+        const engRate = total > 0 ? parseFloat(((engLevelCount / total) * 100).toFixed(1)) : 0;
 
         classCombinedStats.push({
           grade: g,
           department: d,
           displayName: `${g}학년 ${d}`,
           total,
-          certified,
-          rate: rateVal,
+          korRate,
+          engRate,
           korSpeedAvg,
           engSpeedAvg
         });
       });
     });
-
-    // Sort combinations by rate descending, and then by total count as fallback order
-    classCombinedStats.sort((a, b) => b.rate - a.rate || b.total - a.total || a.displayName.localeCompare(b.displayName));
 
     const korRankings = [...classCombinedStats].sort((a, b) => b.korSpeedAvg - a.korSpeedAvg || b.total - a.total);
     const engRankings = [...classCombinedStats].sort((a, b) => b.engSpeedAvg - a.engSpeedAvg || b.total - a.total);
@@ -801,23 +814,11 @@ export function TeacherAnalytics({
           className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
             activeTab === 'achievement' 
               ? 'border-indigo-600 text-indigo-600' 
-              : 'border-transparent text-stone-400 hover:text-stone-700'
+              : 'border-transparent text-stone-400 hover:text-stone-750'
           }`}
         >
           <BarChart2 className="h-4 w-4" />
           <span>기본 분석 & 급수 수집</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('class_rankings')}
-          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
-            activeTab === 'class_rankings' 
-              ? 'border-indigo-600 text-indigo-600' 
-              : 'border-transparent text-stone-400 hover:text-stone-700'
-          }`}
-        >
-          <Trophy className="h-4 w-4 text-purple-600" />
-          <span>각 반별 통합 수련 랭킹</span>
         </button>
 
         <button
@@ -1070,11 +1071,11 @@ export function TeacherAnalytics({
                 {/* Header with KPI count */}
                 <div className="flex justify-between items-center flex-wrap gap-3 pb-3 border-b border-stone-100">
                   <div className="space-y-1">
-                    <h4 className="text-[13px] font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
+                    <h4 className="text-[13px] font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5 font-sans">
                       <UserCheck className="h-4 w-4 text-indigo-600" />
                       전교(학년/학과) 학생 타자 급수 명단
                     </h4>
-                    <p className="text-[11px] text-stone-400">전체 학생의 한글/영어 누적 최고 성적 대조서입니다.</p>
+                    <p className="text-[11px] text-stone-400 font-sans">전체 학생의 한글/영어 누적 최고 성적 대조서입니다.</p>
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-[10px] text-stone-400 font-bold block">조건 필터링 결과</span>
@@ -1086,7 +1087,7 @@ export function TeacherAnalytics({
                 {/* Unified Interactive Filter Console */}
                 <div className="p-4 bg-stone-50 rounded-xl border border-stone-200 space-y-3">
                   
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     
                     {/* Grade Selector Group */}
                     <div className="space-y-1">
@@ -1125,7 +1126,7 @@ export function TeacherAnalytics({
 
                     {/* Achievement Month Filter */}
                     <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block">인증 달성월 필터</span>
+                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block font-sans">인증 달성월 필터</span>
                       <select
                         value={filterMonth}
                         onChange={(e) => setFilterMonth(e.target.value)}
@@ -1139,9 +1140,25 @@ export function TeacherAnalytics({
                       </select>
                     </div>
 
+                    {/* Certificate Level (급수) Filter */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block font-sans">급수 취득 필터</span>
+                      <select
+                        value={filterLevel}
+                        onChange={(e) => setFilterLevel(e.target.value)}
+                        className="w-full bg-white border border-stone-200 rounded-lg p-1.5 text-xs font-bold text-stone-700 focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="all">전체 급수</option>
+                        <option value="1">1급 취득자</option>
+                        <option value="2">2급 취득자</option>
+                        <option value="3">3급 취득자</option>
+                        <option value="0">급수 미취득</option>
+                      </select>
+                    </div>
+
                     {/* Search Field */}
                     <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block">이름 / 학번 검색</span>
+                      <span className="text-[10px] font-bold text-stone-450 uppercase tracking-wider block font-sans">이름 / 학번 검색</span>
                       <div className="relative">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-stone-400">
                           <Search className="h-3.5 w-3.5" />
@@ -1246,125 +1263,7 @@ export function TeacherAnalytics({
             </div>
           )}
 
-          {/* 👑 TAB: GRADE & DEPT CLASS RANKINGS (한글/영어 따로 정렬) */}
-          {activeTab === 'class_rankings' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="bg-amber-50/50 border border-amber-200/65 rounded-2xl p-5 space-y-2 text-xs">
-                <span className="font-black text-amber-850 flex items-center gap-1.5 uppercase">
-                  <Trophy className="h-4 w-4 text-amber-600 animate-bounce" />
-                  ★ 학년·학과별 평균 타수 기준 랭킹 정렬 안내
-                </span>
-                <p className="text-[11.2px] text-amber-800 font-medium leading-relaxed">
-                  학년·학과별 평균 타수(한글/영어 개별 정렬) 기준 순위입니다. 평균속도가 높은 학과가 상위에 정렬됩니다.
-                </p>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* 1. Korean Rankings (Purple) */}
-                <div className="bg-white rounded-2xl border border-purple-200 p-6 space-y-4 shadow-2xs">
-                  <div className="flex justify-between items-center pb-2 border-b border-purple-100">
-                    <h4 className="text-sm font-black text-purple-900 tracking-wider uppercase flex items-center gap-1.5">
-                      <Trophy className="h-4 w-4 text-purple-600" />
-                      한글 타자 학급 순위 (평균속도 기준)
-                    </h4>
-                  </div>
-
-                  <div className="divide-y divide-purple-100 max-h-[500px] overflow-y-auto pr-1 space-y-2.5">
-                    {aggregateStats.korRankings.map((item, idx) => {
-                      const medalEmoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
-                      return (
-                        <div key={idx} className="pt-2.5 first:pt-0 space-y-1">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="flex items-center gap-1.5">
-                              <span className={`w-5 h-5 rounded-md border text-[10px] font-black flex items-center justify-center ${
-                                idx === 0 ? 'bg-purple-100 border-purple-200 text-purple-800' : 
-                                idx === 1 ? 'bg-slate-100 border-slate-200 text-slate-750' : 
-                                idx === 2 ? 'bg-orange-50 border-orange-100 text-orange-750' : 
-                                'bg-stone-50 border-stone-150 text-stone-600'
-                              }`}>
-                                {idx + 1}
-                              </span>
-                              <span className="font-extrabold text-stone-850 text-[12.5px]">
-                                {item.displayName} {medalEmoji}
-                              </span>
-                            </span>
-                            <span className="font-mono font-extrabold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
-                              평균: {item.korSpeedAvg}타
-                            </span>
-                          </div>
-
-                          <div className="h-2 w-full bg-slate-50 border border-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-500 bg-purple-600`} 
-                              style={{ width: `${Math.min(100, (item.korSpeedAvg / 450) * 100)}%` }}
-                            />
-                          </div>
-
-                          <div className="flex justify-between text-[10px] text-stone-450 font-mono pl-6">
-                            <span>인증학생: {item.certified}명 / 총 {item.total}명</span>
-                            <span>인증 비율: {item.rate}%</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. English Rankings (Indigo) */}
-                <div className="bg-white rounded-2xl border border-indigo-200 p-6 space-y-4 shadow-2xs">
-                  <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                    <h4 className="text-sm font-black text-indigo-900 tracking-wider uppercase flex items-center gap-1.5">
-                      <Trophy className="h-4 w-4 text-indigo-600" />
-                      영어 타자 학급 순위 (평균속도 기준)
-                    </h4>
-                  </div>
-
-                  <div className="divide-y divide-indigo-100 max-h-[500px] overflow-y-auto pr-1 space-y-2.5">
-                    {aggregateStats.engRankings.map((item, idx) => {
-                      const medalEmoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
-                      return (
-                        <div key={idx} className="pt-2.5 first:pt-0 space-y-1">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="flex items-center gap-1.5">
-                              <span className={`w-5 h-5 rounded-md border text-[10px] font-black flex items-center justify-center ${
-                                idx === 0 ? 'bg-indigo-100 border-indigo-200 text-indigo-800' : 
-                                idx === 1 ? 'bg-slate-100 border-slate-200 text-slate-750' : 
-                                idx === 2 ? 'bg-orange-50 border-orange-100 text-orange-750' : 
-                                'bg-stone-50 border-stone-150 text-stone-600'
-                              }`}>
-                                {idx + 1}
-                              </span>
-                              <span className="font-extrabold text-stone-850 text-[12.5px]">
-                                {item.displayName} {medalEmoji}
-                              </span>
-                            </span>
-                            <span className="font-mono font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                              평균: {item.engSpeedAvg}타
-                            </span>
-                          </div>
-
-                          <div className="h-2 w-full bg-slate-50 border border-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-500 bg-indigo-600`} 
-                              style={{ width: `${Math.min(100, (item.engSpeedAvg / 250) * 100)}%` }}
-                            />
-                          </div>
-
-                          <div className="flex justify-between text-[10px] text-stone-450 font-mono pl-6">
-                            <span>인증학생: {item.certified}명 / 총 {item.total}명</span>
-                            <span>인증 비율: {item.rate}%</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          )}
 
           {/* 🟡 TAB 2: MONTHLY SNACK AWARDS (CHRONOLOGICAL ROLL-OVER) */}
           {activeTab === 'monthly_snacks' && (
@@ -1737,10 +1636,10 @@ export function TeacherAnalytics({
             <div className="bg-white rounded-2xl border border-stone-200 p-6 space-y-6 shadow-xs animate-fade-in">
               <div className="flex justify-between items-center pb-2 border-b">
                 <div>
-                  <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase">
+                  <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase font-sans">
                     학기 수련 타자 프로그램 도입 전교생 효과 분석 흐름
                   </h4>
-                  <p className="text-[10px] text-stone-400 font-medium">5월 기준 우상향 선 차트 분석 데이터</p>
+                  <p className="text-[10px] text-stone-400 font-medium font-sans">5월 기준 우상향 선 차트 및 각 월별 실제 수련 실적 바 차트 연계</p>
                 </div>
                 <span className="inline-flex items-center gap-1 bg-emerald-55 text-emerald-700 text-[9px] border px-2.5 py-1 rounded-lg font-black font-sans">
                   인비 챌린지 검정 효과 분석 입증용 🚀
@@ -1749,22 +1648,22 @@ export function TeacherAnalytics({
 
               {/* Graphical Plot container */}
               {growthTrendsTimeline.length < 2 ? (
-                <div className="text-center py-16 text-stone-400 text-xs">
+                <div className="text-center py-16 text-stone-400 text-xs font-sans">
                   최소 2개 이상의 월별 훈련 기록이 입력되면 성장 우상향 곡선이 즉각 표기됩니다.
                 </div>
               ) : (
                 <div className="space-y-6">
                   
                   {/* Interactive Indicator */}
-                  <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl text-xs flex justify-between items-center text-[11px] font-medium leading-relaxed font-sans text-indigo-900/90">
+                  <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl text-xs flex flex-col md:flex-row md:justify-between md:items-center gap-2 text-[11px] font-medium leading-relaxed font-sans text-indigo-900/90">
                     <p>
                       💡 <strong>전교생 분석 결과:</strong> 5월 도입 이래, 평균 한글 타수는 
-                      <strong className="text-indigo-650 mx-1">
+                      <strong className="text-indigo-650 mx-1 font-mono font-bold">
                         {growthTrendsTimeline[0].korAvg}타 ➡️ {growthTrendsTimeline[growthTrendsTimeline.length - 1].korAvg}타
                       </strong> 
                       ({growthTrendsTimeline[growthTrendsTimeline.length - 1].korAvg - growthTrendsTimeline[0].korAvg}타 우상향), 
                       영문 타수는 
-                      <strong className="text-indigo-650 mx-1">
+                      <strong className="text-indigo-650 mx-1 font-mono font-bold">
                         {growthTrendsTimeline[0].engAvg}타 ➡️ {growthTrendsTimeline[growthTrendsTimeline.length - 1].engAvg}타
                       </strong> 
                       ({growthTrendsTimeline[growthTrendsTimeline.length - 1].engAvg - growthTrendsTimeline[0].engAvg}타 우상향)으로 집계되었습니다. 
@@ -1772,107 +1671,225 @@ export function TeacherAnalytics({
                     </p>
                   </div>
 
-                  {/* Large custom SVG graph mapping */}
-                  <div className="relative bg-slate-50 border border-slate-100 rounded-2xl p-6 h-64 flex flex-col justify-between select-none">
-                    <div className="flex-1 w-full relative">
-                      {/* Grid Lines */}
-                      <div className="absolute inset-x-0 top-0 border-t border-slate-150" />
-                      <div className="absolute inset-x-0 top-1/4 border-t border-dashed border-slate-200" />
-                      <div className="absolute inset-x-0 top-2/4 border-t border-dashed border-slate-200" />
-                      <div className="absolute inset-x-0 top-3/4 border-t border-dashed border-slate-200" />
-                      <div className="absolute inset-x-0 bottom-0 border-b border-slate-150" />
-
-                      {/* SVG element */}
-                      <svg className="w-full h-full absolute inset-0 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                        {(() => {
-                          const allSpeeds = [
-                            ...growthTrendsTimeline.map(t => t.korAvg),
-                            ...growthTrendsTimeline.map(t => t.engAvg)
-                          ];
-                          const maxSpeed = Math.max(...allSpeeds) * 1.15;
-                          const minSpeed = Math.min(...allSpeeds) * 0.85;
-                          const range = (maxSpeed - minSpeed) || 1;
-
-                          const korPoints = growthTrendsTimeline.map((t, idx) => {
-                            const x = (idx / (growthTrendsTimeline.length - 1)) * 100;
-                            const y = 100 - (((t.korAvg - minSpeed) / range) * 100);
-                            return { x, y };
-                          });
-
-                          const engPoints = growthTrendsTimeline.map((t, idx) => {
-                            const x = (idx / (growthTrendsTimeline.length - 1)) * 100;
-                            const y = 100 - (((t.engAvg - minSpeed) / range) * 100);
-                            return { x, y };
-                          });
-
-                          const korD = korPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-                          const engD = engPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-
-                          return (
-                            <>
-                              {/* Han/Kor Area and Line - styled beautifully in purple */}
-                              <path d={`${korD} L 100 100 L 0 100 Z`} fill="url(#purpleLinearGrad)" opacity="0.08" />
-                              <path d={korD} fill="none" stroke="#9333ea" strokeWidth="3" strokeLinecap="round" />
-
-                              {/* Eng Area and Line - styled in indigo */}
-                              <path d={`${engD} L 100 100 L 0 100 Z`} fill="url(#indigoLinearGrad)" opacity="0.08" />
-                              <path d={engD} fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" />
-
-                              {/* Interactive dots for Purple (Han) */}
-                              {korPoints.map((p, idx) => (
-                                <circle key={`k-${idx}`} cx={p.x} cy={p.y} r="4" fill="#9333ea" stroke="white" strokeWidth="2" />
-                              ))}
-
-                              {/* Interactive dots for Indigo (Eng) */}
-                              {engPoints.map((p, idx) => (
-                                <circle key={`e-${idx}`} cx={p.x} cy={p.y} r="4" fill="#4f46e5" stroke="white" strokeWidth="2" />
-                              ))}
-
-                              {/* Grad Gradients */}
-                              <defs>
-                                <linearGradient id="purpleLinearGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#9333ea" />
-                                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                                </linearGradient>
-                                <linearGradient id="indigoLinearGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="#4f46e5" />
-                                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                                </linearGradient>
-                              </defs>
-                            </>
-                          );
-                        })()}
-                      </svg>
-                    </div>
-
-                    {/* Timeline Legend label */}
-                    <div className="flex justify-between items-center pt-4 border-t border-slate-100 text-[10.5px] font-mono">
-                      {growthTrendsTimeline.map((t, idx) => (
-                        <div key={idx} className="text-center">
-                          <div className="flex flex-col gap-0.5 mb-1 items-center justify-center">
-                            <span className="text-purple-700 font-extrabold">한: {t.korAvg}타</span>
-                            <span className="text-indigo-700 font-extrabold">영: {t.engAvg}타</span>
-                          </div>
-                          <span className="text-stone-400 font-bold block">{t.month}</span>
+                  {/* 2-Column Bento Layout for Trend Graph & May baseline analysis stats */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    {/* Left/Middle Column: Large hybrid SVG graph */}
+                    <div id="growth-hybrid-graph-container" className="lg:col-span-2 relative bg-slate-50 border border-slate-100 rounded-2xl p-6 h-76 flex flex-col justify-between select-none">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider font-sans">성장 곡선 및 월별 수련 결과 (라인 + 막대 하이브리드)</span>
+                        <div className="flex gap-3 text-[9px] font-black font-sans">
+                          <span className="flex items-center gap-1 text-purple-700">🟣 한글선</span>
+                          <span className="flex items-center gap-1 text-indigo-700">🔵 영어선</span>
+                          <span className="flex items-center gap-1 text-stone-400">📊 월실제막대 (5월 포함)</span>
                         </div>
-                      ))}
+                      </div>
+
+                      <div className="flex-1 w-full relative">
+                        {/* Grid Lines */}
+                        <div className="absolute inset-x-0 top-0 border-t border-slate-150" />
+                        <div className="absolute inset-x-0 top-1/4 border-t border-dashed border-slate-200" />
+                        <div className="absolute inset-x-0 top-2/4 border-t border-dashed border-slate-200" />
+                        <div className="absolute inset-x-0 top-3/4 border-t border-dashed border-slate-200" />
+                        <div className="absolute inset-x-0 bottom-0 border-b border-slate-150" />
+
+                        {/* SVG element */}
+                        <svg className="w-full h-full absolute inset-0 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                          {(() => {
+                            const allSpeeds = [
+                              ...growthTrendsTimeline.map(t => t.korAvg),
+                              ...growthTrendsTimeline.map(t => t.engAvg)
+                            ];
+                            const maxSpeed = Math.max(...allSpeeds) * 1.15;
+                            const minSpeed = Math.min(...allSpeeds) * 0.85;
+                            const range = (maxSpeed - minSpeed) || 1;
+
+                            const korPoints = growthTrendsTimeline.map((t, idx) => {
+                              const x = (idx / (growthTrendsTimeline.length - 1)) * 100;
+                              const y = 100 - (((t.korAvg - minSpeed) / range) * 100);
+                              return { x, y, val: t.korAvg };
+                            });
+
+                            const engPoints = growthTrendsTimeline.map((t, idx) => {
+                              const x = (idx / (growthTrendsTimeline.length - 1)) * 100;
+                              const y = 100 - (((t.engAvg - minSpeed) / range) * 100);
+                              return { x, y, val: t.engAvg };
+                            });
+
+                            const korD = korPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                            const engD = engPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+                            return (
+                              <>
+                                {/* Translucent Bar Columns for exact month values (including May) in the background */}
+                                {korPoints.map((p, idx) => (
+                                  <rect
+                                    key={`kor-bar-${idx}`}
+                                    x={Math.max(0, p.x - 2.8)}
+                                    y={Math.min(100, p.y)}
+                                    width="2.2"
+                                    height={Math.max(0, 100 - p.y)}
+                                    fill="#b084f4"
+                                    opacity="0.18"
+                                    rx="0.5"
+                                  />
+                                ))}
+                                {engPoints.map((p, idx) => (
+                                  <rect
+                                    key={`eng-bar-${idx}`}
+                                    x={Math.min(98, p.x + 0.6)}
+                                    y={Math.min(100, p.y)}
+                                    width="2.2"
+                                    height={Math.max(0, 100 - p.y)}
+                                    fill="#6366f1"
+                                    opacity="0.18"
+                                    rx="0.5"
+                                  />
+                                ))}
+
+                                {/* Han/Kor Area and Line - styled beautifully in purple */}
+                                <path d={`${korD} L 100 100 L 0 100 Z`} fill="url(#purpleLinearGrad2)" opacity="0.06" />
+                                <path d={korD} fill="none" stroke="#9333ea" strokeWidth="2.5" strokeLinecap="round" />
+
+                                {/* Eng Area and Line - styled in indigo */}
+                                <path d={`${engD} L 100 100 L 0 100 Z`} fill="url(#indigoLinearGrad2)" opacity="0.06" />
+                                <path d={engD} fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinecap="round" />
+
+                                {/* Interactive dots with tooltip markings for Purple (Han) */}
+                                {korPoints.map((p, idx) => (
+                                  <g key={`kp-dot-${idx}`}>
+                                    <circle cx={p.x} cy={p.y} r="3.5" fill="#9333ea" stroke="white" strokeWidth="1.5" />
+                                    {/* May Highlight Flag */}
+                                    {idx === 0 && (
+                                      <g>
+                                        <rect x="0.5" y={p.y - 12} width="16" height="7.5" fill="#9333ea" rx="1.5" />
+                                        <text x="8" y={p.y - 7} fill="white" fontSize="4.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">시작점</text>
+                                      </g>
+                                    )}
+                                  </g>
+                                ))}
+
+                                {/* Interactive dots for Indigo (Eng) */}
+                                {engPoints.map((p, idx) => (
+                                  <g key={`ep-dot-${idx}`}>
+                                    <circle cx={p.x} cy={p.y} r="3.5" fill="#4f46e5" stroke="white" strokeWidth="1.5" />
+                                    {/* May Highlight Flag */}
+                                    {idx === 0 && (
+                                      <g>
+                                        <rect x="0.5" y={p.y + 4} width="16" height="7.5" fill="#4f46e5" rx="1.5" />
+                                        <text x="8" y={p.y + 9} fill="white" fontSize="4.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">5월 영어</text>
+                                      </g>
+                                    )}
+                                  </g>
+                                ))}
+
+                                {/* Grad Gradients */}
+                                <defs>
+                                  <linearGradient id="purpleLinearGrad2" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#9333ea" />
+                                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                                  </linearGradient>
+                                  <linearGradient id="indigoLinearGrad2" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#4f46e5" />
+                                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                                  </linearGradient>
+                                </defs>
+                              </>
+                            );
+                          })()}
+                        </svg>
+                      </div>
+
+                      {/* Timeline Legend label */}
+                      <div className="flex justify-between items-center pt-4 border-t border-slate-100 text-[10.5px] font-mono">
+                        {growthTrendsTimeline.map((t, idx) => (
+                          <div key={idx} className="text-center">
+                            <div className="flex flex-col gap-0.5 mb-1 items-center justify-center">
+                              <span className="text-purple-700 font-extrabold">{t.month === '5월' ? '⭐ ' : ''}한: {t.korAvg}타</span>
+                              <span className="text-indigo-700 font-extrabold">영: {t.engAvg}타</span>
+                            </div>
+                            <span className={`text-[10px] font-bold block ${t.month === '5월' ? 'text-indigo-600 font-black' : 'text-stone-400'}`}>
+                              {t.month === '5월' ? '5월 (도입)' : t.month}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Legends visual indicator */}
-                  <div className="flex gap-4 justify-center text-xs">
-                    <span className="flex items-center gap-1.5 text-purple-700 font-bold">
-                      <span className="w-3 h-3 bg-purple-600 rounded-full" />
-                      전교생 한글 타자 평균
-                    </span>
-                    <span className="flex items-center gap-1.5 text-indigo-700 font-bold">
-                      <span className="w-3 h-3 bg-indigo-700 rounded-full" />
-                      전교생 영어 타자 평균
-                    </span>
-                  </div>
+                    {/* Right Column: Prominent May Baseline Result Card */}
+                    <div id="may-baseline-results-widget" className="bg-gradient-to-br from-indigo-50/40 to-stone-50 border border-stone-200/85 rounded-2xl p-4 space-y-4 flex flex-col justify-between">
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-1.5 pb-1 border-b border-indigo-100/60">
+                          <span className="text-xs">📅</span>
+                          <h5 className="text-[11.5px] font-black text-slate-800 uppercase tracking-wider font-sans">
+                            도입월(현재 5월) 실적 결과 심층 분석
+                          </h5>
+                        </div>
 
+                        <p className="text-[11px] text-stone-500 leading-relaxed font-sans">
+                          프로그램 도입 최초 시점인 <strong>5월 검정 결과</strong>는 수련 전 기준 성적(Baseline) 역할을 수행하며, 학생 성장 곡선의 시작 좌표가 됩니다.
+                        </p>
+
+                        {/* May Key Metrics Indicators */}
+                        <div className="grid grid-cols-2 gap-2 font-sans">
+                          <div className="p-2.5 bg-white border border-stone-150 rounded-xl">
+                            <span className="text-[9.5px] font-bold text-purple-600 block">5월 한글 평균</span>
+                            <span className="text-sm font-black font-mono text-purple-950">
+                              {growthTrendsTimeline.find(t => t.month === '5월')?.korAvg || 0}타
+                            </span>
+                          </div>
+                          <div className="p-2.5 bg-white border border-stone-150 rounded-xl">
+                            <span className="text-[9.5px] font-bold text-indigo-600 block">5월 영어 평균</span>
+                            <span className="text-sm font-black font-mono text-indigo-950">
+                              {growthTrendsTimeline.find(t => t.month === '5월')?.engAvg || 0}타
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 5월 급수 취득 비중 */}
+                        <div className="p-3 bg-white border border-stone-150 rounded-xl space-y-1.5 font-sans">
+                          <span className="text-[10px] font-extrabold text-stone-500 block">🏆 5월 인증 통과 우수생 비율</span>
+                          <div className="space-y-1 text-[10px]">
+                            {(() => {
+                              const mayAchievers = studentCertificates.filter(s => s.achievementMonth === '5월');
+                              const totalCount = studentCertificates.length || 1;
+                              const ratioOfTotal = Math.round((mayAchievers.length / totalCount) * 100);
+                              
+                              const num1 = mayAchievers.filter(s => s.finalLevel === '1급').length;
+                              const num2 = mayAchievers.filter(s => s.finalLevel === '2급').length;
+                              const num3 = mayAchievers.filter(s => s.finalLevel === '3급').length;
+
+                              return (
+                                <>
+                                  <div className="flex justify-between items-center text-stone-700">
+                                    <span>5월 인증서 취득</span>
+                                    <span className="font-extrabold font-mono text-stone-900">{mayAchievers.length}명 ({ratioOfTotal}%)</span>
+                                  </div>
+                                  <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden mt-0.5">
+                                    <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${ratioOfTotal}%` }} />
+                                  </div>
+                                  <div className="flex justify-between text-[8.5px] text-stone-400 font-bold pt-1">
+                                    <span>1급: {num1}명</span>
+                                    <span>2급: {num2}명</span>
+                                    <span>3급: {num3}명</span>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[9.5px] font-bold text-stone-400 bg-stone-100/50 p-2 rounded-lg font-sans border border-dashed text-center">
+                        ✔️ 5월 기준 결과는 매칭 필터의 기준축입니다.
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               )}
+            </div>
+          )}
 
               {/* 📊 TAB 5: INTEGRATED RESULTS PANEL BY GRADE & DEPT */}
               {activeTab === 'integrated_stats' && (
@@ -1880,13 +1897,128 @@ export function TeacherAnalytics({
                   <div className="flex justify-between items-center pb-3 border-b border-stone-100">
                     <div>
                       <h4 className="text-sm font-black text-stone-900 tracking-wider uppercase">
-                        학년·학과별 통합 수련 타수 결과 현황판 (5월 ~ 10월)
+                        학년·학과 통합 수련 현황 (랭킹 및 누적 통계)
                       </h4>
-                      <p className="text-[10.5px] text-stone-400 font-medium">데스크톱 가로 전폭 레이아웃으로 옆 스크롤 없이 가로 월별 실시간 평균 수집 성적을 쾌적하게 모니터링합니다.</p>
+                      <p className="text-[10.5px] text-stone-400 font-medium">학년·학과별 최고 타수 기준 평균 랭킹 및 5월~10월 월별 실시간 평균 수집 현황을 모니터링합니다.</p>
                     </div>
                     <div className="shrink-0 text-right bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-xl font-sans text-[10px] text-purple-755 font-bold">
-                      <span>2026 전체 통합 타자 수련 통계</span>
+                      <span>2026 전체 통합 통계</span>
                     </div>
+                  </div>
+
+                  {/* 👑 학년·학과별 최고 타수 평균 랭킹 (재적 인원 기준) */}
+                  <div className="bg-amber-50/50 border border-amber-200/65 rounded-2xl p-5 space-y-2 text-xs">
+                    <span className="font-black text-amber-850 flex items-center gap-1.5 uppercase font-sans">
+                      <Trophy className="h-4 w-4 text-amber-600 animate-bounce" />
+                      ★ 학급별 평균 수련 랭킹 정렬 안내 (개별 최고타수 기준)
+                    </span>
+                    <p className="text-[11.2px] text-amber-800 font-medium leading-relaxed font-sans">
+                      각 학생의 <strong>전체 기간 최고 타수</strong>를 기준으로 산출한 반별 평균속도 랭킹입니다. 한글(150타 이상), 영어(100타 이상) 급수 취득 비율이 개별 표시되며 재적 인원만 정밀 산정됩니다.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-stone-50/40 p-4 border border-stone-150 rounded-2xl">
+                    
+                    {/* 1. Korean Rankings (Purple) */}
+                    <div className="bg-white rounded-xl border border-purple-200/60 p-5 space-y-3.5 shadow-2xs">
+                      <div className="flex justify-between items-center pb-2 border-b border-purple-100">
+                        <h4 className="text-xs font-black text-purple-900 tracking-wider uppercase flex items-center gap-1.5">
+                          <Trophy className="h-3.5 w-3.5 text-purple-600 animate-pulse" />
+                          한글 타자 학급 순위 (최고 타수 평균)
+                        </h4>
+                      </div>
+
+                      <div className="divide-y divide-purple-100 max-h-[380px] overflow-y-auto pr-1 space-y-2.5 font-sans">
+                        {aggregateStats.korRankings.map((item, idx) => {
+                          const medalEmoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+                          return (
+                            <div key={idx} className="pt-2.5 first:pt-0 space-y-1">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="flex items-center gap-1.5">
+                                  <span className={`w-5 h-5 rounded-md border text-[10px] font-black flex items-center justify-center ${
+                                    idx === 0 ? 'bg-purple-100 border-purple-200 text-purple-800' : 
+                                    idx === 1 ? 'bg-slate-100 border-slate-200 text-slate-750' : 
+                                    idx === 2 ? 'bg-orange-50 border-orange-100 text-orange-750' : 
+                                    'bg-stone-50 border-stone-150 text-stone-600'
+                                  }`}>
+                                    {idx + 1}
+                                  </span>
+                                  <span className="font-black text-stone-850 text-[12px] font-sans">
+                                    {item.displayName} {medalEmoji}
+                                  </span>
+                                </span>
+                                <span className="font-mono font-extrabold text-purple-700 bg-purple-55 px-2 py-0.5 rounded border border-purple-100/70 text-[11px]">
+                                  평균: {item.korSpeedAvg}타
+                                </span>
+                              </div>
+
+                              <div className="h-1.5 w-full bg-slate-100 border border-slate-150 rounded-full overflow-hidden font-sans">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-500 bg-purple-600`} 
+                                  style={{ width: `${Math.min(100, (item.korSpeedAvg / 450) * 100)}%` }}
+                                />
+                              </div>
+
+                              <div className="flex justify-between text-[10px] text-stone-450 font-mono pl-6 font-sans">
+                                <span className="font-sans font-bold">재적 인원: {item.total}명</span>
+                                <span className="text-purple-600 font-extrabold font-sans">한글 급수 취득 비율: {item.korRate}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 2. English Rankings (Indigo) */}
+                    <div className="bg-white rounded-xl border border-indigo-200/60 p-5 space-y-3.5 shadow-2xs">
+                      <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
+                        <h4 className="text-xs font-black text-indigo-900 tracking-wider uppercase flex items-center gap-1.5">
+                          <Trophy className="h-3.5 w-3.5 text-indigo-600 animate-pulse" />
+                          영어 타자 학급 순위 (최고 타수 평균)
+                        </h4>
+                      </div>
+
+                      <div className="divide-y divide-indigo-100 max-h-[380px] overflow-y-auto pr-1 space-y-2.5 font-sans">
+                        {aggregateStats.engRankings.map((item, idx) => {
+                          const medalEmoji = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+                          return (
+                            <div key={idx} className="pt-2.5 first:pt-0 space-y-1 font-sans">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="flex items-center gap-1.5 font-sans">
+                                  <span className={`w-5 h-5 rounded-md border text-[10px] font-black flex items-center justify-center ${
+                                    idx === 0 ? 'bg-indigo-100 border-indigo-200 text-indigo-800' : 
+                                    idx === 1 ? 'bg-slate-100 border-slate-200 text-slate-750' : 
+                                    idx === 2 ? 'bg-orange-50 border-orange-100 text-orange-750' : 
+                                    'bg-stone-50 border-stone-150 text-stone-600'
+                                  }`}>
+                                    {idx + 1}
+                                  </span>
+                                  <span className="font-black text-stone-850 text-[12px] font-sans">
+                                    {item.displayName} {medalEmoji}
+                                  </span>
+                                </span>
+                                <span className="font-mono font-extrabold text-indigo-700 bg-indigo-55 px-2 py-0.5 rounded border border-indigo-100/70 text-[11px]">
+                                  평균: {item.engSpeedAvg}타
+                                </span>
+                              </div>
+
+                              <div className="h-1.5 w-full bg-slate-100 border border-slate-150 rounded-full overflow-hidden font-sans">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-500 bg-indigo-600`} 
+                                  style={{ width: `${Math.min(100, (item.engSpeedAvg / 250) * 100)}%` }}
+                                />
+                              </div>
+
+                              <div className="flex justify-between text-[10px] text-stone-450 font-mono pl-6 font-sans">
+                                <span className="font-sans font-bold">재적 인원: {item.total}명</span>
+                                <span className="text-indigo-600 font-extrabold font-sans">영어 급수 취득 비율: {item.engRate}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                   </div>
 
                   {/* Stacked Full Width Layout (No more cramming into col-span-2 side-by-side, no horizontal scrolls!) */}
@@ -2041,9 +2173,6 @@ export function TeacherAnalytics({
                   </div>
                 </div>
               )}
-
-            </div>
-          )}
 
         </div>
       )}

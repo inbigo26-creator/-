@@ -67,6 +67,7 @@ export default function App() {
     englishStats: StudentStats;
     koreanStats: StudentStats;
   } | null>(null);
+  const [studentTab, setStudentTab] = useState<'my_stats' | 'hall_of_fame'>('my_stats');
 
   // Modals toggle
   const [showAdmin, setShowAdmin] = useState(false);
@@ -163,6 +164,238 @@ export default function App() {
       }
     };
   }, [authDb, englishDb, koreanDb]);
+
+  // 🟢 1. Sort months chronologically
+  const sortedMonths = React.useMemo(() => {
+    const months = Array.from(new Set([
+      ...englishDb.map(r => r.month),
+      ...koreanDb.map(r => r.month)
+    ]));
+    return months.sort((a,b) => getMonthNumber(a) - getMonthNumber(b));
+  }, [englishDb, koreanDb]);
+
+  // 🟢 2. Calculate Snack Award History Chronologically
+  const monthlySnackWinnersHistory = React.useMemo(() => {
+    interface Winner {
+      studentId: string;
+      name: string;
+      grade: string;
+      department: string;
+      value: number;
+    }
+
+    const historyMap: {
+      [month: string]: {
+        winners: { studentId: string; name: string; department: string; grade: string; reason: string; value: number }[];
+      };
+    } = {};
+
+    const cumulativeSnackWinners = new Set<string>();
+
+    sortedMonths.forEach((month, monthIdx) => {
+      const korThisMonth = koreanDb.filter(r => r.month === month);
+      const engThisMonth = englishDb.filter(r => r.month === month);
+      const prevMonthName = monthIdx > 0 ? sortedMonths[monthIdx - 1] : null;
+
+      // Kor Speed
+      const rawKorSpeedCandidates = korThisMonth.map(r => ({
+        studentId: r.studentId,
+        name: r.name,
+        grade: r.grade,
+        department: r.department,
+        value: r.speed
+      })).sort((a,b) => b.value - a.value);
+
+      // Eng Speed
+      const rawEngSpeedCandidates = engThisMonth.map(r => ({
+        studentId: r.studentId,
+        name: r.name,
+        grade: r.grade,
+        department: r.department,
+        value: r.speed
+      })).sort((a,b) => b.value - a.value);
+
+      // Kor Growth
+      const rawKorGrowthCandidates: Winner[] = [];
+      if (prevMonthName) {
+        const korPrev = koreanDb.filter(r => r.month === prevMonthName);
+        korThisMonth.forEach(curr => {
+          const prev = korPrev.find(p => cleanStudentId(p.studentId) === cleanStudentId(curr.studentId));
+          if (prev) {
+            const diff = curr.speed - prev.speed;
+            if (diff > 0) {
+              rawKorGrowthCandidates.push({
+                studentId: curr.studentId,
+                name: curr.name,
+                grade: curr.grade,
+                department: curr.department,
+                value: diff
+              });
+            }
+          }
+        });
+      }
+      rawKorGrowthCandidates.sort((a,b) => b.value - a.value);
+
+      // Eng Growth
+      const rawEngGrowthCandidates: Winner[] = [];
+      if (prevMonthName) {
+        const engPrev = englishDb.filter(r => r.month === prevMonthName);
+        engThisMonth.forEach(curr => {
+          const prev = engPrev.find(p => cleanStudentId(p.studentId) === cleanStudentId(curr.studentId));
+          if (prev) {
+            const diff = curr.speed - prev.speed;
+            if (diff > 0) {
+              rawEngGrowthCandidates.push({
+                studentId: curr.studentId,
+                name: curr.name,
+                grade: curr.grade,
+                department: curr.department,
+                value: diff
+              });
+            }
+          }
+        });
+      }
+      rawEngGrowthCandidates.sort((a,b) => b.value - a.value);
+
+      const selectedWinners: { studentId: string; name: string; department: string; grade: string; reason: string; value: number }[] = [];
+      const localSelectedSet = new Set<string>();
+
+      const trySelectWinnerForGrade = (list: Winner[], gradeVal: string, reasonTag: string) => {
+        for (let i = 0; i < list.length; i++) {
+          const s = list[i];
+          if (String(s.grade) !== String(gradeVal)) continue;
+          if (isExcludedStudentName(s.name)) continue;
+
+          if (!cumulativeSnackWinners.has(s.studentId) && !localSelectedSet.has(s.studentId)) {
+            selectedWinners.push({
+              studentId: s.studentId,
+              name: s.name,
+              department: s.department,
+              grade: s.grade,
+              reason: `${gradeVal}학년 ${reasonTag}`,
+              value: s.value
+            });
+            localSelectedSet.add(s.studentId);
+            cumulativeSnackWinners.add(s.studentId);
+            break;
+          }
+        }
+      };
+
+      ['1', '2', '3'].forEach(g => {
+        trySelectWinnerForGrade(rawKorSpeedCandidates, g, '한글 최고 속도');
+      });
+      ['1', '2', '3'].forEach(g => {
+        trySelectWinnerForGrade(rawEngSpeedCandidates, g, '영어 최고 속도');
+      });
+      if (prevMonthName) {
+        ['1', '2', '3'].forEach(g => {
+          trySelectWinnerForGrade(rawKorGrowthCandidates, g, '한글 최고 향상도');
+        });
+      }
+      if (prevMonthName) {
+        ['1', '2', '3'].forEach(g => {
+          trySelectWinnerForGrade(rawEngGrowthCandidates, g, '영어 최고 향상도');
+        });
+      }
+
+      historyMap[month] = {
+        winners: selectedWinners
+      };
+    });
+
+    return historyMap;
+  }, [englishDb, koreanDb, sortedMonths]);
+
+  // 🟢 3. Calculate Cumulative Periodic Final Awards (5월~10월)
+  const cumulativeFinalAwards = React.useMemo(() => {
+    const studentIds = Array.from(new Set([...englishDb.map(r => r.studentId), ...koreanDb.map(r => r.studentId)]));
+
+    const korSpeeds: { studentId: string; name: string; department: string; grade: string; value: number }[] = [];
+    const engSpeeds: typeof korSpeeds = [];
+    const korGrowths: typeof korSpeeds = [];
+    const engGrowths: typeof korSpeeds = [];
+
+    studentIds.forEach(sid => {
+      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(sid)).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(sid)).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+
+      if (sKor.length > 0) {
+        const maxVal = Math.max(...sKor.map(r => r.speed));
+         korSpeeds.push({
+           studentId: sid,
+           name: sKor[0].name,
+           department: sKor[0].department,
+           grade: sKor[0].grade,
+           value: maxVal
+         });
+
+         if (sKor.length >= 2) {
+           const firstSpeed = sKor[0].speed;
+           const lastSpeed = sKor[sKor.length - 1].speed;
+           const improvement = lastSpeed - firstSpeed;
+           if (improvement > 0) {
+             korGrowths.push({
+               studentId: sid,
+               name: sKor[0].name,
+               department: sKor[0].department,
+               grade: sKor[0].grade,
+               value: improvement
+             });
+           }
+         }
+      }
+
+      if (sEng.length > 0) {
+        const maxVal = Math.max(...sEng.map(r => r.speed));
+         engSpeeds.push({
+           studentId: sid,
+           name: sEng[0].name,
+           department: sEng[0].department,
+           grade: sEng[0].grade,
+           value: maxVal
+         });
+
+         if (sEng.length >= 2) {
+           const firstSpeed = sEng[0].speed;
+           const lastSpeed = sEng[sEng.length - 1].speed;
+           const improvement = lastSpeed - firstSpeed;
+           if (improvement > 0) {
+             engGrowths.push({
+               studentId: sid,
+               name: sEng[0].name,
+               department: sEng[0].department,
+               grade: sEng[0].grade,
+               value: improvement
+             });
+           }
+         }
+      }
+    });
+
+    const getTopPerGrade = (list: typeof korSpeeds) => {
+      const result: typeof korSpeeds = [];
+      const grades = ['1', '2', '3'];
+      grades.forEach(g => {
+        const sortedForGrade = list
+          .filter(s => String(s.grade) === String(g) && !isExcludedStudentName(s.name))
+          .sort((a, b) => b.value - a.value);
+        if (sortedForGrade.length > 0) {
+          result.push(sortedForGrade[0]);
+        }
+      });
+      return result.sort((a, b) => a.grade.localeCompare(b.grade));
+    };
+
+    return {
+      korSpeed: getTopPerGrade(korSpeeds),
+      engSpeed: getTopPerGrade(engSpeeds),
+      korGrowth: getTopPerGrade(korGrowths),
+      engGrowth: getTopPerGrade(engGrowths)
+    };
+  }, [englishDb, koreanDb]);
 
   const handleTeacherLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -640,42 +873,197 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Side by side stats */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                {/* Korean */}
-                <div className="space-y-6">
-                  <StudentStatsCard 
-                    stats={studentSession.koreanStats} 
-                    title="한글 타자 성장 기록" 
-                    type="korean" 
-                    gradeAverage={statsAverages.korean.gradeAverage[studentSession.grade || '1']}
-                    schoolAverage={statsAverages.korean.schoolAverage}
-                  />
-
-                  <TypingChart 
-                    history={studentSession.koreanStats.history} 
-                    type="korean" 
-                  />
-                </div>
-
-                {/* English */}
-                <div className="space-y-6">
-                  <StudentStatsCard 
-                    stats={studentSession.englishStats} 
-                    title="영어 타자 성장 기록" 
-                    type="english" 
-                    gradeAverage={statsAverages.english.gradeAverage[studentSession.grade || '1']}
-                    schoolAverage={statsAverages.english.schoolAverage}
-                  />
-                  
-                  <TypingChart 
-                    history={studentSession.englishStats.history} 
-                    type="english" 
-                  />
-                </div>
-
+              {/* 📊 STUDENT VIEW NAVIGATION TABS */}
+              <div className="flex bg-stone-100 p-1.5 rounded-2xl border border-stone-200 shadow-2xs max-w-sm sm:max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setStudentTab('my_stats')}
+                  className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    studentTab === 'my_stats'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50/50'
+                  }`}
+                >
+                  📊 나의 수련 성장 현황
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudentTab('hall_of_fame')}
+                  className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    studentTab === 'hall_of_fame'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50/50'
+                  }`}
+                >
+                  🏆 실시간 명예의 전당
+                </button>
               </div>
+
+              {studentTab === 'hall_of_fame' ? (
+                <div className="space-y-8 animate-fade-in font-sans">
+                  {/* 🍿 1. Monthly Snack Awards Column */}
+                  <div className="bg-white rounded-3xl border border-rose-100 p-6 space-y-6 shadow-sm">
+                    <div className="flex items-center gap-3 pb-3 border-b border-rose-100">
+                      <span className="p-2 bg-rose-50 text-rose-600 rounded-xl text-lg">🍿</span>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-800 tracking-wide font-sans">
+                          월별 간식 시상자 명단 (5월 ~ 10월)
+                        </h3>
+                        <p className="text-[10px] text-stone-400 font-bold font-sans">
+                          반 중복 수혜 배제 원칙에 따라 매월 학년별 타수/성장 최고 실적 학생을 정밀 선정합니다 (이름 비공개 보호)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-sans">
+                      {sortedMonths.map((m) => {
+                        const winners = monthlySnackWinnersHistory[m]?.winners || [];
+                        return (
+                          <div key={m} className="bg-stone-50/60 border border-stone-200/80 rounded-2xl p-4 space-y-3 hover:border-rose-300 transition-colors shadow-3xs">
+                            <div className="flex justify-between items-center pb-2 border-b border-stone-200/40">
+                              <span className="text-[10.5px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-lg">{m} 간식 수상자</span>
+                              <span className="text-[10px] font-bold text-stone-400 font-mono">{winners.length}명</span>
+                            </div>
+                            {winners.length === 0 ? (
+                              <p className="text-[10px] text-stone-400 text-center py-6 font-medium">이 달의 시상 데이터가 없습니다.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {winners.map((w, idx) => (
+                                  <div key={idx} className="flex flex-col gap-0.5 p-2.5 bg-white rounded-xl border border-stone-150 text-[11px]">
+                                    <div className="flex justify-between items-center font-bold">
+                                      <span className="text-stone-800 font-black">{w.grade}학년 {w.department}과</span>
+                                      <span className="text-rose-600 font-black font-mono text-xs">{w.value}타</span>
+                                    </div>
+                                    <span className="text-[9px] font-bold text-stone-400 block">{w.reason}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 👑 2. Cumulative Final Awards Block */}
+                  <div className="bg-white rounded-3xl border border-amber-100 p-6 space-y-6 shadow-sm">
+                    <div className="flex items-center gap-3 pb-3 border-b border-amber-100">
+                      <span className="p-2 bg-amber-50 text-amber-600 rounded-xl text-lg">👑</span>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-800 tracking-wide font-sans">
+                          5~10월 최종 종합 누적 시상자 대장 (명예의 전당)
+                        </h3>
+                        <p className="text-[10px] text-stone-400 font-bold font-sans">
+                          전체 수련 전 과정에 걸쳐 부문별 최고 실적 및 최대 성장을 이루어낸 자랑스런 전교 대표 영광의 수상자입니다.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 font-sans text-xs">
+                      {/* 한글 최고 속도상 */}
+                      <div className="p-4 bg-gradient-to-b from-purple-50/20 to-white border border-purple-100 rounded-2xl space-y-3.5">
+                        <span className="text-[10px] font-black text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-1 rounded-lg block text-center">한글 최고 속도상</span>
+                        <div className="space-y-2">
+                          {cumulativeFinalAwards.korSpeed.map((w, idx) => (
+                            <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
+                              <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
+                              <div className="flex justify-between items-center font-black mt-0.5">
+                                <span className="text-stone-800">{w.department}과</span>
+                                <span className="text-purple-600 font-mono font-black">{w.value}타</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 영어 최고 속도상 */}
+                      <div className="p-4 bg-gradient-to-b from-indigo-50/20 to-white border border-indigo-100 rounded-2xl space-y-3.5">
+                        <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg block text-center">영어 최고 속도상</span>
+                        <div className="space-y-2">
+                          {cumulativeFinalAwards.engSpeed.map((w, idx) => (
+                            <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
+                              <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
+                              <div className="flex justify-between items-center font-black mt-0.5">
+                                <span className="text-stone-800">{w.department}과</span>
+                                <span className="text-indigo-650 font-mono font-black">{w.value}타</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 한글 최고 성장상 */}
+                      <div className="p-4 bg-gradient-to-b from-emerald-50/20 to-white border border-emerald-100 rounded-2xl space-y-3.5">
+                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg block text-center">한글 최고 성장상</span>
+                        <div className="space-y-2">
+                          {cumulativeFinalAwards.korGrowth.map((w, idx) => (
+                            <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
+                              <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
+                              <div className="flex justify-between items-center font-black mt-0.5">
+                                <span className="text-stone-800">{w.department}과</span>
+                                <span className="text-emerald-600 font-mono font-black">+{w.value}타</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 영어 최고 성장상 */}
+                      <div className="p-4 bg-gradient-to-b from-rose-50/20 to-white border border-rose-100 rounded-2xl space-y-3.5">
+                        <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-lg block text-center">영어 최고 성장상</span>
+                        <div className="space-y-2">
+                          {cumulativeFinalAwards.engGrowth.map((w, idx) => (
+                            <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
+                              <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
+                              <div className="flex justify-between items-center font-black mt-0.5">
+                                <span className="text-stone-800">{w.department}과</span>
+                                <span className="text-rose-600 font-mono font-black">+{w.value}타</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Side by side stats */
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  
+                  {/* Korean */}
+                  <div className="space-y-6">
+                    <StudentStatsCard 
+                      stats={studentSession.koreanStats} 
+                      title="한글 타자 성장 기록" 
+                      type="korean" 
+                      gradeAverage={statsAverages.korean.gradeAverage[studentSession.grade || '1']}
+                      schoolAverage={statsAverages.korean.schoolAverage}
+                    />
+
+                    <TypingChart 
+                      history={studentSession.koreanStats.history} 
+                      type="korean" 
+                    />
+                  </div>
+
+                  {/* English */}
+                  <div className="space-y-6">
+                    <StudentStatsCard 
+                      stats={studentSession.englishStats} 
+                      title="영어 타자 성장 기록" 
+                      type="english" 
+                      gradeAverage={statsAverages.english.gradeAverage[studentSession.grade || '1']}
+                      schoolAverage={statsAverages.english.schoolAverage}
+                    />
+                    
+                    <TypingChart 
+                      history={studentSession.englishStats.history} 
+                      type="english" 
+                    />
+                  </div>
+
+                </div>
+              )}
 
               <p className="text-xs text-slate-400 text-center font-medium leading-relaxed max-w-sm mx-auto">
                 학생 개인정보 보호 체계가 가동 중입니다. 
