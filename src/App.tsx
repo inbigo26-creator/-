@@ -985,10 +985,10 @@ export default function App() {
                       <span className="p-2 bg-rose-50 text-rose-600 rounded-xl text-lg">🍿</span>
                       <div>
                         <h3 className="text-sm font-black text-slate-800 tracking-wide font-sans">
-                          월별 간식 시상자 명단 (5월 ~ 10월)
+                          월별 명예의 전당 (5월~10월)
                         </h3>
                         <p className="text-[10px] text-stone-400 font-bold font-sans">
-                          반 중복 수혜 배제 원칙에 따라 매월 학년별 타수/성장 최고 실적 학생을 정밀 선정합니다 (이름 비공개 보호)
+                          [안내] 월별 명예의 전당 선정자는 이후 대상에서 제외됩니다. (이름 비공개)
                         </p>
                       </div>
                     </div>
@@ -1029,10 +1029,10 @@ export default function App() {
                       <span className="p-2 bg-amber-50 text-amber-600 rounded-xl text-lg">👑</span>
                       <div>
                         <h3 className="text-sm font-black text-slate-800 tracking-wide font-sans">
-                          5~10월 최종 종합 누적 시상자 대장 (명예의 전당)
+                          최종 종합 (5월~10월) 명예의 전당
                         </h3>
                         <p className="text-[10px] text-stone-400 font-bold font-sans">
-                          전체 수련 전 과정에 걸쳐 부문별 최고 실적 및 최대 성장을 이루어낸 자랑스런 전교 대표 영광의 수상자입니다.
+                          전 기간 중 각 학년별/부문별 최고 실적 및 최대 성장을 이루어낸 자랑스런 영광의 수상자입니다.
                         </p>
                       </div>
                     </div>
@@ -1046,7 +1046,7 @@ export default function App() {
                             <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
                               <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
                               <div className="flex justify-between items-center font-black mt-0.5">
-                                <span className="text-stone-800">{w.department}과</span>
+                                <span className="text-stone-800">{w.department}</span>
                                 <span className="text-purple-600 font-mono font-black">{w.value}타</span>
                               </div>
                             </div>
@@ -1062,7 +1062,7 @@ export default function App() {
                             <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
                               <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
                               <div className="flex justify-between items-center font-black mt-0.5">
-                                <span className="text-stone-800">{w.department}과</span>
+                                <span className="text-stone-800">{w.department}</span>
                                 <span className="text-indigo-650 font-mono font-black">{w.value}타</span>
                               </div>
                             </div>
@@ -1078,7 +1078,7 @@ export default function App() {
                             <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
                               <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
                               <div className="flex justify-between items-center font-black mt-0.5">
-                                <span className="text-stone-800">{w.department}과</span>
+                                <span className="text-stone-800">{w.department}</span>
                                 <span className="text-emerald-600 font-mono font-black">+{w.value}타</span>
                               </div>
                             </div>
@@ -1094,7 +1094,7 @@ export default function App() {
                             <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
                               <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
                               <div className="flex justify-between items-center font-black mt-0.5">
-                                <span className="text-stone-800">{w.department}과</span>
+                                <span className="text-stone-800">{w.department}</span>
                                 <span className="text-rose-600 font-mono font-black">+{w.value}타</span>
                               </div>
                             </div>
