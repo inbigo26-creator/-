@@ -79,7 +79,8 @@ export default function App() {
     englishStats: StudentStats;
     koreanStats: StudentStats;
   } | null>(null);
-  const [studentTab, setStudentTab] = useState<'my_stats' | 'hall_of_fame'>('my_stats');
+  const [studentTab, setStudentTab] = useState<'my_stats' | 'hall_of_fame' | 'privacy_consent'>('my_stats');
+  const [showPrivacyOnlyModal, setShowPrivacyOnlyModal] = useState(false);
 
   // Modals toggle
   const [showAdmin, setShowAdmin] = useState(false);
@@ -694,9 +695,38 @@ export default function App() {
           </div>
           
           <nav className="flex-1 space-y-1.5">
-            <button className="w-full text-left px-4 py-3 bg-emerald-100/60 text-emerald-700 rounded-xl font-bold flex items-center gap-3">
+            <button
+              onClick={() => setStudentTab('my_stats')}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                studentTab === 'my_stats'
+                  ? 'bg-emerald-100/60 text-emerald-700 font-black'
+                  : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50/50'
+              }`}
+            >
               <Keyboard className="h-5 w-5 text-emerald-600" />
               성장 대시보드
+            </button>
+            <button
+              onClick={() => setStudentTab('hall_of_fame')}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                studentTab === 'hall_of_fame'
+                  ? 'bg-rose-100/60 text-rose-750 font-black'
+                  : 'text-stone-500 hover:text-stone-850 hover:bg-stone-50/50'
+              }`}
+            >
+              <Medal className="h-5 w-5 text-rose-500" />
+              명예의 전당
+            </button>
+            <button
+              onClick={() => setStudentTab('privacy_consent')}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                studentTab === 'privacy_consent'
+                  ? 'bg-indigo-100/60 text-indigo-750 font-black'
+                  : 'text-stone-500 hover:text-slate-800 hover:bg-stone-50/50'
+              }`}
+            >
+              <Lock className="h-5 w-5 text-indigo-550" />
+              개인정보 동의 안내
             </button>
           </nav>
 
@@ -892,6 +922,17 @@ export default function App() {
                     </div>
                   )}
 
+                  {/* 🔐 Privacy Policy viewer for student before logging in */}
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPrivacyOnlyModal(true)}
+                      className="text-[11px] text-emerald-750 hover:text-emerald-800 hover:underline font-black transition-all cursor-pointer font-sans"
+                    >
+                      [개인정보 수집·이용 동의 안내 보기]
+                    </button>
+                  </div>
+
                   {/* 🔐 Teacher Login Quick Trigger Button replacing original Spreadsheet Connection Indicator */}
                   <div className="pt-5 border-t border-slate-105 flex flex-col items-center justify-center gap-2">
                     <p className="text-[10px] text-stone-400 font-bold">2026 인비 타자 챌린지 성장 기록 시스템</p>
@@ -952,32 +993,43 @@ export default function App() {
               </div>
 
               {/* 📊 STUDENT VIEW NAVIGATION TABS */}
-              <div className="flex bg-stone-100 p-1.5 rounded-2xl border border-stone-200 shadow-2xs max-w-sm sm:max-w-md">
+              <div className="flex bg-stone-100 p-1.5 rounded-2xl border border-stone-200 shadow-2xs max-w-sm sm:max-w-md md:max-w-lg w-full">
                 <button
                   type="button"
                   onClick={() => setStudentTab('my_stats')}
                   className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     studentTab === 'my_stats'
-                      ? 'bg-emerald-600 text-white shadow-sm'
+                      ? 'bg-emerald-600 text-white shadow-sm font-black'
                       : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50/50'
                   }`}
                 >
-                  📊 나의 수련 성장 현황
+                  📊 수련 성장
                 </button>
                 <button
                   type="button"
                   onClick={() => setStudentTab('hall_of_fame')}
                   className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     studentTab === 'hall_of_fame'
-                      ? 'bg-rose-600 text-white shadow-sm'
+                      ? 'bg-rose-600 text-white shadow-sm font-black'
                       : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50/50'
                   }`}
                 >
-                  🏆 실시간 명예의 전당
+                  🏆 명예의 전당
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudentTab('privacy_consent')}
+                  className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    studentTab === 'privacy_consent'
+                      ? 'bg-indigo-650 text-white shadow-sm font-black'
+                      : 'text-stone-500 hover:text-indigo-800 hover:bg-stone-50/50'
+                  }`}
+                >
+                  🔒 개인정보 동의
                 </button>
               </div>
 
-              {studentTab === 'hall_of_fame' ? (
+              {studentTab === 'hall_of_fame' && (
                 <div className="space-y-8 animate-fade-in font-sans">
                   {/* 🍿 1. Monthly Snack Awards Column */}
                   <div className="bg-white rounded-3xl border border-rose-100 p-6 space-y-6 shadow-sm">
@@ -1104,10 +1156,10 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              ) : (
-                /* Side by side stats */
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  
+              )}
+
+              {studentTab === 'my_stats' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in font-sans">
                   {/* Korean */}
                   <div className="space-y-6">
                     <StudentStatsCard 
@@ -1139,7 +1191,74 @@ export default function App() {
                       type="english" 
                     />
                   </div>
+                </div>
+              )}
 
+              {studentTab === 'privacy_consent' && (
+                <div className="bg-white rounded-3xl border border-indigo-100 p-6 sm:p-8 space-y-6 shadow-sm animate-fade-in font-sans max-w-2xl mx-auto">
+                  <div className="flex items-center gap-3 pb-3 border-b border-indigo-50">
+                    <div className="p-2.5 bg-indigo-50 text-indigo-650 rounded-xl border border-indigo-100/60">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 tracking-tight">개인정보 수집 및 이용 동의 현황</h3>
+                      <p className="text-[11px] text-stone-400 font-bold">학생의 동의 정보와 수집 세부 방침을 안내해 드립니다.</p>
+                    </div>
+                  </div>
+
+                  {/* 동의 완료 확인 카드 */}
+                  <div className="p-4.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="text-xs font-black text-emerald-800">개인정보 동의 상태 : 동의 완료(Active)</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-705/80 font-semibold leading-relaxed">
+                        귀하는 원활한 타자 성적 조회 및 성 취도 추적 관리를 지지하며 동의하였습니다.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg shrink-0 uppercase tracking-widest">
+                      ACTIVE
+                    </span>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-800 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4 text-indigo-550 shrink-0" />
+                      개인정보 보호법 제15조에 따른 주요 동의 내용 요약
+                    </h4>
+
+                    <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4.5 space-y-3.5 text-xs text-stone-605">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-1.5 sm:gap-4 pb-3 border-b border-stone-200/50 font-sans">
+                        <span className="font-black text-stone-900">1. 수집 항목</span>
+                        <span className="sm:col-span-3 text-stone-750 font-bold font-sans">
+                          학번, 이름, 생년월일, 매월 타자검정 결과 (타수, 성장도, 급수)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-1.5 sm:gap-4 pb-3 border-b border-stone-200/50 font-sans">
+                        <span className="font-black text-stone-900">2. 수집 및 이용 목적</span>
+                        <span className="sm:col-span-3 text-stone-750 font-bold font-sans">
+                          인비 타자 챌린지 내 사용자 본인 확인/식별, 개인별 성장도 계산 및 조회, 학교별/학년별 통계 관리
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-1.5 sm:gap-4 font-sans">
+                        <span className="font-black text-stone-900">3. 보유 및 이용 기간</span>
+                        <span className="sm:col-span-3 text-emerald-800 font-extrabold font-sans">
+                          해당 학년도 종료 시까지 (종료 후 안전하게 파기됩니다.)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-indigo-50/50 text-center space-y-2">
+                    <p className="text-[11px] font-black text-stone-700">
+                      동의 주체: {studentSession.id} {studentSession.name}
+                    </p>
+                    <p className="text-[10px] text-stone-400 leading-normal">
+                      ※ 귀하는 동의를 거부할 권리가 있으나, 동의 거부 시 본 성장 관리 프로그램을 이용할 수 없습니다. <br />
+                      동의 철회나 정보 정정을 원하실 경우, 담당 교사에게 문의해 주시기 바랍니다.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1321,6 +1440,59 @@ export default function App() {
               <p className="text-[9.5px] text-stone-400 font-medium text-center leading-normal font-sans">
                 귀하는 동의를 거부할 권리가 있으나, 동의 거부 시 프로그램 이용이 제한될 수 있습니다.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔐 Standalone Guidelines Disclosure modal */}
+      {showPrivacyOnlyModal && (
+        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in animate-duration-150">
+          <div className="bg-white rounded-3xl border border-indigo-100 shadow-xl max-w-lg w-full p-6 sm:p-8 space-y-6 relative overflow-hidden animate-scale-up font-sans">
+            <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-indigo-500 via-indigo-400 to-indigo-600" />
+            
+            <div className="flex items-center gap-3 pb-3 border-b border-stone-100">
+              <div className="p-2.5 bg-indigo-50 text-indigo-650 rounded-xl border border-indigo-100">
+                <Lock className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-black text-slate-950 font-sans tracking-tight">
+                개인정보 수집·이용 동의 안내
+              </h3>
+            </div>
+
+            <div className="space-y-4 text-xs tracking-tight text-stone-605 leading-relaxed font-sans">
+              <p className="font-bold">
+                본 인비 타자 챌린지 프로그램은 학생들의 타자 수련 능력 향상도 관리를 위해 아래와 같이 최소한의 개인정보를 안전하게 수집합니다.
+              </p>
+              
+              <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4.5 space-y-2 text-[11px] font-sans shadow-3xs">
+                <div>
+                  <span className="font-black text-stone-900 font-sans">1. 수집 항목: </span>
+                  <span className="font-black text-indigo-805 font-sans">학번, 이름, 생년월일, 매월 타자검정 결과 (속도/정확도/성장율/급수)</span>
+                </div>
+                <div>
+                  <span className="font-black text-stone-900 font-sans">2. 수집 목적: </span>
+                  <span className="font-black text-indigo-805 font-sans">인증을 통한 본인 식별, 성장 통계 분석, 개인 진도 대시보드 및 명예의 전당 통계 제공</span>
+                </div>
+                <div>
+                  <span className="font-black text-stone-900 font-sans">3. 보유 및 이용 기간: </span>
+                  <span className="font-black text-indigo-805 font-sans">수집 일로부터 해당 학년도 종료 시까지 (학기가 종료된 후 데이터는 복구 불가능하도록 자동 파기됩니다.)</span>
+                </div>
+              </div>
+
+              <p className="text-[10.5px] font-black text-stone-500 font-sans leading-relaxed">
+                ※ 귀하는 상기 개인정보 수집 및 이용의 동의를 거부할 권리가 있습니다. 단, 동의를 거부하는 경우 본 프로그램 내 대시보드 조회 및 성장도 기록 매칭에 일부 제한이 따를 수 있음을 안내해 드립니다.
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-stone-100">
+              <button
+                type="button"
+                onClick={() => setShowPrivacyOnlyModal(false)}
+                className="w-full py-3 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all cursor-pointer shadow-xs active:scale-98 text-center"
+              >
+                닫기 및 확인
+              </button>
             </div>
           </div>
         </div>
