@@ -520,11 +520,20 @@ export async function fetchSpreadsheetData(
               continue; // try next candidate (or reject fallback to auth sheet)
             }
 
-            results[sheetKey] = rows.slice(1).map(row => ({
-              studentId: cleanCodeValue(row[idxId]),
-              name: cleanCellValue(row[idxName]),
-              agreed: idxAgreed !== -1 ? (String(row[idxAgreed] || '').includes('동의') || String(row[idxAgreed] || '').includes('agree') || String(row[idxAgreed] || '').trim() === 'true') : true
-            })).filter(item => item.studentId);
+            results[sheetKey] = rows.slice(1).map(row => {
+              const rawAgreed = String(row[idxAgreed] || '').trim().toUpperCase();
+              const hasAgreed = idxAgreed !== -1 ? (
+                rawAgreed.includes('동의') || 
+                rawAgreed.includes('AGREE') || 
+                rawAgreed === 'TRUE' || 
+                rawAgreed === 'Y'
+              ) : true;
+              return {
+                studentId: cleanCodeValue(row[idxId]),
+                name: cleanCellValue(row[idxName]),
+                agreed: hasAgreed
+              };
+            }).filter(item => item.studentId);
           }
 
           // If we reached here without error, we loaded the sheet successfully!
@@ -681,15 +690,15 @@ export async function saveConsentToSpreadsheet(
     return true;
   }
 
-  const rowData = [studentId, name, '동의'];
+  const rowData = [studentId, name, 'Y'];
 
   // 1. Save using Apps Script custom action if available
   if (appsScriptUrl && appsScriptUrl.trim()) {
     try {
       const cleanUrl = appsScriptUrl.trim();
       const fetchUrl = cleanUrl.includes('?')
-        ? `${cleanUrl}&action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent('동의')}&t=${Date.now()}`
-        : `${cleanUrl}?action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent('동의')}&t=${Date.now()}`;
+        ? `${cleanUrl}&action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent('Y')}&t=${Date.now()}`
+        : `${cleanUrl}?action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent('Y')}&t=${Date.now()}`;
       
       const res = await fetch(fetchUrl);
       if (res.ok) {

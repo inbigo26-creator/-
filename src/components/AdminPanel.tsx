@@ -412,8 +412,8 @@ function getAllDataForSystem() {
         for (var i = 1; i < pValues.length; i++) {
           var id = cleanCode(pValues[i][pIdxId]);
           var nm = cleanValue(pValues[i][pIdxName]);
-          var agreedStr = pIdxAgreed !== -1 ? String(pValues[i][pIdxAgreed] || '') : '동의';
-          var agreed = agreedStr.indexOf('동의') !== -1 || agreedStr.indexOf('agree') !== -1;
+          var agreedStr = pIdxAgreed !== -1 ? String(pValues[i][pIdxAgreed] || '').trim().toUpperCase() : 'Y';
+          var agreed = agreedStr.indexOf('동의') !== -1 || agreedStr.indexOf('AGREE') !== -1 || agreedStr === 'Y' || agreedStr === 'TRUE';
           if (id) {
             result.privacy.push({ studentId: id, name: nm, agreed: agreed });
           }
@@ -613,7 +613,7 @@ function saveConsentGas(studentId, name) {
   }
   
   if (foundRowIndex !== -1) {
-    sheet.getRange(foundRowIndex, idxAgreed + 1).setValue('동의');
+    sheet.getRange(foundRowIndex, idxAgreed + 1).setValue('Y');
     if (name) {
       sheet.getRange(foundRowIndex, idxName + 1).setValue(name);
     }
@@ -623,7 +623,7 @@ function saveConsentGas(studentId, name) {
     for (var col = 0; col <= maxIdx; col++) {
       if (col === idxId) newRow.push(studentId);
       else if (col === idxName) newRow.push(name || '');
-      else if (col === idxAgreed) newRow.push('동의');
+      else if (col === idxAgreed) newRow.push('Y');
       else newRow.push('');
     }
     sheet.appendRow(newRow);
