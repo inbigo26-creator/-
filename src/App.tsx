@@ -435,6 +435,7 @@ export default function App() {
       setEnglishDb(data.english);
       setKoreanDb(data.korean);
       setLevelRulesDb(data.levels);
+      setPrivacyDb(data.privacy || []);
       
       setSheetMetrics({
         success: true,
@@ -503,7 +504,7 @@ export default function App() {
   };
 
   // Handle student credentials login match
-  const handleStudentLogin = (e: React.FormEvent) => {
+  const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
 
@@ -519,8 +520,19 @@ export default function App() {
     setIsAuthenticating(true);
 
     try {
-      // Find matching credentials in students_auth DB with robust normalization
-      const currentAuth = authDb.find(
+      // 1. Always pull fresh live database data directly during login to verify correct credentials and live privacy status!
+      clearDataCache();
+      const freshData = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
+      
+      // Update in-memory react-state with latest fetched values
+      setAuthDb(freshData.auth);
+      setEnglishDb(freshData.english);
+      setKoreanDb(freshData.korean);
+      setLevelRulesDb(freshData.levels);
+      setPrivacyDb(freshData.privacy || []);
+
+      // Find matching credentials in freshData.auth DB with robust normalization
+      const currentAuth = freshData.auth.find(
         (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
       );
 
@@ -530,9 +542,9 @@ export default function App() {
         return;
       }
 
-      // Compute statistics for authenticated student ID
-      const englishStats = calculateStudentStats(currentAuth.studentId, englishDb, levelRulesDb, 'english');
-      const koreanStats = calculateStudentStats(currentAuth.studentId, koreanDb, levelRulesDb, 'korean');
+      // Compute statistics for authenticated student ID using the fresh database
+      const englishStats = calculateStudentStats(currentAuth.studentId, freshData.english, freshData.levels, 'english');
+      const koreanStats = calculateStudentStats(currentAuth.studentId, freshData.korean, freshData.levels, 'korean');
 
       // Dynamically extract Grade and Department strictly based on school 5-digit Student ID rule
       const studentInfo = parseStudentIdInfo(currentAuth.studentId);
@@ -550,7 +562,7 @@ export default function App() {
 
       // Check if student has already consented to privacy terms
       const normId = normalizeValue(currentAuth.studentId);
-      const sheetRecord = privacyDb.find(p => normalizeValue(p.studentId) === normId);
+      const sheetRecord = (freshData.privacy || []).find(p => normalizeValue(p.studentId) === normId);
       
       const isDemoMode = (!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') && (!appsScriptUrl || !appsScriptUrl.trim());
       
@@ -595,9 +607,9 @@ export default function App() {
         }, 300);
       }
 
-    } catch (err) {
-      console.error('Computation error:', err);
-      setAuthError('통합 타자 계산을 수행하는 도중 데이터 오류가 발생하였습니다.');
+    } catch (err: any) {
+      console.error('Computation/fetching error during login:', err);
+      setAuthError('통합 타자 계산 및 스프레드시트 연동 중 오류가 발생하였습니다: ' + (err.message || err));
     } finally {
       setIsAuthenticating(false);
     }
