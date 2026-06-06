@@ -174,6 +174,20 @@ function doGet(e) {
             .setMimeType(ContentService.MimeType.JSON);
       }
     }
+
+    // 1b. 개인정보 수집 및 이용 동의 처리
+    if (e.parameter.action === 'saveConsent') {
+      try {
+        var stdId = e.parameter.studentId;
+        var stdNm = e.parameter.name;
+        var res = saveConsentGas(stdId, stdNm);
+        return ContentService.createTextOutput(JSON.stringify(res))
+            .setMimeType(ContentService.MimeType.JSON);
+      } catch (err) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, message: err.toString() }))
+            .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
   }
 
   // 2. 단일 학생 검색 분기 (선택 사항)
@@ -207,14 +221,16 @@ function getAllDataForSystem() {
     auth: [],
     english: [],
     korean: [],
-    levels: []
+    levels: [],
+    privacy: []
   };
 
   var fallbackNamesMap = {
     'students_auth': ['students_auth', 'student_auth', 'students', 'auth', '인증', '학생명부', '학생_auth'],
     'english_all': ['english_all', 'english', '영어_all', '영어', '영어타자', 'englishes', 'eng_all'],
     'korean_all': ['korean_all', 'korean', '한글_all', '한글', '한글타자', 'koreans', 'kor_all'],
-    'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준']
+    'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준'],
+    'privacy': ['privacy', '동의', '개인정보', '개인정보동의', 'privacy_consent']
   };
 
   function getSheetByPossibleNames(candidates) {
@@ -382,6 +398,30 @@ function getAllDataForSystem() {
     }
   }
 
+  // 4b. privacy_consent parsing from sheet
+  var privacySheet = getSheetByPossibleNames(fallbackNamesMap['privacy']);
+  if (privacySheet) {
+    var pValues = privacySheet.getDataRange().getValues();
+    if (pValues.length > 1) {
+      var pHeaders = pValues[0];
+      var pIdxId = findHeaderIndex(pHeaders, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+      var pIdxName = findHeaderIndex(pHeaders, ['이름', '성명', '학생명', 'name']);
+      var pIdxAgreed = findHeaderIndex(pHeaders, ['동의', 'consent', 'agreed', '동의여부']);
+      
+      if (pIdxId !== -1 && pIdxName !== -1) {
+        for (var i = 1; i < pValues.length; i++) {
+          var id = cleanCode(pValues[i][pIdxId]);
+          var nm = cleanValue(pValues[i][pIdxName]);
+          var agreedStr = pIdxAgreed !== -1 ? String(pValues[i][pIdxAgreed] || '') : '동의';
+          var agreed = agreedStr.indexOf('동의') !== -1 || agreedStr.indexOf('agree') !== -1;
+          if (id) {
+            result.privacy.push({ studentId: id, name: nm, agreed: agreed });
+          }
+        }
+      }
+    }
+  }
+
   return result;
 }
 
@@ -530,12 +570,66 @@ function getStudentTypingData(studentId, pin) {
       studentId: searchId,
       english: englishRecords,
       korean: koreanRecords,
-      levels: allData.levels
+      levels: allData.levels,
+      privacy: allData.privacy ? allData.privacy.filter(function(r) { return r.studentId === searchId; }) : []
     };
     
   } catch(e) {
     return { success: false, message: "시스템 처리 중 서버 오류가 발생했습니다: " + e.toString() };
   }
+}
+
+/**
+ * 개인정보 수집 및 이용 동의 저장
+ */
+function saveConsentGas(studentId, name) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('privacy');
+  
+  if (!sheet) {
+    sheet = ss.insertSheet('privacy');
+    sheet.appendRow(['학번', '이름', '동의']);
+  }
+  
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var idxId = findHeaderIndex(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호']);
+  var idxName = findHeaderIndex(headers, ['이름', '성명', '학생명', 'name']);
+  var idxAgreed = findHeaderIndex(headers, ['동의', 'consent', 'agreed', '동의여부']);
+  
+  if (idxId === -1) idxId = 0;
+  if (idxName === -1) idxName = 1;
+  if (idxAgreed === -1) idxAgreed = 2;
+  
+  var foundRowIndex = -1;
+  var searchId = String(studentId).trim();
+  
+  for (var i = 1; i < values.length; i++) {
+    var curId = String(values[i][idxId]).trim().replace(/\s/g, '');
+    if (curId === searchId.replace(/\s/g, '')) {
+      foundRowIndex = i + 1;
+      break;
+    }
+  }
+  
+  if (foundRowIndex !== -1) {
+    sheet.getRange(foundRowIndex, idxAgreed + 1).setValue('동의');
+    if (name) {
+      sheet.getRange(foundRowIndex, idxName + 1).setValue(name);
+    }
+  } else {
+    var newRow = [];
+    var maxIdx = Math.max(idxId, idxName, idxAgreed);
+    for (var col = 0; col <= maxIdx; col++) {
+      if (col === idxId) newRow.push(studentId);
+      else if (col === idxName) newRow.push(name || '');
+      else if (col === idxAgreed) newRow.push('동의');
+      else newRow.push('');
+    }
+    sheet.appendRow(newRow);
+  }
+  
+  return { success: true, message: "동의 정보가 성공적으로 기록되었습니다." };
 }`;
 
   const appsScriptCode_HTML = `<!DOCTYPE html>
