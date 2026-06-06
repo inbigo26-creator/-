@@ -179,7 +179,8 @@ export async function fetchSpreadsheetData(
   }
 
   try {
-    const sheetsToFetch = ['students_auth', 'english_all', 'korean_all', 'level_rule', 'privacy'];
+    // Exact sheet order specified: privacy / students_auth / english_all / korean_all / level_rule
+    const sheetsToFetch = ['privacy', 'students_auth', 'english_all', 'korean_all', 'level_rule'];
     const results: { [key: string]: any[] } = {};
 
     // Load persistent cache from localStorage to guarantee extremely fast (0ms) lookups!
@@ -193,12 +194,13 @@ export async function fetchSpreadsheetData(
       }
     } catch (_) {}
 
+    // Fallbacks prioritized by standard/user-given exact workbook names at the front
     const fallbackNamesMap: { [key: string]: string[] } = {
+      'privacy': ['privacy', 'privacy_consent', '개인정보동의', '동의여부', '동의'],
       'students_auth': ['students_auth', 'student_auth', 'students', 'auth', '인증', '학생명부', '학생_auth'],
       'english_all': ['english_all', 'english', '영어_all', '영어', '영어타자', 'englishes', 'eng_all'],
       'korean_all': ['korean_all', 'korean', '한글_all', '한글', '한글타자', 'koreans', 'kor_all'],
-      'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준'],
-      'privacy': ['privacy_consent', 'privacy', '개인정보동의', '동의여부', '동의']
+      'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준']
     };
 
     // If we do NOT have an accessToken (i.e. gviz/tq CSV fallback mode), we pre-fetch the default first sheet of the spreadsheet.
@@ -258,6 +260,11 @@ export async function fetchSpreadsheetData(
             
             if (firstSheetKeyDiscovered) {
               results[firstSheetKeyDiscovered] = firstSheetParsedResults;
+              resolvedSheetTitles[firstSheetKeyDiscovered] = firstSheetKeyDiscovered;
+              try {
+                const cacheKey2 = `resolved_sheets_${spreadsheetId}`;
+                localStorage.setItem(cacheKey2, JSON.stringify(resolvedSheetTitles));
+              } catch (_) {}
               console.log(`[Sheets Optimization] Managed to auto-discover that the first sheet behaves as: "${firstSheetKeyDiscovered}". Pre-populated!`);
             }
           }
@@ -274,9 +281,12 @@ export async function fetchSpreadsheetData(
         return firstSheetParsedResults;
       }
 
-      // Prioritize previously verified actual sheet name to skip the candidates loop
+      // Prioritize previously verified actual sheet name to skip the candidates loop, but allow fallback on failure!
       const verifiedTitle = resolvedSheetTitles[sheetKey];
-      const candidates = verifiedTitle ? [verifiedTitle] : (fallbackNamesMap[sheetKey] || [sheetKey]);
+      let candidates = fallbackNamesMap[sheetKey] || [sheetKey];
+      if (verifiedTitle) {
+        candidates = [verifiedTitle, ...candidates.filter(c => c !== verifiedTitle)];
+      }
       
       let loadedSuccessfully = false;
       let lastErrorMessage = '';
@@ -312,8 +322,8 @@ export async function fetchSpreadsheetData(
             const csvText = await res.text();
 
             // EXCELLENT INSTANT OPTIMIZATION: If Google Sheets redirected us to the first sheet (fallback behavior when sheet name isn't found),
-            // and this is not the first sheet itself, skip this candidate instantly (0ms logic penalty)!
-            if (firstSheetCsvText && csvText === firstSheetCsvText) {
+            // and this is not the first sheet itself (which is privacy), skip this candidate instantly (0ms logic penalty)!
+            if (firstSheetCsvText && csvText === firstSheetCsvText && sheetKey !== 'privacy' && sheetKey !== firstSheetKeyDiscovered) {
               console.log(`[Sheets Optimization] Candidate "${candidateName}" redirected to default first sheet signature. Skipping.`);
               continue;
             }
@@ -899,22 +909,27 @@ export function parseStudentIdInfo(studentId: string): { grade: string; departme
   const gChar = idStr.charAt(0);
   const grade = `${gChar}학년`;
 
-  // Rule 2: Second and Third digits represent class code
-  // Classes 01 -> "소프트웨어 개발과"
-  // Classes 02 -> "소프트웨어 개발과"
-  // Classes 03 -> "임베디드 소프트웨어과"
-  // Classes 04 -> "임베디드 소프트웨어과"
-  // Classes 05 -> "블록체인 소프트웨어과"
-  // Classes 06 -> "블록체인 소프트웨어과"
+  // Rule 2: Second and Third digits represent class code (or 3rd digit represents class)
+  // Classes 1, 2 (i.e. '01', '02') -> "항공서비스"
+  // Classes 3, 4 (i.e. '03', '04') -> "부사관경영"
+  // Classes 5, 6 (i.e. '05', '06') -> "SNS마케팅"
+  // Classes 7, 8 (i.e. '07', '08') -> "콘텐츠디자인"
   const classCode = idStr.substring(1, 3);
+  let classNum = parseInt(classCode, 10);
+  if (isNaN(classNum)) {
+    classNum = parseInt(idStr.charAt(2), 10);
+  }
+  
   let department = '공통';
 
-  if (classCode === '01' || classCode === '02') {
-    department = '소프트웨어개발과';
-  } else if (classCode === '03' || classCode === '04') {
-    department = '임베디드소프트웨어과';
-  } else if (classCode === '05' || classCode === '06') {
-    department = '인공지능소프트웨어과';
+  if (classNum === 1 || classNum === 2) {
+    department = '항공서비스';
+  } else if (classNum === 3 || classNum === 4) {
+    department = '부사관경영';
+  } else if (classNum === 5 || classNum === 6) {
+    department = 'SNS마케팅';
+  } else if (classNum === 7 || classNum === 8) {
+    department = '콘텐츠디자인';
   }
 
   return { grade, department };

@@ -521,21 +521,39 @@ export default function App() {
     setIsAuthenticating(true);
 
     try {
-      // 1. Always pull fresh live database data directly during login to verify correct credentials and live privacy status!
-      clearDataCache();
-      const freshData = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
-      
-      // Update in-memory react-state with latest fetched values
-      setAuthDb(freshData.auth);
-      setEnglishDb(freshData.english);
-      setKoreanDb(freshData.korean);
-      setLevelRulesDb(freshData.levels);
-      setPrivacyDb(freshData.privacy || []);
-
-      // Find matching credentials in freshData.auth DB with robust normalization
-      const currentAuth = freshData.auth.find(
+      // 1. Try to authenticate with current cached state first to give an INSTANT (0ms) login experience!
+      let currentAuth = authDb.find(
         (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
       );
+
+      let freshData = {
+        auth: authDb,
+        english: englishDb,
+        korean: koreanDb,
+        levels: levelRulesDb,
+        privacy: privacyDb
+      };
+
+      // If credentials are NOT matched in the local cache, or if the local database is empty, pull fresh data from the spreadsheet!
+      if (!currentAuth || authDb.length === 0) {
+        console.log('[Login Optimization] Credentials not found in local memory cache. Forcing a fresh spreadsheet pull...');
+        clearDataCache();
+        const pulledData = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
+        freshData = pulledData;
+        
+        // Update local state with fresh data
+        setAuthDb(pulledData.auth);
+        setEnglishDb(pulledData.english);
+        setKoreanDb(pulledData.korean);
+        setLevelRulesDb(pulledData.levels);
+        setPrivacyDb(pulledData.privacy || []);
+
+        currentAuth = pulledData.auth.find(
+          (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
+        );
+      } else {
+        console.log('[Login Optimization] Blazing fast login! Authenticated instantly with local memory cache.');
+      }
 
       if (!currentAuth) {
         setAuthError('입력하신 학번 또는 인증번호가 일치하지 않습니다. 다시 확인해 드립니다.');
@@ -543,7 +561,7 @@ export default function App() {
         return;
       }
 
-      // Compute statistics for authenticated student ID using the fresh database
+      // Compute statistics for authenticated student ID using the fresh/cached database
       const englishStats = calculateStudentStats(currentAuth.studentId, freshData.english, freshData.levels, 'english');
       const koreanStats = calculateStudentStats(currentAuth.studentId, freshData.korean, freshData.levels, 'korean');
 
