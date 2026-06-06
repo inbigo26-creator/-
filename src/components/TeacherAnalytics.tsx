@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TypingRecord, StudentAuth } from '../types';
-import { getMonthNumber, parseStudentIdInfo } from '../data';
+import { getMonthNumber, parseStudentIdInfo, normalizeDepartment } from '../data';
 import { 
   Award, TrendingUp, BarChart2, CheckCircle, Users, Lightbulb, 
   Settings, HelpCircle, Flame, Calendar, Trophy, AlertCircle, 
@@ -69,18 +69,7 @@ const cleanStudentId = (id: string) => String(id || '').trim().replace(/[^0-9A-Z
 
 const isDeptMatch = (dbDept: string, targetDept: string) => {
   if (!dbDept || !targetDept) return false;
-  const d = dbDept.trim();
-  const t = targetDept.trim();
-  if (d === t) return true;
-  
-  const simplify = (name: string) => {
-    if (name.includes('항공')) return '항공';
-    if (name.includes('부사관')) return '부사관';
-    if (name.includes('SNS') || name.includes('sns')) return 'SNS';
-    if (name.includes('콘텐츠') || name.includes('컨텐츠')) return '콘텐츠';
-    return name;
-  };
-  return simplify(d) === simplify(t);
+  return normalizeDepartment(dbDept) === normalizeDepartment(targetDept);
 };
 
 export function TeacherAnalytics({ 
@@ -110,7 +99,7 @@ export function TeacherAnalytics({
       studentMap.set(s.studentId, {
         studentId: s.studentId,
         name: s.name,
-        department: info.department,
+        department: normalizeDepartment(info.department),
         grade: info.grade
       });
     });
@@ -122,7 +111,7 @@ export function TeacherAnalytics({
         studentMap.set(r.studentId, {
           studentId: r.studentId,
           name: r.name,
-          department: r.department || info.department,
+          department: normalizeDepartment(r.department || info.department),
           grade: r.grade || info.grade
         });
       }
@@ -135,7 +124,7 @@ export function TeacherAnalytics({
         studentMap.set(r.studentId, {
           studentId: r.studentId,
           name: r.name,
-          department: r.department || info.department,
+          department: normalizeDepartment(r.department || info.department),
           grade: r.grade || info.grade
         });
       }
@@ -222,13 +211,7 @@ export function TeacherAnalytics({
 
   const availableDepts = useMemo(() => {
     const rawDepts = studentCertificates.map(s => s.department).filter(Boolean);
-    const normalized = rawDepts.map(d => {
-      if (d.includes('항공')) return '항공서비스';
-      if (d.includes('부사관')) return '부사관경영';
-      if (d.includes('SNS') || d.includes('sns')) return 'SNS마케팅';
-      if (d.includes('콘텐츠') || d.includes('컨텐츠')) return '콘텐츠디자인';
-      return d;
-    });
+    const normalized = rawDepts.map(d => normalizeDepartment(d));
     return Array.from(new Set(normalized));
   }, [studentCertificates]);
 
@@ -448,7 +431,7 @@ export function TeacherAnalytics({
       const rawKorSpeedCandidates = korThisMonth.map(r => {
         const info = parseStudentIdInfo(r.studentId);
         const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
-        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        const rDept = normalizeDepartment(r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department);
         return {
           studentId: r.studentId,
           name: r.name,
@@ -462,7 +445,7 @@ export function TeacherAnalytics({
       const rawEngSpeedCandidates = engThisMonth.map(r => {
         const info = parseStudentIdInfo(r.studentId);
         const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
-        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        const rDept = normalizeDepartment(r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department);
         return {
           studentId: r.studentId,
           name: r.name,
@@ -483,7 +466,7 @@ export function TeacherAnalytics({
             if (diff > 0) {
               const info = parseStudentIdInfo(curr.studentId);
               const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
-              const rDept = curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department;
+              const rDept = normalizeDepartment(curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department);
               rawKorGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
@@ -508,7 +491,7 @@ export function TeacherAnalytics({
             if (diff > 0) {
               const info = parseStudentIdInfo(curr.studentId);
               const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
-              const rDept = curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department;
+              const rDept = normalizeDepartment(curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department);
               rawEngGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
@@ -614,7 +597,7 @@ export function TeacherAnalytics({
       if (sKor.length > 0) {
         const maxVal = Math.max(...sKor.map(r => r.speed));
         const rGrade = sKor[0].grade && sKor[0].grade !== '기타' ? sKor[0].grade : info.grade;
-        const rDept = sKor[0].department && sKor[0].department !== '기타' && sKor[0].department !== '공통' ? sKor[0].department : info.department;
+        const rDept = normalizeDepartment(sKor[0].department && sKor[0].department !== '기타' && sKor[0].department !== '공통' ? sKor[0].department : info.department);
 
         korSpeeds.push({
           studentId: sid,
@@ -643,7 +626,7 @@ export function TeacherAnalytics({
       if (sEng.length > 0) {
         const maxVal = Math.max(...sEng.map(r => r.speed));
         const rGrade = sEng[0].grade && sEng[0].grade !== '기타' ? sEng[0].grade : info.grade;
-        const rDept = sEng[0].department && sEng[0].department !== '기타' && sEng[0].department !== '공통' ? sEng[0].department : info.department;
+        const rDept = normalizeDepartment(sEng[0].department && sEng[0].department !== '기타' && sEng[0].department !== '공통' ? sEng[0].department : info.department);
 
         engSpeeds.push({
           studentId: sid,
@@ -774,12 +757,12 @@ export function TeacherAnalytics({
       return Math.round(sum / filtered.length);
     };
 
-    // Compact layout mapping
+    // Compact layout mapping -> full display per request
     const mapDisplayName = (d: string) => {
-      if (d === '항공서비스') return '항공';
-      if (d === '부사관경영') return '부사관';
-      if (d === 'SNS마케팅') return 'SNS';
-      if (d === '콘텐츠디자인') return '콘텐츠';
+      if (d === '항공' || d === '항공서비스') return '항공서비스';
+      if (d === '부사관' || d === '부사관경영') return '부사관경영';
+      if (d === 'SNS' || d === 'SNS마케팅') return 'SNS마케팅';
+      if (d === '콘텐츠' || d === '콘텐츠디자인' || d === '컨텐츠') return '콘텐츠디자인';
       return d;
     };
 

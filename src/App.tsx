@@ -11,7 +11,8 @@ import {
   getMonthNumber,
   clearDataCache,
   parseStudentIdInfo,
-  saveConsentToSpreadsheet
+  saveConsentToSpreadsheet,
+  normalizeDepartment
 } from './data';
 import { StudentAuth, TypingRecord, LevelRule, StudentStats } from './types';
 import { StudentStatsCard } from './components/StudentCards';
@@ -215,7 +216,7 @@ export default function App() {
       const rawKorSpeedCandidates = korThisMonth.map(r => {
         const info = parseStudentIdInfo(r.studentId);
         const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
-        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        const rDept = normalizeDepartment(r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department);
         return {
           studentId: r.studentId,
           name: r.name,
@@ -229,7 +230,7 @@ export default function App() {
       const rawEngSpeedCandidates = engThisMonth.map(r => {
         const info = parseStudentIdInfo(r.studentId);
         const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
-        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        const rDept = normalizeDepartment(r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department);
         return {
           studentId: r.studentId,
           name: r.name,
@@ -250,7 +251,7 @@ export default function App() {
             if (diff > 0) {
               const info = parseStudentIdInfo(curr.studentId);
               const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
-              const rDept = curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department;
+              const rDept = normalizeDepartment(curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department);
               rawKorGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
@@ -275,7 +276,7 @@ export default function App() {
             if (diff > 0) {
               const info = parseStudentIdInfo(curr.studentId);
               const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
-              const rDept = curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department;
+              const rDept = normalizeDepartment(curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department);
               rawEngGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
@@ -362,7 +363,7 @@ export default function App() {
       if (sKor.length > 0) {
         const maxVal = Math.max(...sKor.map(r => r.speed));
         const rGrade = sKor[0].grade && sKor[0].grade !== '기타' ? sKor[0].grade : info.grade;
-        const rDept = sKor[0].department && sKor[0].department !== '기타' && sKor[0].department !== '공통' ? sKor[0].department : info.department;
+        const rDept = normalizeDepartment(sKor[0].department && sKor[0].department !== '기타' && sKor[0].department !== '공통' ? sKor[0].department : info.department);
 
         korSpeeds.push({
           studentId: sid,
@@ -391,7 +392,7 @@ export default function App() {
       if (sEng.length > 0) {
         const maxVal = Math.max(...sEng.map(r => r.speed));
         const rGrade = sEng[0].grade && sEng[0].grade !== '기타' ? sEng[0].grade : info.grade;
-        const rDept = sEng[0].department && sEng[0].department !== '기타' && sEng[0].department !== '공통' ? sEng[0].department : info.department;
+        const rDept = normalizeDepartment(sEng[0].department && sEng[0].department !== '기타' && sEng[0].department !== '공통' ? sEng[0].department : info.department);
 
         engSpeeds.push({
           studentId: sid,

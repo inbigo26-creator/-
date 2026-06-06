@@ -1010,6 +1010,15 @@ export function parseStudentIdInfo(studentId: string): { grade: string; departme
   return { grade, department };
 }
 
+export function normalizeDepartment(dept: string | null | undefined): string {
+  const d = String(dept || '').trim();
+  if (d.includes('항공')) return '항공서비스';
+  if (d.includes('부사관')) return '부사관경영';
+  if (d.includes('SNS') || d.includes('sns') || d.includes('Sns')) return 'SNS마케팅';
+  if (d.includes('콘텐츠') || d.includes('컨텐츠')) return '콘텐츠디자인';
+  return d || '공통';
+}
+
 // Simple and robust parser for double-quoted or standard CSV fields
 function parseCSV(text: string): string[][] {
   const lines: string[][] = [];
