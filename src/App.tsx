@@ -550,8 +550,10 @@ export default function App() {
 
       // Check if student has already consented to privacy terms
       const normId = normalizeValue(currentAuth.studentId);
-      const hasConsented = localStorage.getItem('privacy_consent_' + normId) === 'true' || 
-                           privacyDb.some(p => normalizeValue(p.studentId) === normId && p.agreed);
+      const sheetRecord = privacyDb.find(p => normalizeValue(p.studentId) === normId);
+      // If found in the database, strictly respect the sheet's agreed status ('Y' vs 'N')
+      // If not registered in the sheet yet, fallback to localStorage or require consent
+      const hasConsented = sheetRecord ? sheetRecord.agreed : (localStorage.getItem('privacy_consent_' + normId) === 'true');
 
       if (!hasConsented) {
         setPendingSession(session);
@@ -620,7 +622,7 @@ export default function App() {
       localStorage.setItem('privacy_consent_' + normId, 'true');
 
       setPrivacyDb(prev => [
-        ...prev,
+        ...prev.filter(p => normalizeValue(p.studentId) !== normId),
         { studentId: pendingSession.id, name: pendingSession.name, agreed: true }
       ]);
 

@@ -584,7 +584,23 @@ function getStudentTypingData(studentId, pin) {
  */
 function saveConsentGas(studentId, name) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('privacy');
+  var candidates = ['privacy_consent', 'privacy', '개인정보동의', '동의여부', '동의'];
+  var sheet = null;
+  
+  if (ss) {
+    var allSheets = ss.getSheets();
+    for (var i = 0; i < candidates.length; i++) {
+      var cand = String(candidates[i]).trim().toLowerCase().replace(/[\s_/-]/g, '');
+      for (var j = 0; j < allSheets.length; j++) {
+        var sClean = String(allSheets[j].getName()).trim().toLowerCase().replace(/[\s_/-]/g, '');
+        if (sClean === cand) {
+          sheet = allSheets[j];
+          break;
+        }
+      }
+      if (sheet) break;
+    }
+  }
   
   if (!sheet) {
     sheet = ss.insertSheet('privacy');

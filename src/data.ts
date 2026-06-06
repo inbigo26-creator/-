@@ -716,66 +716,141 @@ export async function saveConsentToSpreadsheet(
   // 2. Save directly via Google Sheets API (v4) with valid OAuth token
   if (googleToken) {
     try {
-      // 2a. Attempt to add Sheet "privacy" request in case it doesn't already exist.
-      // Ignore 400 errors meaning sheet already exists.
-      try {
-        const createUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
-        const createRes = await fetch(createUrl, {
+      // 2a. Determine which sheet title actually exists out of candidates
+      const sheetsMetaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
+      const metaRes = await fetch(sheetsMetaUrl, {
+        headers: { Authorization: `Bearer ${googleToken}` }
+      });
+      let activeSheetName = 'privacy';
+      if (metaRes.ok) {
+        const metaData = await metaRes.json();
+        const sheetTitles = (metaData.sheets || []).map((s: any) => s.properties.title);
+        const candidates = ['privacy_consent', 'privacy', '개인정보동의', '동의여부', '동의'];
+        const matched = sheetTitles.find((title: string) => 
+          candidates.some(cand => cand.toLowerCase() === title.trim().toLowerCase())
+        );
+        if (matched) {
+          activeSheetName = matched;
+        } else {
+          // If none of candidates exist, create a new 'privacy' sheet
+          try {
+            const createUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+            const createRes = await fetch(createUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${googleToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                requests: [
+                  {
+                    addSheet: {
+                      properties: {
+                        title: 'privacy'
+                      }
+                    }
+                  }
+                ]
+              })
+            });
+
+            if (createRes.ok) {
+              // Newly created sheet - prepopulate Headers
+              const headerUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/privacy!A1:C1?valueInputOption=USER_ENTERED`;
+              await fetch(headerUrl, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${googleToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  values: [['학번', '이름', '동의']]
+                })
+              });
+              activeSheetName = 'privacy';
+            }
+          } catch (createErr) {
+            console.log('Error creating initial privacy sheet:', createErr);
+          }
+        }
+      }
+
+      // 2b. Fetch existing values from the active sheet to search for studentId in place update
+      const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(activeSheetName)}?valueRenderOption=FORMATTED_VALUE`;
+      const getRes = await fetch(getUrl, {
+        headers: { Authorization: `Bearer ${googleToken}` }
+      });
+      let updated = false;
+
+      if (getRes.ok) {
+        const getData = await getRes.json();
+        const values = getData.values || [];
+        if (values.length > 0) {
+          const headers = values[0].map((h: any) => String(h || '').trim());
+          const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+          const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
+          const idxAgreed = findIndexByNames(headers, ['동의', 'consent', 'agreed', '동의여부']);
+
+          if (idxId !== -1) {
+            const targetCleanId = studentId.trim().replace(/\s/g, '');
+            let foundRowIndex = -1;
+            for (let i = 1; i < values.length; i++) {
+              const rowId = String(values[i][idxId] || '').trim().replace(/\s/g, '');
+              if (rowId === targetCleanId) {
+                foundRowIndex = i + 1; // 1-based index (e.g. index 1 is row 2)
+                break;
+              }
+            }
+
+            if (foundRowIndex !== -1) {
+              const updateColIndex = idxAgreed !== -1 ? idxAgreed : 2;
+              const colLetter = String.fromCharCode(65 + updateColIndex); // A, B, C, D...
+              const updateRange = `${activeSheetName}!${colLetter}${foundRowIndex}`;
+              
+              const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(updateRange)}?valueInputOption=USER_ENTERED`;
+              const updateRes = await fetch(updateUrl, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${googleToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  values: [['Y']]
+                })
+              });
+              if (updateRes.ok) {
+                console.log(`Directly updated cell ${updateRange} to 'Y'`);
+                updated = true;
+              } else {
+                console.error('Failed to direct-write to sheet cell:', await updateRes.text());
+              }
+            }
+          }
+        }
+      }
+
+      // If existing student registration wasn't found in active privacy sheet, do standard append
+      if (!updated) {
+        const appendUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(activeSheetName)}:append?valueInputOption=USER_ENTERED`;
+        const appendRes = await fetch(appendUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${googleToken}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            requests: [
-              {
-                addSheet: {
-                  properties: {
-                    title: 'privacy'
-                  }
-                }
-              }
-            ]
+            values: [rowData]
           })
         });
 
-        if (createRes.ok) {
-          // Newly created sheet - prepopulate Headers
-          const headerUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/privacy!A1:C1?valueInputOption=USER_ENTERED`;
-          await fetch(headerUrl, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${googleToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              values: [['학번', '이름', '동의']]
-            })
-          });
+        if (appendRes.ok) {
+          console.log(`Appended new consent row [${studentId}, ${name}, 'Y'] to ${activeSheetName}`);
+          return true;
+        } else {
+          console.error('Failed fallback append payload: ', await appendRes.text());
         }
-      } catch (createErr) {
-        console.log('Add privacy sheet batchUpdate status:', createErr);
-      }
-
-      // 2b. Append rows
-      const appendUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/privacy:append?valueInputOption=USER_ENTERED`;
-      const appendRes = await fetch(appendUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${googleToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          values: [rowData]
-        })
-      });
-
-      if (appendRes.ok) {
-        console.log('Consent appended successfully to Google Sheets API v4.');
-        return true;
       } else {
-        const errTxt = await appendRes.text();
-        console.error('Failed appending to privacy sheet direct endpoint:', errTxt);
+        return true;
       }
     } catch (err) {
       console.error('Direct Google Sheets save process failed:', err);
