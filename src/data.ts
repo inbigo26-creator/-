@@ -966,30 +966,36 @@ export function generateSchoolRanks(
 // Helper: Parse school standard 5-digit student id to extract Grade and Department
 export function parseStudentIdInfo(studentId: string): { grade: string; department: string } {
   const idStr = String(studentId || '').trim();
-  
-  if (idStr.length !== 5) {
+  let grade = '1';
+  let classNum = 1;
+  let department = '기타';
+
+  if (idStr.length >= 5) {
+    grade = idStr.charAt(0);
+    const classChar = idStr.charAt(2);
+    const parsedClass = parseInt(classChar, 10);
+    if (!isNaN(parsedClass)) {
+      classNum = parsedClass;
+    }
+  } else if (idStr.length > 0) {
+    const firstChar = idStr.charAt(0);
+    if (/^\d$/.test(firstChar)) {
+      grade = firstChar;
+    } else {
+      grade = '기타';
+    }
+    
+    // Attempt intermediate character for class if 4 digits (e.g. 1215 is grade 1, class 2, number 15)
+    if (idStr.length >= 3) {
+      const classChar = idStr.charAt(1);
+      const parsedClass = parseInt(classChar, 10);
+      if (!isNaN(parsedClass)) {
+        classNum = parsedClass;
+      }
+    }
+  } else {
     return { grade: '기타', department: '공통' };
   }
-
-  // Rule 1: First character represents grade (e.g., 10203 -> "1")
-  const gChar = idStr.charAt(0);
-  const grade = gChar;
-
-  // Rule 2: Middle digit (3rd character, index 2) represents class/department
-  // Classes 1, 2 (i.e. '1', '2') -> "항공서비스"
-  // Classes 3, 4 (i.e. '3', '4') -> "부사관경영"
-  // Classes 5, 6 (i.e. '5', '6') -> "SNS마케팅"
-  // Classes 7, 8 (i.e. '7', '8') -> "콘텐츠디자인"
-  const classChar = idStr.charAt(2);
-  let classNum = parseInt(classChar, 10);
-  
-  // Fallback to second/third digits if needed
-  if (isNaN(classNum)) {
-    const classCode = idStr.substring(1, 3);
-    classNum = parseInt(classCode, 10);
-  }
-  
-  let department = '공통';
 
   if (classNum === 1 || classNum === 2) {
     department = '항공서비스';

@@ -245,7 +245,11 @@ export function TeacherAnalytics({
   // Filtered student list for bottom grid
   const filteredStudents = useMemo(() => {
     return studentCertificates.filter(s => {
-      if (filterGrade !== 'all' && s.grade !== filterGrade) return false;
+      if (filterGrade !== 'all') {
+        const sGradeNum = String(s.grade || '').replace(/[^0-9]/g, '');
+        const targetGradeNum = String(filterGrade).replace(/[^0-9]/g, '');
+        if (sGradeNum !== targetGradeNum) return false;
+      }
       if (filterDept !== 'all' && !isDeptMatch(s.department, filterDept)) return false;
       if (filterMonth !== 'all') {
         if (filterMonth === '미달') {
@@ -291,13 +295,18 @@ export function TeacherAnalytics({
     // Grade comparison
     const grades = ['1', '2', '3'];
     const gradeStats = grades.map(g => {
-      const list = validStudents.filter(s => s.grade === g);
+      const list = validStudents.filter(s => {
+        const sGradeNum = String(s.grade || '').replace(/[^0-9]/g, '');
+        const targetGradeNum = String(g).replace(/[^0-9]/g, '');
+        return sGradeNum === targetGradeNum;
+      });
       const total = list.length;
       const certified = list.filter(s => s.isCertified).length;
-      const rate = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
+      const rate = total > 0 ? parseFloat(((certified / total) * 105).toFixed(1)) : 0; // wait, let's keep it (certified / total) * 100
+      const actualRate = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
       const korSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.korSpeed, 0) / total) : 0;
       const engSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.engSpeed, 0) / total) : 0;
-      return { grade: g, total, certified, rate, korSpeedAvg, engSpeedAvg };
+      return { grade: g, total, certified, rate: actualRate, korSpeedAvg, engSpeedAvg };
     });
 
     // Department comparison
@@ -334,7 +343,11 @@ export function TeacherAnalytics({
 
     activeGrades.forEach(g => {
       activeDepts.forEach(d => {
-        const list = validStudents.filter(s => s.grade === g && isDeptMatch(s.department, d));
+        const list = validStudents.filter(s => {
+          const sGradeNum = String(s.grade || '').replace(/[^0-9]/g, '');
+          const targetGradeNum = String(g).replace(/[^0-9]/g, '');
+          return sGradeNum === targetGradeNum && isDeptMatch(s.department, d);
+        });
         const total = list.length;
         const korSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.maxKorSpeed, 0) / total) : 0;
         const engSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.maxEngSpeed, 0) / total) : 0;
@@ -432,22 +445,32 @@ export function TeacherAnalytics({
       const prevMonthName = monthIdx > 0 ? sortedMonths[monthIdx - 1] : null;
 
       // 1. Korean Speed candidates
-      const rawKorSpeedCandidates = korThisMonth.map(r => ({
-        studentId: r.studentId,
-        name: r.name,
-        grade: r.grade,
-        department: r.department,
-        value: r.speed
-      })).sort((a,b) => b.value - a.value);
+      const rawKorSpeedCandidates = korThisMonth.map(r => {
+        const info = parseStudentIdInfo(r.studentId);
+        const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
+        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        return {
+          studentId: r.studentId,
+          name: r.name,
+          grade: rGrade,
+          department: rDept,
+          value: r.speed
+        };
+      }).sort((a,b) => b.value - a.value);
 
       // 2. English Speed candidates
-      const rawEngSpeedCandidates = engThisMonth.map(r => ({
-        studentId: r.studentId,
-        name: r.name,
-        grade: r.grade,
-        department: r.department,
-        value: r.speed
-      })).sort((a,b) => b.value - a.value);
+      const rawEngSpeedCandidates = engThisMonth.map(r => {
+        const info = parseStudentIdInfo(r.studentId);
+        const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
+        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        return {
+          studentId: r.studentId,
+          name: r.name,
+          grade: rGrade,
+          department: rDept,
+          value: r.speed
+        };
+      }).sort((a,b) => b.value - a.value);
 
       // 3. Korean Growth Candidates (June/6월 onwards)
       const rawKorGrowthCandidates: Winner[] = [];
@@ -458,11 +481,14 @@ export function TeacherAnalytics({
           if (prev) {
             const diff = curr.speed - prev.speed;
             if (diff > 0) {
+              const info = parseStudentIdInfo(curr.studentId);
+              const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
+              const rDept = curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department;
               rawKorGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
-                grade: curr.grade,
-                department: curr.department,
+                grade: rGrade,
+                department: rDept,
                 value: diff
               });
             }
@@ -480,11 +506,14 @@ export function TeacherAnalytics({
           if (prev) {
             const diff = curr.speed - prev.speed;
             if (diff > 0) {
+              const info = parseStudentIdInfo(curr.studentId);
+              const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
+              const rDept = curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department;
               rawEngGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
-                grade: curr.grade,
-                department: curr.department,
+                grade: rGrade,
+                department: rDept,
                 value: diff
               });
             }
@@ -501,11 +530,15 @@ export function TeacherAnalytics({
       const trySelectWinnerForGrade = (list: Winner[], gradeVal: string, reasonTag: string) => {
         for (let i = 0; i < list.length; i++) {
           const s = list[i];
-          if (String(s.grade) !== String(gradeVal)) continue;
+          const cleanId = cleanStudentId(s.studentId);
+          const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
+          const targetGradeNum = String(gradeVal).replace(/[^0-9]/g, '');
+
+          if (sGradeNum !== targetGradeNum) continue;
           if (isExcludedStudentName(s.name)) continue;
 
           // Filter out if they won in past months or are already selected this month
-          if (!cumulativeSnackWinners.has(s.studentId) && !localSelectedSet.has(s.studentId)) {
+          if (!cumulativeSnackWinners.has(cleanId) && !localSelectedSet.has(cleanId)) {
             selectedWinners.push({
               studentId: s.studentId,
               name: s.name,
@@ -514,8 +547,8 @@ export function TeacherAnalytics({
               reason: `${gradeVal}학년 ${reasonTag}`,
               value: s.value
             });
-            localSelectedSet.add(s.studentId);
-            cumulativeSnackWinners.add(s.studentId);
+            localSelectedSet.add(cleanId);
+            cumulativeSnackWinners.add(cleanId);
             break; // selected 1 for this grade & category combination, we are done
           }
         }
@@ -572,16 +605,22 @@ export function TeacherAnalytics({
     const engGrowths: typeof korSpeeds = [];
 
     studentIds.forEach(sid => {
-      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(sid)).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
-      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(sid)).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const cleanId = cleanStudentId(sid);
+      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanId).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanId).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+
+      const info = parseStudentIdInfo(sid);
 
       if (sKor.length > 0) {
         const maxVal = Math.max(...sKor.map(r => r.speed));
+        const rGrade = sKor[0].grade && sKor[0].grade !== '기타' ? sKor[0].grade : info.grade;
+        const rDept = sKor[0].department && sKor[0].department !== '기타' && sKor[0].department !== '공통' ? sKor[0].department : info.department;
+
         korSpeeds.push({
           studentId: sid,
           name: sKor[0].name,
-          department: sKor[0].department,
-          grade: sKor[0].grade,
+          department: rDept,
+          grade: rGrade,
           value: maxVal
         });
 
@@ -593,8 +632,8 @@ export function TeacherAnalytics({
             korGrowths.push({
               studentId: sid,
               name: sKor[0].name,
-              department: sKor[0].department,
-              grade: sKor[0].grade,
+              department: rDept,
+              grade: rGrade,
               value: improvement
             });
           }
@@ -603,11 +642,14 @@ export function TeacherAnalytics({
 
       if (sEng.length > 0) {
         const maxVal = Math.max(...sEng.map(r => r.speed));
+        const rGrade = sEng[0].grade && sEng[0].grade !== '기타' ? sEng[0].grade : info.grade;
+        const rDept = sEng[0].department && sEng[0].department !== '기타' && sEng[0].department !== '공통' ? sEng[0].department : info.department;
+
         engSpeeds.push({
           studentId: sid,
           name: sEng[0].name,
-          department: sEng[0].department,
-          grade: sEng[0].grade,
+          department: rDept,
+          grade: rGrade,
           value: maxVal
         });
 
@@ -619,8 +661,8 @@ export function TeacherAnalytics({
             engGrowths.push({
               studentId: sid,
               name: sEng[0].name,
-              department: sEng[0].department,
-              grade: sEng[0].grade,
+              department: rDept,
+              grade: rGrade,
               value: improvement
             });
           }
@@ -633,7 +675,11 @@ export function TeacherAnalytics({
       const grades = ['1', '2', '3'];
       grades.forEach(g => {
         const sortedForGrade = list
-          .filter(s => String(s.grade) === String(g) && !isExcludedStudentName(s.name))
+          .filter(s => {
+            const sGradeNum = String(s.grade || '').replace(/[^0-9]/g, '');
+            const targetGradeNum = String(g).replace(/[^0-9]/g, '');
+            return sGradeNum === targetGradeNum && !isExcludedStudentName(s.name);
+          })
           .sort((a, b) => b.value - a.value);
         if (sortedForGrade.length > 0) {
           result.push(sortedForGrade[0]);
@@ -677,12 +723,21 @@ export function TeacherAnalytics({
 
     const getAverageForCell = (lang: 'english' | 'korean', grade: string, dept: string, mStr: string) => {
       const db = lang === 'english' ? englishDb : koreanDb;
-      const filtered = db.filter(r => 
-        r.grade === grade && 
-        !isExcludedStudentName(r.name) &&
-        isDeptMatch(r.department, dept) && 
-        getMonthNumber(r.month) === getMonthNumber(mStr)
-      );
+      const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
+
+      const filtered = db.filter(r => {
+        const info = parseStudentIdInfo(r.studentId);
+        const rGradeRaw = r.grade || info.grade;
+        const rGradeNum = String(rGradeRaw).replace(/[^0-9]/g, '');
+        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+
+        return (
+          rGradeNum === targetGradeNum && 
+          !isExcludedStudentName(r.name) &&
+          isDeptMatch(rDept, dept) && 
+          getMonthNumber(r.month) === getMonthNumber(mStr)
+        );
+      });
       if (filtered.length === 0) return 0;
       const sum = filtered.reduce((acc, r) => acc + r.speed, 0);
       return Math.round(sum / filtered.length);
@@ -690,11 +745,19 @@ export function TeacherAnalytics({
 
     const getGradeAverage = (lang: 'english' | 'korean', grade: string, mStr: string) => {
       const db = lang === 'english' ? englishDb : koreanDb;
-      const filtered = db.filter(r => 
-        r.grade === grade && 
-        !isExcludedStudentName(r.name) &&
-        getMonthNumber(r.month) === getMonthNumber(mStr)
-      );
+      const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
+
+      const filtered = db.filter(r => {
+        const info = parseStudentIdInfo(r.studentId);
+        const rGradeRaw = r.grade || info.grade;
+        const rGradeNum = String(rGradeRaw).replace(/[^0-9]/g, '');
+
+        return (
+          rGradeNum === targetGradeNum && 
+          !isExcludedStudentName(r.name) &&
+          getMonthNumber(r.month) === getMonthNumber(mStr)
+        );
+      });
       if (filtered.length === 0) return 0;
       const sum = filtered.reduce((acc, r) => acc + r.speed, 0);
       return Math.round(sum / filtered.length);

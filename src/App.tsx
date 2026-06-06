@@ -212,22 +212,32 @@ export default function App() {
       const prevMonthName = monthIdx > 0 ? sortedMonths[monthIdx - 1] : null;
 
       // Kor Speed
-      const rawKorSpeedCandidates = korThisMonth.map(r => ({
-        studentId: r.studentId,
-        name: r.name,
-        grade: r.grade,
-        department: r.department,
-        value: r.speed
-      })).sort((a,b) => b.value - a.value);
+      const rawKorSpeedCandidates = korThisMonth.map(r => {
+        const info = parseStudentIdInfo(r.studentId);
+        const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
+        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        return {
+          studentId: r.studentId,
+          name: r.name,
+          grade: rGrade,
+          department: rDept,
+          value: r.speed
+        };
+      }).sort((a,b) => b.value - a.value);
 
       // Eng Speed
-      const rawEngSpeedCandidates = engThisMonth.map(r => ({
-        studentId: r.studentId,
-        name: r.name,
-        grade: r.grade,
-        department: r.department,
-        value: r.speed
-      })).sort((a,b) => b.value - a.value);
+      const rawEngSpeedCandidates = engThisMonth.map(r => {
+        const info = parseStudentIdInfo(r.studentId);
+        const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
+        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        return {
+          studentId: r.studentId,
+          name: r.name,
+          grade: rGrade,
+          department: rDept,
+          value: r.speed
+        };
+      }).sort((a,b) => b.value - a.value);
 
       // Kor Growth
       const rawKorGrowthCandidates: Winner[] = [];
@@ -238,11 +248,14 @@ export default function App() {
           if (prev) {
             const diff = curr.speed - prev.speed;
             if (diff > 0) {
+              const info = parseStudentIdInfo(curr.studentId);
+              const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
+              const rDept = curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department;
               rawKorGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
-                grade: curr.grade,
-                department: curr.department,
+                grade: rGrade,
+                department: rDept,
                 value: diff
               });
             }
@@ -260,11 +273,14 @@ export default function App() {
           if (prev) {
             const diff = curr.speed - prev.speed;
             if (diff > 0) {
+              const info = parseStudentIdInfo(curr.studentId);
+              const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
+              const rDept = curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department;
               rawEngGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
-                grade: curr.grade,
-                department: curr.department,
+                grade: rGrade,
+                department: rDept,
                 value: diff
               });
             }
@@ -279,10 +295,14 @@ export default function App() {
       const trySelectWinnerForGrade = (list: Winner[], gradeVal: string, reasonTag: string) => {
         for (let i = 0; i < list.length; i++) {
           const s = list[i];
-          if (String(s.grade) !== String(gradeVal)) continue;
+          const cleanId = cleanStudentId(s.studentId);
+          const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
+          const targetGradeNum = String(gradeVal).replace(/[^0-9]/g, '');
+
+          if (sGradeNum !== targetGradeNum) continue;
           if (isExcludedStudentName(s.name)) continue;
 
-          if (!cumulativeSnackWinners.has(s.studentId) && !localSelectedSet.has(s.studentId)) {
+          if (!cumulativeSnackWinners.has(cleanId) && !localSelectedSet.has(cleanId)) {
             selectedWinners.push({
               studentId: s.studentId,
               name: s.name,
@@ -291,8 +311,8 @@ export default function App() {
               reason: `${gradeVal}학년 ${reasonTag}`,
               value: s.value
             });
-            localSelectedSet.add(s.studentId);
-            cumulativeSnackWinners.add(s.studentId);
+            localSelectedSet.add(cleanId);
+            cumulativeSnackWinners.add(cleanId);
             break;
           }
         }
@@ -333,59 +353,68 @@ export default function App() {
     const engGrowths: typeof korSpeeds = [];
 
     studentIds.forEach(sid => {
-      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(sid)).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
-      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(sid)).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const cleanId = cleanStudentId(sid);
+      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanId).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanId).sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+
+      const info = parseStudentIdInfo(sid);
 
       if (sKor.length > 0) {
         const maxVal = Math.max(...sKor.map(r => r.speed));
-         korSpeeds.push({
-           studentId: sid,
-           name: sKor[0].name,
-           department: sKor[0].department,
-           grade: sKor[0].grade,
-           value: maxVal
-         });
+        const rGrade = sKor[0].grade && sKor[0].grade !== '기타' ? sKor[0].grade : info.grade;
+        const rDept = sKor[0].department && sKor[0].department !== '기타' && sKor[0].department !== '공통' ? sKor[0].department : info.department;
 
-         if (sKor.length >= 2) {
-           const firstSpeed = sKor[0].speed;
-           const lastSpeed = sKor[sKor.length - 1].speed;
-           const improvement = lastSpeed - firstSpeed;
-           if (improvement > 0) {
-             korGrowths.push({
-               studentId: sid,
-               name: sKor[0].name,
-               department: sKor[0].department,
-               grade: sKor[0].grade,
-               value: improvement
-             });
-           }
-         }
+        korSpeeds.push({
+          studentId: sid,
+          name: sKor[0].name,
+          department: rDept,
+          grade: rGrade,
+          value: maxVal
+        });
+
+        if (sKor.length >= 2) {
+          const firstSpeed = sKor[0].speed;
+          const lastSpeed = sKor[sKor.length - 1].speed;
+          const improvement = lastSpeed - firstSpeed;
+          if (improvement > 0) {
+            korGrowths.push({
+              studentId: sid,
+              name: sKor[0].name,
+              department: rDept,
+              grade: rGrade,
+              value: improvement
+            });
+          }
+        }
       }
 
       if (sEng.length > 0) {
         const maxVal = Math.max(...sEng.map(r => r.speed));
-         engSpeeds.push({
-           studentId: sid,
-           name: sEng[0].name,
-           department: sEng[0].department,
-           grade: sEng[0].grade,
-           value: maxVal
-         });
+        const rGrade = sEng[0].grade && sEng[0].grade !== '기타' ? sEng[0].grade : info.grade;
+        const rDept = sEng[0].department && sEng[0].department !== '기타' && sEng[0].department !== '공통' ? sEng[0].department : info.department;
 
-         if (sEng.length >= 2) {
-           const firstSpeed = sEng[0].speed;
-           const lastSpeed = sEng[sEng.length - 1].speed;
-           const improvement = lastSpeed - firstSpeed;
-           if (improvement > 0) {
-             engGrowths.push({
-               studentId: sid,
-               name: sEng[0].name,
-               department: sEng[0].department,
-               grade: sEng[0].grade,
-               value: improvement
-             });
-           }
-         }
+        engSpeeds.push({
+          studentId: sid,
+          name: sEng[0].name,
+          department: rDept,
+          grade: rGrade,
+          value: maxVal
+        });
+
+        if (sEng.length >= 2) {
+          const firstSpeed = sEng[0].speed;
+          const lastSpeed = sEng[sEng.length - 1].speed;
+          const improvement = lastSpeed - firstSpeed;
+          if (improvement > 0) {
+            engGrowths.push({
+              studentId: sid,
+              name: sEng[0].name,
+              department: rDept,
+              grade: rGrade,
+              value: improvement
+            });
+          }
+        }
       }
     });
 
@@ -394,7 +423,11 @@ export default function App() {
       const grades = ['1', '2', '3'];
       grades.forEach(g => {
         const sortedForGrade = list
-          .filter(s => String(s.grade) === String(g) && !isExcludedStudentName(s.name))
+          .filter(s => {
+            const sGradeNum = String(s.grade || '').replace(/[^0-9]/g, '');
+            const targetGradeNum = String(g).replace(/[^0-9]/g, '');
+            return sGradeNum === targetGradeNum && !isExcludedStudentName(s.name);
+          })
           .sort((a, b) => b.value - a.value);
         if (sortedForGrade.length > 0) {
           result.push(sortedForGrade[0]);
