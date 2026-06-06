@@ -551,7 +551,7 @@ export default function App() {
       // Check if student has already consented to privacy terms
       const normId = normalizeValue(currentAuth.studentId);
       const hasConsented = localStorage.getItem('privacy_consent_' + normId) === 'true' || 
-                           privacyDb.some(p => normalizeValue(p.studentId) === normId);
+                           privacyDb.some(p => normalizeValue(p.studentId) === normId && p.agreed);
 
       if (!hasConsented) {
         setPendingSession(session);

@@ -338,7 +338,7 @@ export async function fetchSpreadsheetData(
       'english_all': ['english_all', 'english', '영어_all', '영어', '영어타자', 'englishes', 'eng_all'],
       'korean_all': ['korean_all', 'korean', '한글_all', '한글', '한글타자', 'koreans', 'kor_all'],
       'level_rule': ['level_rule', 'level_rules', 'levels', 'rules', '급수기준', '기준'],
-      'privacy': ['privacy', '동의', '개인정보', '개인정보동의', 'privacy_consent']
+      'privacy': ['privacy_consent', 'privacy', '개인정보동의', '동의여부', '동의']
     };
 
     for (const sheetKey of sheetsToFetch) {
