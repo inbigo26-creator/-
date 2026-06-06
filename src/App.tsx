@@ -963,6 +963,23 @@ export default function App() {
                     </button>
                   </form>
 
+                  {sheetLoadError && (
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col gap-1.5 text-xs">
+                      <div className="flex items-start gap-1.5">
+                        <AlertCircle className="h-4.5 w-4.5 shrink-0 mt-0.5 text-amber-600" />
+                        <div>
+                          <p className="font-extrabold text-amber-950">스프레드시트 동기화 경고</p>
+                          <p className="text-[11px] text-amber-700 font-bold leading-relaxed mt-0.5 whitespace-pre-wrap">
+                            {sheetLoadError}
+                          </p>
+                          <p className="text-[10px] text-amber-500 font-medium leading-relaxed mt-1">
+                            우측 상단 ⚙️ 설정을 통해 스프레드시트 ID와 시트명을 다시 점검해 주십시오.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {authError && (
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-105 text-rose-700 flex flex-col gap-2 text-xs">
                       <div className="flex items-start gap-2">

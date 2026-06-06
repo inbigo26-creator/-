@@ -103,6 +103,19 @@ export function clearDataCache() {
   cachedSpreadsheetKorean = null;
   cachedSpreadsheetLevels = null;
   cachedSpreadsheetPrivacy = null;
+  resolvedSheetTitles = {};
+
+  try {
+    // Clear all resolved_sheets_ and school_db_cache_ keys from localStorage
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('resolved_sheets_') || key.startsWith('school_db_cache_'))) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch (e) {
+    console.warn('[Cache Optimization] Failed clearing localStorage cache keys:', e);
+  }
 }
 
 // Fetch Google Sheets Data
@@ -129,7 +142,36 @@ export async function fetchSpreadsheetData(
     };
   }
 
-  // If already cached, return it to prevent multiple duplicate network calls
+  // 0. CHECK PERSISTENT LOCALSTORAGE OFFSET CACHE (5 minutes TTL for instant loading)
+  const dbCacheKey = `school_db_cache_${spreadsheetId}`;
+  try {
+    const cachedStr = localStorage.getItem(dbCacheKey);
+    if (cachedStr) {
+      const cachedObj = JSON.parse(cachedStr);
+      const now = Date.now();
+      // 5 minutes TTL (300,000ms)
+      if (now - cachedObj.timestamp < 300000) {
+        console.log('[Cache Optimization] Loaded spreadsheet database from localStorage cache (TTL valid). Instant load!');
+        cachedSpreadsheetAuth = cachedObj.auth || [];
+        cachedSpreadsheetEnglish = cachedObj.english || [];
+        cachedSpreadsheetKorean = cachedObj.korean || [];
+        cachedSpreadsheetLevels = cachedObj.levels || [];
+        cachedSpreadsheetPrivacy = cachedObj.privacy || [];
+        
+        return {
+          auth: cachedSpreadsheetAuth || [],
+          english: cachedSpreadsheetEnglish || [],
+          korean: cachedSpreadsheetKorean || [],
+          levels: cachedSpreadsheetLevels || [],
+          privacy: cachedSpreadsheetPrivacy || []
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('[Cache Optimization] Failed parsing cached spreadsheet database.', e);
+  }
+
+  // If already cached in memory, return it to prevent multiple duplicate network calls
   if (cachedSpreadsheetAuth && cachedSpreadsheetEnglish && cachedSpreadsheetKorean && cachedSpreadsheetLevels) {
     return {
       auth: cachedSpreadsheetAuth,
@@ -160,6 +202,18 @@ export async function fetchSpreadsheetData(
         cachedSpreadsheetLevels = json.levels || [];
         cachedSpreadsheetPrivacy = json.privacy || [];
         
+        // Cache to localStorage
+        try {
+          localStorage.setItem(`school_db_cache_${spreadsheetId}`, JSON.stringify({
+            auth: cachedSpreadsheetAuth,
+            english: cachedSpreadsheetEnglish,
+            korean: cachedSpreadsheetKorean,
+            levels: cachedSpreadsheetLevels,
+            privacy: cachedSpreadsheetPrivacy,
+            timestamp: Date.now()
+          }));
+        } catch (_) {}
+
         return {
           auth: cachedSpreadsheetAuth,
           english: cachedSpreadsheetEnglish,
@@ -525,6 +579,18 @@ export async function fetchSpreadsheetData(
     cachedSpreadsheetKorean = results['korean_all'];
     cachedSpreadsheetLevels = results['level_rule'];
     cachedSpreadsheetPrivacy = results['privacy'] || [];
+
+    // Cache to localStorage
+    try {
+      localStorage.setItem(`school_db_cache_${spreadsheetId}`, JSON.stringify({
+        auth: cachedSpreadsheetAuth,
+        english: cachedSpreadsheetEnglish,
+        korean: cachedSpreadsheetKorean,
+        levels: cachedSpreadsheetLevels,
+        privacy: cachedSpreadsheetPrivacy,
+        timestamp: Date.now()
+      }));
+    } catch (_) {}
 
     return {
       auth: cachedSpreadsheetAuth || [],
