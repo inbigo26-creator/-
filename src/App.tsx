@@ -562,23 +562,30 @@ export default function App() {
 
       // Check if student has already consented to privacy terms
       const normId = normalizeValue(currentAuth.studentId);
-      const sheetRecord = (freshData.privacy || []).find(p => normalizeValue(p.studentId) === normId);
+      // Search from the end of the array to prioritize the latest record in case there are multiple rows for this student
+      const sheetRecord = [...(freshData.privacy || [])].reverse().find(p => normalizeValue(p.studentId) === normId);
       
       const isDemoMode = (!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') && (!appsScriptUrl || !appsScriptUrl.trim());
       
-      // If found in the database, strictly respect the sheet's agreed status (true/Y vs false/N).
-      // Live Mode: Must exist AND be agreed in the sheet. No localStorage bypass allowed so we can live-sync updates.
-      // Demo Mode: Fallback allowed to localStorage.
-      const hasConsented = sheetRecord 
-        ? sheetRecord.agreed 
-        : (isDemoMode ? (localStorage.getItem('privacy_consent_' + normId) === 'true') : false);
+      // Determine consent status with clear logging
+      let hasConsented = false;
+      if (sheetRecord) {
+        hasConsented = sheetRecord.agreed;
+        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 기록 발견됨 - 동의 여부(agreed): ${sheetRecord.agreed}`);
+      } else {
+        hasConsented = isDemoMode ? (localStorage.getItem('privacy_consent_' + normId) === 'true') : false;
+        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 기록 없음. 데모모드 여부: ${isDemoMode}, 로컬스토리지 동의여부: ${localStorage.getItem('privacy_consent_' + normId)}`);
+      }
 
       if (!hasConsented) {
+        console.log(`[통계 및 동의 디버그] 학번: ${normId} - 동의 미완료(N) 상태이므로 동의 수집 팝업(Pending)을 표시합니다.`);
         setPendingSession(session);
         setPrivacyCheckboxChecked(false);
         setIsAuthenticating(false);
         return;
       }
+
+      console.log(`[통계 및 동의 디버그] 학번: ${normId} - 동의 확인 완료(Active). 로그인을 승인합니다.`);
 
       setStudentSession(session);
 

@@ -120,6 +120,43 @@ export function parseStudentIdInfo(studentId: string): { grade: string; classNum
   return { grade, classNum, department };
 }
 
+// Robust analyzer to determine if privacy consent cell indicates explicit agreement or refusal
+export function isAgreedValue(val: any): boolean {
+  const clean = String(val || '').trim().toUpperCase().replace(/[\s_/-]/g, '');
+  if (!clean) return false;
+
+  // Explicit negative indicators (check these first to avoid false-positives like '미동의' matching '.includes(동의)')
+  if (
+    clean === 'N' ||
+    clean === 'NO' ||
+    clean === 'FALSE' ||
+    clean === 'X' ||
+    clean.includes('미동의') ||
+    clean.includes('비동의') ||
+    clean.includes('안함') ||
+    clean.includes('거절') ||
+    clean.includes('거부') ||
+    clean.includes('아니오') ||
+    clean.includes('PENDING')
+  ) {
+    return false;
+  }
+
+  // Explicit positive indicators
+  if (
+    clean === 'Y' ||
+    clean === 'YES' ||
+    clean === 'TRUE' ||
+    clean === 'ACTIVE' ||
+    clean.includes('동의') ||
+    clean.includes('AGREE')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 // Helper to look up column header index supporting alternative names, case insensivity, and spacing variants
 export function findIndexByNames(headers: string[], possibleNames: string[]): number {
   if (!headers || headers.length === 0) return -1;
@@ -521,13 +558,8 @@ export async function fetchSpreadsheetData(
             }
 
             results[sheetKey] = rows.slice(1).map(row => {
-              const rawAgreed = String(row[idxAgreed] || '').trim().toUpperCase();
-              const hasAgreed = idxAgreed !== -1 ? (
-                rawAgreed.includes('동의') || 
-                rawAgreed.includes('AGREE') || 
-                rawAgreed === 'TRUE' || 
-                rawAgreed === 'Y'
-              ) : true;
+              const rawAgreed = row[idxAgreed];
+              const hasAgreed = idxAgreed !== -1 ? isAgreedValue(rawAgreed) : false;
               return {
                 studentId: cleanCodeValue(row[idxId]),
                 name: cleanCellValue(row[idxName]),

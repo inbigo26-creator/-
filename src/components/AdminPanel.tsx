@@ -412,8 +412,8 @@ function getAllDataForSystem() {
         for (var i = 1; i < pValues.length; i++) {
           var id = cleanCode(pValues[i][pIdxId]);
           var nm = cleanValue(pValues[i][pIdxName]);
-          var agreedStr = pIdxAgreed !== -1 ? String(pValues[i][pIdxAgreed] || '').trim().toUpperCase() : 'Y';
-          var agreed = agreedStr.indexOf('동의') !== -1 || agreedStr.indexOf('AGREE') !== -1 || agreedStr === 'Y' || agreedStr === 'TRUE';
+          var rawAgreed = pIdxAgreed !== -1 ? pValues[i][pIdxAgreed] : '';
+          var agreed = pIdxAgreed !== -1 ? isAgreedValueGas(rawAgreed) : false;
           if (id) {
             result.privacy.push({ studentId: id, name: nm, agreed: agreed });
           }
@@ -456,6 +456,46 @@ function findHeaderIndex(headers, possibleNames) {
     }
   }
   return -1;
+}
+
+/**
+ * 개인정보 동의 상태를 다각도로 안전하게 판별 (미동의, 비동의를 완벽 구분하여 '동의' 오탐 방지)
+ */
+function isAgreedValueGas(val) {
+  if (val === null || val === undefined) return false;
+  var clean = String(val).trim().toUpperCase().replace(/[\s_/-]/g, '');
+  if (!clean) return false;
+
+  // Explicit negative indicators (우선 필터링하여 '미동의' 등에 대한 오동작 원천 차단)
+  if (
+    clean === 'N' ||
+    clean === 'NO' ||
+    clean === 'FALSE' ||
+    clean === 'X' ||
+    clean.indexOf('미동의') !== -1 ||
+    clean.indexOf('비동의') !== -1 ||
+    clean.indexOf('안함') !== -1 ||
+    clean.indexOf('거절') !== -1 ||
+    clean.indexOf('거부') !== -1 ||
+    clean.indexOf('아니오') !== -1 ||
+    clean.indexOf('PENDING') !== -1
+  ) {
+    return false;
+  }
+
+  // Explicit positive indicators
+  if (
+    clean === 'Y' ||
+    clean === 'YES' ||
+    clean === 'TRUE' ||
+    clean === 'ACTIVE' ||
+    clean.indexOf('동의') !== -1 ||
+    clean.indexOf('AGREE') !== -1
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
