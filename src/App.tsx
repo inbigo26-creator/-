@@ -71,6 +71,7 @@ export default function App() {
   } | null>(null);
   const [privacyCheckboxChecked, setPrivacyCheckboxChecked] = useState(false);
   const [isSavingConsent, setIsSavingConsent] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
   const [studentSession, setStudentSession] = useState<{
     id: string;
     name: string;
@@ -581,6 +582,7 @@ export default function App() {
         console.log(`[통계 및 동의 디버그] 학번: ${normId} - 동의 미완료(N) 상태이므로 동의 수집 팝업(Pending)을 표시합니다.`);
         setPendingSession(session);
         setPrivacyCheckboxChecked(false);
+        setConsentError(null);
         setIsAuthenticating(false);
         return;
       }
@@ -634,13 +636,15 @@ export default function App() {
   const handleSaveConsent = async () => {
     if (!pendingSession) return;
     setIsSavingConsent(true);
+    setConsentError(null);
     try {
       await saveConsentToSpreadsheet(
         spreadsheetId,
         pendingSession.id,
         pendingSession.name,
         googleToken,
-        appsScriptUrl
+        appsScriptUrl,
+        'Y'
       );
 
       const normId = normalizeValue(pendingSession.id);
@@ -675,11 +679,12 @@ export default function App() {
           });
         }, 300);
       }
-    } catch (err) {
+      setPendingSession(null); // Only close modal on successful save!
+    } catch (err: any) {
       console.error('Failed saving privacy consent:', err);
+      setConsentError(err.message || '동의 상태를 연동 저장하지 못했습니다. 관리자 설정 및 네트워크를 확인해 주세요.');
     } finally {
       setIsSavingConsent(false);
-      setPendingSession(null);
     }
   };
 
@@ -1494,6 +1499,13 @@ export default function App() {
                 ※ 귀하는 개인정보 수집·이용에 동의하지 않을 권리가 있으며, 동의 거부 시 본 프로그램 이용이 불가능합니다.
               </p>
             </div>
+
+            {consentError && (
+              <div className="bg-rose-50 border border-rose-150 rounded-2xl p-4.5 text-xs text-rose-800 font-medium space-y-1 shadow-3xs">
+                <p className="font-bold text-rose-600 flex items-center gap-1">⚠️ 동의 정보를 저장하지 못했습니다:</p>
+                <p className="text-[11px] leading-relaxed select-text">{consentError}</p>
+              </div>
+            )}
 
             <div className="pt-2 border-t border-stone-100 space-y-5">
               <label className="flex items-start gap-2.5 cursor-pointer select-none">

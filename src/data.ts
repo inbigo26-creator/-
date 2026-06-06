@@ -724,6 +724,7 @@ export async function saveConsentToSpreadsheet(
   }
 
   const rowData = [studentId, name, agreementStatus];
+  let lastError: any = null;
 
   // 1. Save using Apps Script custom action if available
   if (appsScriptUrl && appsScriptUrl.trim()) {
@@ -734,15 +735,19 @@ export async function saveConsentToSpreadsheet(
         : `${cleanUrl}?action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent(agreementStatus)}&t=${Date.now()}`;
       
       const res = await fetch(fetchUrl);
-      if (res.ok) {
-        const json = await res.json().catch(() => ({ success: true }));
-        if (json && json.success !== false) {
-          console.log(`Privacy consent (${agreementStatus}) logged successfully via Apps Script web app API.`);
-          return true;
-        }
+      if (!res.ok) {
+        throw new Error(`Apps Script API 응답 실패 (코드: ${res.status})`);
       }
-    } catch (err) {
-      console.error('GAS Apps Script consent append failed - trying native sheets backup...', err);
+      const json = await res.json().catch(() => ({ success: true }));
+      if (json && json.success !== false) {
+        console.log(`Privacy consent (${agreementStatus}) logged successfully via Apps Script web app API.`);
+        return true;
+      } else {
+        throw new Error(json?.message || 'Apps Script에서 동의 결과 처리에 실패 응답을 보냈습니다.');
+      }
+    } catch (err: any) {
+      console.error('GAS Apps Script consent append failed:', err);
+      lastError = err;
     }
   }
 
@@ -855,7 +860,7 @@ export async function saveConsentToSpreadsheet(
                 console.log(`Directly updated cell ${updateRange} to '${agreementStatus}'`);
                 updated = true;
               } else {
-                console.error('Failed to direct-write to sheet cell:', await updateRes.text());
+                throw new Error(`동의 데이터 직접 셀 업데이트 쓰기 실패: ${await updateRes.text()}`);
               }
             }
           }
@@ -880,15 +885,21 @@ export async function saveConsentToSpreadsheet(
           console.log(`Appended new consent row [${studentId}, ${name}, '${agreementStatus}'] to ${activeSheetName}`);
           return true;
         } else {
-          console.error('Failed fallback append payload: ', await appendRes.text());
+          throw new Error(`동의 행 추가(Append) API 실패: ${await appendRes.text()}`);
         }
       } else {
         return true;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Direct Google Sheets save process failed:', err);
+      lastError = err;
     }
   }
 
-  return false;
+  // If we reached here, and we had an error or were not able to save anywhere
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error('데이터베이스에 동의 상태를 전송할 연동 장치(Apps Script 웹앱 또는 Google API 토큰)가 구성되어 있지 않습니다.');
 }
