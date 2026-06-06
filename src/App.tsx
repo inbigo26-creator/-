@@ -1258,11 +1258,29 @@ export default function App() {
                             </span>
                             <button
                               type="button"
-                              onClick={() => {
-                                if (window.confirm('개인정보 동의 기록을 로컬에서 초기화하고 로그아웃하시겠습니까? (로그인 시 동의 팝업 테스트 가능)')) {
+                              onClick={async () => {
+                                if (window.confirm('개인정보 동의 기록을 로컬 및 구글 스프레드시트에서 초기화(N 상태로 동의 철회)하고 로그아웃하시겠습니까? (로그인 시 동의 팝업이 다시 나타나게 됩니다)')) {
                                   const nId = normalizeValue(studentSession.id);
                                   localStorage.removeItem('privacy_consent_' + nId);
-                                  setPrivacyDb(prev => prev.filter(p => normalizeValue(p.studentId) !== nId));
+                                  
+                                  // Live sync modification to spreadsheet so it is explicitly marked 'N' in Google Sheets!
+                                  try {
+                                    await saveConsentToSpreadsheet(
+                                      spreadsheetId,
+                                      studentSession.id,
+                                      studentSession.name,
+                                      googleToken,
+                                      appsScriptUrl,
+                                      'N'
+                                    );
+                                  } catch (err) {
+                                    console.error('Failed to update consent to N in spreadsheet:', err);
+                                  }
+
+                                  setPrivacyDb(prev => [
+                                    ...prev.filter(p => normalizeValue(p.studentId) !== nId),
+                                    { studentId: studentSession.id, name: studentSession.name, agreed: false }
+                                  ]);
                                   handleStudentLogout();
                                 }
                               }}

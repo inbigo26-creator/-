@@ -180,7 +180,8 @@ function doGet(e) {
       try {
         var stdId = e.parameter.studentId;
         var stdNm = e.parameter.name;
-        var res = saveConsentGas(stdId, stdNm);
+        var agreement = e.parameter.agreement || 'Y';
+        var res = saveConsentGas(stdId, stdNm, agreement);
         return ContentService.createTextOutput(JSON.stringify(res))
             .setMimeType(ContentService.MimeType.JSON);
       } catch (err) {
@@ -622,7 +623,8 @@ function getStudentTypingData(studentId, pin) {
 /**
  * 개인정보 수집 및 이용 동의 저장
  */
-function saveConsentGas(studentId, name) {
+function saveConsentGas(studentId, name, agreement) {
+  var aggStatus = (agreement === 'N' || agreement === 'n') ? 'N' : 'Y';
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var candidates = ['privacy_consent', 'privacy', '개인정보동의', '동의여부', '동의'];
   var sheet = null;
@@ -669,7 +671,7 @@ function saveConsentGas(studentId, name) {
   }
   
   if (foundRowIndex !== -1) {
-    sheet.getRange(foundRowIndex, idxAgreed + 1).setValue('Y');
+    sheet.getRange(foundRowIndex, idxAgreed + 1).setValue(aggStatus);
     if (name) {
       sheet.getRange(foundRowIndex, idxName + 1).setValue(name);
     }
@@ -679,7 +681,7 @@ function saveConsentGas(studentId, name) {
     for (var col = 0; col <= maxIdx; col++) {
       if (col === idxId) newRow.push(studentId);
       else if (col === idxName) newRow.push(name || '');
-      else if (col === idxAgreed) newRow.push('Y');
+      else if (col === idxAgreed) newRow.push(aggStatus);
       else newRow.push('');
     }
     sheet.appendRow(newRow);

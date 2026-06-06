@@ -714,7 +714,8 @@ export async function saveConsentToSpreadsheet(
   studentId: string,
   name: string,
   googleToken?: string | null,
-  appsScriptUrl?: string | null
+  appsScriptUrl?: string | null,
+  agreementStatus: 'Y' | 'N' = 'Y'
 ): Promise<boolean> {
   // Offline or Demo Mode
   if ((!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') && (!appsScriptUrl || !appsScriptUrl.trim())) {
@@ -722,21 +723,21 @@ export async function saveConsentToSpreadsheet(
     return true;
   }
 
-  const rowData = [studentId, name, 'Y'];
+  const rowData = [studentId, name, agreementStatus];
 
   // 1. Save using Apps Script custom action if available
   if (appsScriptUrl && appsScriptUrl.trim()) {
     try {
       const cleanUrl = appsScriptUrl.trim();
       const fetchUrl = cleanUrl.includes('?')
-        ? `${cleanUrl}&action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent('Y')}&t=${Date.now()}`
-        : `${cleanUrl}?action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent('Y')}&t=${Date.now()}`;
+        ? `${cleanUrl}&action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent(agreementStatus)}&t=${Date.now()}`
+        : `${cleanUrl}?action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent(agreementStatus)}&t=${Date.now()}`;
       
       const res = await fetch(fetchUrl);
       if (res.ok) {
         const json = await res.json().catch(() => ({ success: true }));
         if (json && json.success !== false) {
-          console.log('Privacy consent logged successfully via Apps Script web app API.');
+          console.log(`Privacy consent (${agreementStatus}) logged successfully via Apps Script web app API.`);
           return true;
         }
       }
@@ -847,11 +848,11 @@ export async function saveConsentToSpreadsheet(
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  values: [['Y']]
+                  values: [[agreementStatus]]
                 })
               });
               if (updateRes.ok) {
-                console.log(`Directly updated cell ${updateRange} to 'Y'`);
+                console.log(`Directly updated cell ${updateRange} to '${agreementStatus}'`);
                 updated = true;
               } else {
                 console.error('Failed to direct-write to sheet cell:', await updateRes.text());
@@ -876,7 +877,7 @@ export async function saveConsentToSpreadsheet(
         });
 
         if (appendRes.ok) {
-          console.log(`Appended new consent row [${studentId}, ${name}, 'Y'] to ${activeSheetName}`);
+          console.log(`Appended new consent row [${studentId}, ${name}, '${agreementStatus}'] to ${activeSheetName}`);
           return true;
         } else {
           console.error('Failed fallback append payload: ', await appendRes.text());
