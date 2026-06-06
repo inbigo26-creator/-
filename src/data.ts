@@ -513,14 +513,17 @@ export async function fetchSpreadsheetData(
             const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
             const idxAgreed = findIndexByNames(headers, ['동의', 'consent', 'agreed', '동의여부']);
 
-            if (idxId === -1 || idxName === -1) {
-              continue; // try next candidate
+            // Detect if this sheet is actually students_auth due to gviz/tq fallback
+            const idxPinInPrivacy = findIndexByNames(headers, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
+
+            if (idxId === -1 || idxName === -1 || idxPinInPrivacy !== -1) {
+              continue; // try next candidate (or reject fallback to auth sheet)
             }
 
             results[sheetKey] = rows.slice(1).map(row => ({
               studentId: cleanCodeValue(row[idxId]),
               name: cleanCellValue(row[idxName]),
-              agreed: idxAgreed !== -1 ? String(row[idxAgreed] || '').includes('동의') : true
+              agreed: idxAgreed !== -1 ? (String(row[idxAgreed] || '').includes('동의') || String(row[idxAgreed] || '').includes('agree') || String(row[idxAgreed] || '').trim() === 'true') : true
             })).filter(item => item.studentId);
           }
 

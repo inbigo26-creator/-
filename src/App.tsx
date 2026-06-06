@@ -1217,9 +1217,25 @@ export default function App() {
                         귀하는 원활한 타자 성적 조회 및 성 취도 추적 관리를 지지하며 동의하였습니다.
                       </p>
                     </div>
-                    <span className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg shrink-0 uppercase tracking-widest">
-                      ACTIVE
-                    </span>
+                    <div className="flex flex-col gap-2 shrink-0 items-end">
+                      <span className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg uppercase tracking-widest text-center">
+                        ACTIVE
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('개인정보 동의 기록을 로컬에서 초기화하고 로그아웃하시겠습니까? (로그인 시 동의 팝업 테스트 가능)')) {
+                            const normId = normalizeValue(studentSession.id);
+                            localStorage.removeItem('privacy_consent_' + normId);
+                            setPrivacyDb(prev => prev.filter(p => normalizeValue(p.studentId) !== normId));
+                            handleStudentLogout();
+                          }
+                        }}
+                        className="text-[9.5px] font-black text-stone-400 hover:text-rose-600 transition-colors underline cursor-pointer"
+                      >
+                        [동의 초기화 및 로그아웃]
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
