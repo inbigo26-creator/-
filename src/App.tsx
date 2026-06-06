@@ -570,14 +570,14 @@ export default function App() {
       // Search from the end of the array to prioritize the latest record in case there are multiple rows for this student
       const sheetRecord = [...(freshData.privacy || [])].reverse().find(p => normalizeValue(p.studentId) === normId);
       
-      // Determine consent status with clear logging
+      // Determine consent status with clear logging: Prioritize the live spreadsheet record over local storage as the absolute source of truth!
       let hasConsented = false;
-      if (localConsented) {
-        hasConsented = true;
-        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 브라우저 로컬 스토리지에 동의 기록이 존재하여 직시 승인합니다.`);
-      } else if (sheetRecord) {
+      if (sheetRecord) {
         hasConsented = sheetRecord.agreed;
         console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 기록 발견됨 - 동의 여부(agreed): ${sheetRecord.agreed}`);
+      } else if (localConsented) {
+        hasConsented = true;
+        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 브라우저 로컬 스토리지에 동의 기록이 존재하여 동의 지연을 우회(Bypass)합니다.`);
       } else {
         hasConsented = false;
         console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 및 로컬 동의 기록 없음.`);

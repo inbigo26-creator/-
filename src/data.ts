@@ -1,271 +1,80 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import { GoogleGenAI } from '@google/genai';
 
-import { StudentAuth, TypingRecord, LevelRule, StudentStats } from './types';
-import { SCHOOL_SPREADSHEET_ID } from './config';
+// -----------------------------------------------------------------------------
+// TYPES & INTERFACES
+// -----------------------------------------------------------------------------
 
-// Default Spreadsheet ID (Imported from school config.ts)
-export const DEFAULT_SPREADSHEET_ID = SCHOOL_SPREADSHEET_ID;
-
-// --- ROBUST INLINE CSV PARSER ---
-export function parseCSV(text: string): string[][] {
-  const result: string[][] = [];
-  // Ensure we strip any UTF-8 Byte Order Mark (BOM) at the very start of the text
-  const cleanText = text.replace(/^\uFEFF/, '');
-  const rows = cleanText.split(/\r?\n/);
-  
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i].trim();
-    if (!row) continue;
-    
-    const cells: string[] = [];
-    let insideQuote = false;
-    let currentCell = '';
-    
-    for (let j = 0; j < row.length; j++) {
-      const char = row[j];
-      if (char === '"') {
-        insideQuote = !insideQuote;
-      } else if (char === ',' && !insideQuote) {
-        cells.push(currentCell.trim());
-        currentCell = '';
-      } else {
-        currentCell += char;
-      }
-    }
-    cells.push(currentCell.trim());
-    result.push(cells);
-  }
-  return result;
+export interface StudentAuth {
+  studentId: string;
+  name: string;
+  pin: string;
 }
 
-// Helper to extract numeric month for proper sorting (e.g., "3월" -> 3, "10월" -> 10)
-export function getMonthNumber(monthStr: string): number {
-  const num = parseInt(monthStr.replace(/[^0-9]/g, ''), 10);
-  return isNaN(num) ? 0 : num;
+export interface TypingRecord {
+  studentId: string;
+  name: string;
+  grade: string;
+  department: string;
+  month: string;
+  speed: number;
+  type: 'english' | 'korean';
 }
 
-// Sort typing records chronologically by month
-export function sortRecordsByMonth<T extends { month: string }>(records: T[]): T[] {
-  return [...records].sort((a, b) => getMonthNumber(a.month) - getMonthNumber(b.month));
+export interface LevelRule {
+  type: '영어' | '한글';
+  level: string;
+  minVal: number;
 }
 
-// Helper to clean cell values from quotes, extraneous spaces, and trailing float decimals (.0)
-export function cleanCellValue(val: any): string {
-  if (val === null || val === undefined) return '';
-  let str = String(val).trim().replace(/['"“”]/g, '');
-  if (str.endsWith('.0')) {
-    str = str.substring(0, str.length - 2);
-  } else if (str.includes('.')) {
-    const parts = str.split('.');
-    if (/^0+$/.test(parts[1])) {
-      str = parts[0];
-    }
-  }
-  return str.trim();
+export interface StudentStats {
+  history: { month: string; speed: number }[];
+  latestSpeed: number;
+  maxSpeed: number;
+  growth: number;
+  currentLevel: string;
+  nextLevel: string;
+  nextLevelNeeded: number;
+  percentToNext: number;
 }
 
-// Specialized clean helper for codes (student IDs, pin codes) by removing all whitespace
-export function cleanCodeValue(val: any): string {
-  return cleanCellValue(val).replace(/\s/g, '');
+export interface SchoolRankEntry {
+  rank: number;
+  studentId: string;
+  name: string;
+  grade: string;
+  department: string;
+  maxSpeed: number;
+  growth: number;
+  currentLevel: string;
 }
 
-/**
- * 학번을 기반으로 학년과 학과(반 배정 규칙) 정보를 자동으로 추출하는 분석 함수
- * - 학번 5자리 기준: 1번째 자리 = 학년, 3번째 자리 = 반
- * - 반 배정 학과 정보:
- *   - 1,2반: 항공서비스
- *   - 3,4반: 부사관경영
- *   - 5,6반: SNS마케팅
- *   - 7,8반: 콘텐츠디자인
- *   - 기타: 기타
- */
-export function parseStudentIdInfo(studentId: string): { grade: string; classNum: number; department: string } {
-  const cleanId = String(studentId || '').trim();
-  let grade = '1';
-  let classNum = 1;
-  let department = '일반';
+// -----------------------------------------------------------------------------
+// SAMPLE DATA / FALLBACKS
+// -----------------------------------------------------------------------------
 
-  if (cleanId.length >= 5) {
-    // 1번째 자리: 학년
-    grade = cleanId.charAt(0);
-    // 3번째 자리: 반
-    const classChar = cleanId.charAt(2);
-    const parsedClass = parseInt(classChar, 10);
-    if (!isNaN(parsedClass)) {
-      classNum = parsedClass;
-    }
-  } else if (cleanId.length > 0) {
-    const firstChar = cleanId.charAt(0);
-    if (/^\d$/.test(firstChar)) {
-      grade = firstChar;
-    }
+export const DEFAULT_SPREADSHEET_ID = '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o';
+
+export function getMonthNumber(monthStr: string | undefined | null): number {
+  if (!monthStr) return 0;
+  const match = String(monthStr).match(/\d+/);
+  if (match) {
+    return parseInt(match[0], 10);
   }
-
-  // 1,2반 -> 항공서비스, 3,4반 -> 부사관경영, 5,6반 -> SNS마케팅, 7,8반 -> 콘텐츠디자인
-  if (classNum === 1 || classNum === 2) {
-    department = '항공서비스';
-  } else if (classNum === 3 || classNum === 4) {
-    department = '부사관경영';
-  } else if (classNum === 5 || classNum === 6) {
-    department = 'SNS마케팅';
-  } else if (classNum === 7 || classNum === 8) {
-    department = '콘텐츠디자인';
-  } else {
-    department = '기타';
-  }
-
-  return { grade, classNum, department };
+  const s = String(monthStr).trim().toLowerCase();
+  if (s.includes('jan')) return 1;
+  if (s.includes('feb')) return 2;
+  if (s.includes('mar')) return 3;
+  if (s.includes('apr')) return 4;
+  if (s.includes('may')) return 5;
+  if (s.includes('jun')) return 6;
+  if (s.includes('jul')) return 7;
+  if (s.includes('aug')) return 8;
+  if (s.includes('sep')) return 9;
+  if (s.includes('oct')) return 10;
+  if (s.includes('nov')) return 11;
+  if (s.includes('dec')) return 12;
+  return 0;
 }
-
-// Robust analyzer to determine if privacy consent cell indicates explicit agreement or refusal
-export function isAgreedValue(val: any): boolean {
-  const clean = String(val || '').trim().toUpperCase().replace(/[\s_/-]/g, '');
-  if (!clean) return false;
-
-  // Explicit negative indicators (check these first to avoid false-positives like '미동의' matching '.includes(동의)')
-  if (
-    clean === 'N' ||
-    clean === 'NO' ||
-    clean === 'FALSE' ||
-    clean === 'X' ||
-    clean.includes('미동의') ||
-    clean.includes('비동의') ||
-    clean.includes('안함') ||
-    clean.includes('거절') ||
-    clean.includes('거부') ||
-    clean.includes('아니오') ||
-    clean.includes('PENDING')
-  ) {
-    return false;
-  }
-
-  // Explicit positive indicators
-  if (
-    clean === 'Y' ||
-    clean === 'YES' ||
-    clean === 'TRUE' ||
-    clean === 'ACTIVE' ||
-    clean.includes('동의') ||
-    clean.includes('AGREE')
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
-// Helper to look up column header index supporting alternative names, case insensivity, and spacing variants
-export function findIndexByNames(headers: string[], possibleNames: string[]): number {
-  if (!headers || headers.length === 0) return -1;
-
-  // Clean actual headers: remove BOM, lowercase, remove all whitespaces/quotes/hyphens
-  const cleanedHeaders = headers.map(h => 
-    String(h || '').trim().replace(/^\uFEFF/, '').toLowerCase().replace(/['"“”\s_/-]/g, '')
-  );
-
-  // Clean target potential names
-  const cleanedPossibles = possibleNames.map(p => 
-    p.trim().toLowerCase().replace(/['"“”\s_/-]/g, '')
-  );
-
-  // 1st Pass: Exact matching
-  for (const possible of cleanedPossibles) {
-    const idx = cleanedHeaders.indexOf(possible);
-    if (idx !== -1) return idx;
-  }
-
-  // 2nd Pass: Containment check
-  for (let i = 0; i < cleanedHeaders.length; i++) {
-    const header = cleanedHeaders[i];
-    if (!header) continue;
-    for (const possible of cleanedPossibles) {
-      if (header.includes(possible) || possible.includes(header)) {
-        return i;
-      }
-    }
-  }
-
-  return -1;
-}
-
-// --- HIGH-FIDELITY SAMPLE/SEED DATA ---
-export const SAMPLE_AUTH_DATA: StudentAuth[] = [
-  { studentId: '10101', name: '홍길동', pin: '4821' },
-  { studentId: '10102', name: '김영희', pin: '1234' },
-  { studentId: '10201', name: '이몽룡', pin: '9999' },
-  { studentId: '10202', name: '성춘향', pin: '5678' }
-];
-
-export const SAMPLE_ENGLISH_RECORDS: TypingRecord[] = [
-  // 홍길동 (Steady growth, Bronze to Gold)
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '3월', speed: 120, type: 'english' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '4월', speed: 175, type: 'english' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '5월', speed: 215, type: 'english' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '6월', speed: 230, type: 'english' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '9월', speed: 275, type: 'english' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '10월', speed: 360, type: 'english' },
-
-  // 김영희 (Excellent starter, Silver to Diamond)
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '3월', speed: 220, type: 'english' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '4월', speed: 290, type: 'english' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '5월', speed: 310, type: 'english' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '6월', speed: 350, type: 'english' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '9월', speed: 410, type: 'english' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '10월', speed: 480, type: 'english' },
-
-  // 이몽룡 (Overcomes plateau)
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '3월', speed: 80, type: 'english' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '4월', speed: 110, type: 'english' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '5월', speed: 145, type: 'english' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '6월', speed: 155, type: 'english' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '9월', speed: 210, type: 'english' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '10월', speed: 260, type: 'english' },
-
-  // 성춘향 (Super rapid improvement)
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '3월', speed: 150, type: 'english' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '4월', speed: 160, type: 'english' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '5월', speed: 230, type: 'english' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '6월', speed: 290, type: 'english' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '9월', speed: 380, type: 'english' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '10월', speed: 460, type: 'english' }
-];
-
-export const SAMPLE_KOREAN_RECORDS: TypingRecord[] = [
-  // 홍길동 (Fast growth in Hangul, Gold to Platinum)
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '3월', speed: 320, type: 'korean' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '4월', speed: 380, type: 'korean' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '5월', speed: 430, type: 'korean' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '6월', speed: 470, type: 'korean' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '9월', speed: 560, type: 'korean' },
-  { studentId: '10101', name: '홍길동', grade: '1', department: '관광', month: '10월', speed: 650, type: 'korean' },
-
-  // 김영희 (Excellent starter in Hangul)
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '3월', speed: 450, type: 'korean' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '4월', speed: 510, type: 'korean' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '5월', speed: 580, type: 'korean' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '6월', speed: 600, type: 'korean' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '9월', speed: 690, type: 'korean' },
-  { studentId: '10102', name: '김영희', grade: '1', department: '관광', month: '10월', speed: 810, type: 'korean' },
-
-  // 이몽룡
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '3월', speed: 210, type: 'korean' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '4월', speed: 280, type: 'korean' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '5월', speed: 340, type: 'korean' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '6월', speed: 380, type: 'korean' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '9월', speed: 460, type: 'korean' },
-  { studentId: '10201', name: '이몽룡', grade: '1', department: '디자인', month: '10월', speed: 540, type: 'korean' },
-
-  // 성춘향
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '3월', speed: 350, type: 'korean' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '4월', speed: 410, type: 'korean' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '5월', speed: 490, type: 'korean' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '6월', speed: 540, type: 'korean' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '9월', speed: 670, type: 'korean' },
-  { studentId: '10202', name: '성춘향', grade: '1', department: '디자인', month: '10월', speed: 780, type: 'korean' }
-];
 
 export const SAMPLE_LEVEL_RULES: LevelRule[] = [
   { type: '영어', level: '3급(Bronze)', minVal: 100 },
@@ -373,6 +182,17 @@ export async function fetchSpreadsheetData(
     const sheetsToFetch = ['students_auth', 'english_all', 'korean_all', 'level_rule', 'privacy'];
     const results: { [key: string]: any[] } = {};
 
+    // Load persistent cache from localStorage to guarantee extremely fast (0ms) lookups!
+    const cacheKey = `resolved_sheets_${spreadsheetId}`;
+    let cachedTitles: { [key: string]: string } = {};
+    try {
+      const saved = localStorage.getItem(cacheKey);
+      if (saved) {
+        cachedTitles = JSON.parse(saved);
+        resolvedSheetTitles = { ...resolvedSheetTitles, ...cachedTitles };
+      }
+    } catch (_) {}
+
     const fallbackNamesMap: { [key: string]: string[] } = {
       'students_auth': ['students_auth', 'student_auth', 'students', 'auth', '인증', '학생명부', '학생_auth'],
       'english_all': ['english_all', 'english', '영어_all', '영어', '영어타자', 'englishes', 'eng_all'],
@@ -381,9 +201,80 @@ export async function fetchSpreadsheetData(
       'privacy': ['privacy_consent', 'privacy', '개인정보동의', '동의여부', '동의']
     };
 
+    // If we do NOT have an accessToken (i.e. gviz/tq CSV fallback mode), we pre-fetch the default first sheet of the spreadsheet.
+    // This allows us to instantly check if other queries fell back to this first sheet, avoiding false positive matches and skipping loop retries in milliseconds!
+    let firstSheetCsvText = '';
+    let firstSheetHeaders: string[] = [];
+    let firstSheetParsedResults: any[] = [];
+    let firstSheetKeyDiscovered: string | null = null;
+
+    if (!accessToken) {
+      try {
+        console.log('[Sheets Optimization] Pre-fetching default first sheet signature to identify default fallbacks...');
+        const cacheBust = `t=${Date.now()}`;
+        const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&${cacheBust}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          firstSheetCsvText = await res.text();
+          const firstSheetRows = parseCSV(firstSheetCsvText);
+          if (firstSheetRows.length >= 1) {
+            firstSheetHeaders = firstSheetRows[0].map(h => String(h || '').trim());
+            
+            // Auto-detect which sheetKey this first sheet actually behaves as!
+            const idxId = findIndexByNames(firstSheetHeaders, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+            const idxName = findIndexByNames(firstSheetHeaders, ['이름', '성명', '학생명', 'name']);
+            const idxPin = findIndexByNames(firstSheetHeaders, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
+            const idxAgreed = findIndexByNames(firstSheetHeaders, ['동의', 'consent', 'agreed', '동의여부']);
+            const idxType = findIndexByNames(firstSheetHeaders, ['타입', '구분', '종류', 'type', '언어']);
+            const idxLevel = findIndexByNames(firstSheetHeaders, ['급수', '등급', '레벨', 'level']);
+            const idxMin = findIndexByNames(firstSheetHeaders, ['최소값', '기준', '타수', '최소', 'min', '최저']);
+
+            if (idxId !== -1 && idxName !== -1 && idxPin !== -1) {
+              firstSheetKeyDiscovered = 'students_auth';
+              firstSheetParsedResults = firstSheetRows.slice(1).map(row => ({
+                studentId: cleanCodeValue(row[idxId]),
+                name: cleanCellValue(row[idxName]),
+                pin: cleanCodeValue(row[idxPin])
+              })).filter(item => item.studentId && item.pin);
+            } else if (idxId !== -1 && idxName !== -1 && idxAgreed !== -1) {
+              firstSheetKeyDiscovered = 'privacy';
+              firstSheetParsedResults = firstSheetRows.slice(1).map(row => {
+                const rawAgreed = row[idxAgreed];
+                const hasAgreed = idxAgreed !== -1 ? isAgreedValue(rawAgreed) : false;
+                return {
+                  studentId: cleanCodeValue(row[idxId]),
+                  name: cleanCellValue(row[idxName]),
+                  agreed: hasAgreed
+                };
+              }).filter(item => item.studentId);
+            } else if (idxType !== -1 && idxLevel !== -1 && idxMin !== -1) {
+              firstSheetKeyDiscovered = 'level_rule';
+              firstSheetParsedResults = firstSheetRows.slice(1).map(row => ({
+                type: cleanCellValue(row[idxType]),
+                level: cleanCellValue(row[idxLevel]),
+                minVal: parseInt(cleanCodeValue(row[idxMin]), 10) || 0
+              })).filter(item => item.type && item.level);
+            }
+            
+            if (firstSheetKeyDiscovered) {
+              results[firstSheetKeyDiscovered] = firstSheetParsedResults;
+              console.log(`[Sheets Optimization] Managed to auto-discover that the first sheet behaves as: "${firstSheetKeyDiscovered}". Pre-populated!`);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Sheets Optimization] Failed pre-fetching first sheet signature:', err);
+      }
+    }
+
     // Helper process to fetch a single sheet-key asynchronously
     const fetchSingleSheet = async (sheetKey: string): Promise<any[]> => {
-      // Prioritize previously verified actual sheet name to skip the 404 candidates loop
+      // If we already preloaded this sheetKey as the first sheet, return its results directly!
+      if (firstSheetKeyDiscovered === sheetKey) {
+        return firstSheetParsedResults;
+      }
+
+      // Prioritize previously verified actual sheet name to skip the candidates loop
       const verifiedTitle = resolvedSheetTitles[sheetKey];
       const candidates = verifiedTitle ? [verifiedTitle] : (fallbackNamesMap[sheetKey] || [sheetKey]);
       
@@ -419,6 +310,14 @@ export async function fetchSpreadsheetData(
             }
             
             const csvText = await res.text();
+
+            // EXCELLENT INSTANT OPTIMIZATION: If Google Sheets redirected us to the first sheet (fallback behavior when sheet name isn't found),
+            // and this is not the first sheet itself, skip this candidate instantly (0ms logic penalty)!
+            if (firstSheetCsvText && csvText === firstSheetCsvText) {
+              console.log(`[Sheets Optimization] Candidate "${candidateName}" redirected to default first sheet signature. Skipping.`);
+              continue;
+            }
+
             rows = parseCSV(csvText);
           }
 
@@ -577,6 +476,11 @@ export async function fetchSpreadsheetData(
 
           // Successfully found and matched! Remember this verified candidate title
           resolvedSheetTitles[sheetKey] = candidateName;
+          try {
+            const cacheKey = `resolved_sheets_${spreadsheetId}`;
+            localStorage.setItem(cacheKey, JSON.stringify(resolvedSheetTitles));
+          } catch (_) {}
+
           loadedSuccessfully = true;
           break; // break candidate loop for this sheetKey
 
@@ -587,7 +491,7 @@ export async function fetchSpreadsheetData(
       }
 
       if (!loadedSuccessfully) {
-        console.warn(`Failed to loading single sheet key "${sheetKey}": ${lastErrorMessage}`);
+        console.warn(`Failed loading single sheet key "${sheetKey}": ${lastErrorMessage}`);
         if (sheetKey === 'students_auth') {
           throw new Error(`[학생 명부 로드 오류] ${lastErrorMessage || '인증용 학생 명부 시트를 불러올 수 없습니다. 시트 명을 검토해 주세요.'}`);
         }
@@ -637,76 +541,52 @@ export function calculateStudentStats(
   const norm = (id: string) => String(id || '').trim().replace(/[^0-9A-Za-z]/g, '');
   const targetIdNorm = norm(studentId);
 
-  // Filter for matching student and record type
-  const targetTypeStr = type === 'english' ? 'english' : 'korean';
-  const rawRecords = allRecords.filter(r => norm(r.studentId) === targetIdNorm && r.type === targetTypeStr);
+  const history = allRecords
+    .filter((r) => norm(r.studentId) === targetIdNorm && r.type === type)
+    .map((r) => ({
+      month: r.month,
+      speed: r.speed
+    }))
+    // Sort by chronological timing if applicable, or keep spreadsheet ordering
+    .slice(-10); // Keep last 10 records for history view
+
+  const latestSpeed = history.length > 0 ? history[history.length - 1].speed : 0;
+  const maxSpeed = history.length > 0 ? Math.max(...history.map((h) => h.speed)) : 0;
   
-  // Sort chronologically (March -> October, etc.)
-  const history = sortRecordsByMonth(rawRecords);
+  // Calculate improvement (growth): Max Speed minus the earliest recorded speed
+  const earliestSpeed = history.length > 0 ? history[0].speed : 0;
+  const growth = maxSpeed - earliestSpeed;
 
-  if (history.length === 0) {
-    return {
-      history: [],
-      latestSpeed: 0,
-      maxSpeed: 0,
-      growth: 0,
-      currentLevel: '기타 (기록 없음)',
-      nextLevel: null,
-      nextLevelNeeded: null,
-      percentToNext: 0
-    };
-  }
-
-  // Get speeds
-  const latestRecord = history[history.length - 1];
-  const latestSpeed = latestRecord.speed;
-  const maxSpeed = Math.max(...history.map(r => r.speed));
-
-  // Growth calculation: latest month speed minus previous month speed
-  let growth = 0;
-  if (history.length > 1) {
-    const prevRecord = history[history.length - 2];
-    growth = latestSpeed - prevRecord.speed;
-  }
-
-  // Map user sheet level_rule criteria to standard types
-  const levelMappingType = type === 'english' ? '영어' : '한글';
+  // Filter levels for the target subject
+  const subjectLabel = type === 'english' ? '영어' : '한글';
   const levels = allLevels
-    .filter(l => l.type === levelMappingType)
+    .filter((l) => l.type === subjectLabel)
     .sort((a, b) => a.minVal - b.minVal);
 
-  // Evaluate current level and next level
-  let currentLevel = '무급 (훈련 필요)';
-  let currentMinVal = 0;
-  let nextLevel: string | null = null;
-  let nextLevelNeeded: number | null = null;
+  let currentLevel = '무급';
+  let nextLevel = '최종 수료';
+  let nextLevelNeeded = 0;
   let percentToNext = 100;
 
-  // Find achieved levels (latestSpeed >= level.minVal)
-  const achievedLevels = levels.filter(l => latestSpeed >= l.minVal);
-  if (achievedLevels.length > 0) {
-    const highestAchieved = achievedLevels[achievedLevels.length - 1];
-    currentLevel = highestAchieved.level;
-    currentMinVal = highestAchieved.minVal;
+  // Evaluate highest criteria matched
+  for (let i = 0; i < levels.length; i++) {
+    if (maxSpeed >= levels[i].minVal) {
+      currentLevel = levels[i].level;
+    }
   }
 
-  // Find next target level (first level that is higher than current score)
-  const incomingLevels = levels.filter(l => latestSpeed < l.minVal);
-  if (incomingLevels.length > 0) {
-    const firstNext = incomingLevels[0];
-    nextLevel = firstNext.level;
-    nextLevelNeeded = firstNext.minVal - latestSpeed;
-
-    // Progression percentage from previous level to next level
-    const denominator = firstNext.minVal - currentMinVal;
-    if (denominator > 0) {
-      percentToNext = Math.min(
-        100,
-        Math.max(0, Math.floor(((latestSpeed - currentMinVal) / denominator) * 100))
-      );
-    } else {
-      percentToNext = 0;
-    }
+  // Find next achievable criteria
+  const nextIdx = levels.findIndex((l) => maxSpeed < l.minVal);
+  if (nextIdx !== -1) {
+    const nextL = levels[nextIdx];
+    nextLevel = nextL.level;
+    nextLevelNeeded = nextL.minVal - maxSpeed;
+    
+    // Calculate progress percentage to next grade
+    const prevMin = nextIdx > 0 ? levels[nextIdx - 1].minVal : 0;
+    const range = nextL.minVal - prevMin;
+    const progress = maxSpeed - prevMin;
+    percentToNext = range > 0 ? Math.min(100, Math.max(0, Math.round((progress / range) * 100))) : 0;
   } else if (levels.length > 0) {
     // Already hit maximum possible level
     nextLevel = '최고 등급 달성! 🎉';
@@ -926,4 +806,159 @@ export async function saveConsentToSpreadsheet(
   }
 
   throw new Error('데이터베이스에 동의 상태를 전송할 연동 장치(Apps Script 웹앱 또는 Google API 토큰)가 구성되어 있지 않습니다.');
+}
+
+// -----------------------------------------------------------------------------
+// ANALYTICS & UTILS
+// -----------------------------------------------------------------------------
+
+// Search column header index in sheet
+function findIndexByNames(headers: string[], candidates: string[]): number {
+  return headers.findIndex((h) =>
+    candidates.some((cand) => cand.toLowerCase() === h.toLowerCase())
+  );
+}
+
+// Clean and normalize input search fields
+const cleanCellValue = (val: string | number | undefined | null): string => {
+  if (val === undefined || val === null) return '';
+  return String(val).trim();
+};
+
+const cleanCodeValue = (val: string | number | undefined | null): string => {
+  if (val === undefined || val === null) return '';
+  let clean = String(val).trim();
+  // Strip trailing float decimal artifacts (.0) from spreadsheet integers (e.g. 10101.0 -> 10101)
+  if (clean.includes('.')) {
+    const parts = clean.split('.');
+    if (/^0+$/.test(parts[1])) {
+      clean = parts[0];
+    }
+  }
+  return clean.replace(/[^0-9A-Za-z]/g, '');
+};
+
+// Check if a cell represents a yes consent status
+function isAgreedValue(val: string | number | undefined | null): boolean {
+  if (val === undefined || val === null) return false;
+  const s = String(val).trim().toLowerCase();
+  return s === 'y' || s === 'yes' || s === '동의' || s === 'true' || s === '1' || s === 'o';
+}
+
+// Generate typing records statistics for grade breakdown rank list view
+export function generateSchoolRanks(
+  allAuth: StudentAuth[],
+  allEnglish: TypingRecord[],
+  allKorean: TypingRecord[],
+  allLevels: LevelRule[],
+  type: 'english' | 'korean'
+): SchoolRankEntry[] {
+  const records = type === 'english' ? allEnglish : allKorean;
+  const ranks: SchoolRankEntry[] = [];
+
+  // Group typing values by unique active studentId
+  const studentIds = Array.from(new Set(allAuth.map((a) => a.studentId)));
+
+  for (const sId of studentIds) {
+    const authRecord = allAuth.find((a) => a.studentId === sId);
+    if (!authRecord) continue;
+
+    const stats = calculateStudentStats(sId, records, allLevels, type);
+    if (stats.maxSpeed > 0) {
+      ranks.push({
+        rank: 0,
+        studentId: sId,
+        name: authRecord.name,
+        grade: parseStudentIdInfo(sId).grade,
+        department: parseStudentIdInfo(sId).department,
+        maxSpeed: stats.maxSpeed,
+        growth: stats.growth,
+        currentLevel: stats.currentLevel
+      });
+    }
+  }
+
+  // Sort descending by highest typing speed
+  const sorted = ranks.sort((a, b) => b.maxSpeed - a.maxSpeed);
+  sorted.forEach((item, index) => {
+    item.rank = index + 1;
+  });
+
+  return sorted;
+}
+
+// Helper: Parse school standard 5-digit student id to extract Grade and Department
+export function parseStudentIdInfo(studentId: string): { grade: string; department: string } {
+  const idStr = String(studentId || '').trim();
+  
+  if (idStr.length !== 5) {
+    return { grade: '기타', department: '공통' };
+  }
+
+  // Rule 1: First character represents grade (e.g., 10203 -> "1학년")
+  const gChar = idStr.charAt(0);
+  const grade = `${gChar}학년`;
+
+  // Rule 2: Second and Third digits represent class code
+  // Classes 01 -> "소프트웨어 개발과"
+  // Classes 02 -> "소프트웨어 개발과"
+  // Classes 03 -> "임베디드 소프트웨어과"
+  // Classes 04 -> "임베디드 소프트웨어과"
+  // Classes 05 -> "블록체인 소프트웨어과"
+  // Classes 06 -> "블록체인 소프트웨어과"
+  const classCode = idStr.substring(1, 3);
+  let department = '공통';
+
+  if (classCode === '01' || classCode === '02') {
+    department = '소프트웨어개발과';
+  } else if (classCode === '03' || classCode === '04') {
+    department = '임베디드소프트웨어과';
+  } else if (classCode === '05' || classCode === '06') {
+    department = '인공지능소프트웨어과';
+  }
+
+  return { grade, department };
+}
+
+// Simple and robust parser for double-quoted or standard CSV fields
+function parseCSV(text: string): string[][] {
+  const lines: string[][] = [];
+  let row: string[] = [];
+  let inQuotes = false;
+  let currentValue = '';
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        currentValue += '"'; // Doubled quote acts as an escaped quote
+        i++;
+      } else {
+        inQuotes = !inQuotes; // Toggle quote state
+      }
+    } else if (char === ',' && !inQuotes) {
+      row.push(currentValue);
+      currentValue = '';
+    } else if ((char === '\r' || char === '\n') && !inQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        i++; // skip LF of CRLF
+      }
+      row.push(currentValue);
+      lines.push(row);
+      row = [];
+      currentValue = '';
+    } else {
+      currentValue += char;
+    }
+  }
+
+  // Push remaining trailing values
+  if (currentValue !== '' || row.length > 0) {
+    row.push(currentValue);
+    lines.push(row);
+  }
+
+  return lines.filter((l) => l.length > 0 && l.some((cell) => cell.trim() !== ''));
 }
