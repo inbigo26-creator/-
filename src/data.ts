@@ -277,6 +277,9 @@ export const SAMPLE_LEVEL_RULES: LevelRule[] = [
   { type: '한글', level: '1급(Gold)', minVal: 650 }
 ];
 
+// Memory cache to hold the resolved actual sheet titles across calls to prevent wasteful 404 retries
+let resolvedSheetTitles: { [key: string]: string } = {};
+
 // Cache spreadsheet data in memory or session storage
 let cachedSpreadsheetAuth: StudentAuth[] | null = null;
 let cachedSpreadsheetEnglish: TypingRecord[] | null = null;
@@ -378,11 +381,15 @@ export async function fetchSpreadsheetData(
       'privacy': ['privacy_consent', 'privacy', '개인정보동의', '동의여부', '동의']
     };
 
-    for (const sheetKey of sheetsToFetch) {
-      results[sheetKey] = [];
-      const candidates = fallbackNamesMap[sheetKey] || [sheetKey];
+    // Helper process to fetch a single sheet-key asynchronously
+    const fetchSingleSheet = async (sheetKey: string): Promise<any[]> => {
+      // Prioritize previously verified actual sheet name to skip the 404 candidates loop
+      const verifiedTitle = resolvedSheetTitles[sheetKey];
+      const candidates = verifiedTitle ? [verifiedTitle] : (fallbackNamesMap[sheetKey] || [sheetKey]);
+      
       let loadedSuccessfully = false;
       let lastErrorMessage = '';
+      let parsedResults: any[] = [];
 
       for (const candidateName of candidates) {
         try {
@@ -433,7 +440,7 @@ export async function fetchSpreadsheetData(
               continue; // try next candidate if headers don't match
             }
 
-            results[sheetKey] = rows.slice(1).map(row => ({
+            parsedResults = rows.slice(1).map(row => ({
               studentId: cleanCodeValue(row[idxId]),
               name: cleanCellValue(row[idxName]),
               pin: cleanCodeValue(row[idxPin])
@@ -503,7 +510,7 @@ export async function fetchSpreadsheetData(
                   }
                 });
               });
-              results[sheetKey] = parsedRecords;
+              parsedResults = parsedRecords;
             } else {
               // 2. VERTICAL STANDARD PARSING
               const idxMonth = findIndexByNames(headers, ['월', '시기', 'month', '구분']);
@@ -514,7 +521,7 @@ export async function fetchSpreadsheetData(
                 continue; // try next candidate (maybe vertical headers failed to match)
               }
 
-              results[sheetKey] = rows.slice(1).map(row => {
+              parsedResults = rows.slice(1).map(row => {
                 const studentId = cleanCodeValue(row[idxId]);
                 const studentInfo = parseStudentIdInfo(studentId);
                 return {
@@ -539,7 +546,7 @@ export async function fetchSpreadsheetData(
               continue; // try next candidate
             }
 
-            results[sheetKey] = rows.slice(1).map(row => ({
+            parsedResults = rows.slice(1).map(row => ({
               type: cleanCellValue(row[idxType]),
               level: cleanCellValue(row[idxLevel]),
               minVal: parseInt(cleanCodeValue(row[idxMin]), 10) || 0
@@ -557,7 +564,7 @@ export async function fetchSpreadsheetData(
               continue; // try next candidate (or reject fallback to auth sheet)
             }
 
-            results[sheetKey] = rows.slice(1).map(row => {
+            parsedResults = rows.slice(1).map(row => {
               const rawAgreed = row[idxAgreed];
               const hasAgreed = idxAgreed !== -1 ? isAgreedValue(rawAgreed) : false;
               return {
@@ -568,7 +575,8 @@ export async function fetchSpreadsheetData(
             }).filter(item => item.studentId);
           }
 
-          // If we reached here without error, we loaded the sheet successfully!
+          // Successfully found and matched! Remember this verified candidate title
+          resolvedSheetTitles[sheetKey] = candidateName;
           loadedSuccessfully = true;
           break; // break candidate loop for this sheetKey
 
@@ -579,14 +587,24 @@ export async function fetchSpreadsheetData(
       }
 
       if (!loadedSuccessfully) {
-        console.error(`Failed to load sheet ${sheetKey} after trying all candidates: ${lastErrorMessage}`);
+        console.warn(`Failed to loading single sheet key "${sheetKey}": ${lastErrorMessage}`);
         if (sheetKey === 'students_auth') {
-          throw new Error(`[학생 명부 로드 오류] ${lastErrorMessage || '인증 시트를 불러오지 못했습니다.'}`);
-        } else {
-          results[sheetKey] = [];
+          throw new Error(`[학생 명부 로드 오류] ${lastErrorMessage || '인증용 학생 명부 시트를 불러올 수 없습니다. 시트 명을 검토해 주세요.'}`);
         }
       }
-    }
+
+      return parsedResults;
+    };
+
+    // Parallel concurrent trigger using Promise.all for outstanding performance!
+    const loadedDataArrays = await Promise.all(
+      sheetsToFetch.map(sheetKey => fetchSingleSheet(sheetKey))
+    );
+
+    // Unpack results back to their designated keys
+    sheetsToFetch.forEach((key, index) => {
+      results[key] = loadedDataArrays[index];
+    });
 
     cachedSpreadsheetAuth = results['students_auth'];
     cachedSpreadsheetEnglish = results['english_all'];
@@ -899,6 +917,12 @@ export async function saveConsentToSpreadsheet(
   // If we reached here, and we had an error or were not able to save anywhere
   if (lastError) {
     throw lastError;
+  }
+
+  // If no write configuration exists (e.g. read-only share-link CSV mode), bypass error and approve local storage fallback
+  if (!appsScriptUrl && !googleToken) {
+    console.log('No write integration config (Apps Script or Google OAuth Token) matches. Operating under browser local storage mode.');
+    return true;
   }
 
   throw new Error('데이터베이스에 동의 상태를 전송할 연동 장치(Apps Script 웹앱 또는 Google API 토큰)가 구성되어 있지 않습니다.');
