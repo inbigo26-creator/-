@@ -551,9 +551,15 @@ export default function App() {
       // Check if student has already consented to privacy terms
       const normId = normalizeValue(currentAuth.studentId);
       const sheetRecord = privacyDb.find(p => normalizeValue(p.studentId) === normId);
-      // If found in the database, strictly respect the sheet's agreed status ('Y' vs 'N')
-      // If not registered in the sheet yet, fallback to localStorage or require consent
-      const hasConsented = sheetRecord ? sheetRecord.agreed : (localStorage.getItem('privacy_consent_' + normId) === 'true');
+      
+      const isDemoMode = (!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') && (!appsScriptUrl || !appsScriptUrl.trim());
+      
+      // If found in the database, strictly respect the sheet's agreed status (true/Y vs false/N).
+      // Live Mode: Must exist AND be agreed in the sheet. No localStorage bypass allowed so we can live-sync updates.
+      // Demo Mode: Fallback allowed to localStorage.
+      const hasConsented = sheetRecord 
+        ? sheetRecord.agreed 
+        : (isDemoMode ? (localStorage.getItem('privacy_consent_' + normId) === 'true') : false);
 
       if (!hasConsented) {
         setPendingSession(session);
@@ -1208,37 +1214,74 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 동의 완료 확인 카드 */}
-                  <div className="p-4.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span className="text-xs font-black text-emerald-800">개인정보 동의 상태 : 동의 완료(Active)</span>
-                      </div>
-                      <p className="text-[11px] text-emerald-705/80 font-semibold leading-relaxed">
-                        귀하는 원활한 타자 성적 조회 및 성 취도 추적 관리를 지지하며 동의하였습니다.
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-2 shrink-0 items-end">
-                      <span className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg uppercase tracking-widest text-center">
-                        ACTIVE
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm('개인정보 동의 기록을 로컬에서 초기화하고 로그아웃하시겠습니까? (로그인 시 동의 팝업 테스트 가능)')) {
-                            const normId = normalizeValue(studentSession.id);
-                            localStorage.removeItem('privacy_consent_' + normId);
-                            setPrivacyDb(prev => prev.filter(p => normalizeValue(p.studentId) !== normId));
-                            handleStudentLogout();
-                          }
-                        }}
-                        className="text-[9.5px] font-black text-stone-400 hover:text-rose-600 transition-colors underline cursor-pointer"
-                      >
-                        [동의 초기화 및 로그아웃]
-                      </button>
-                    </div>
-                  </div>
+                  {/* 동의 완료 확인 카드 (시트 기준 동적 렌더링) */}
+                  {(() => {
+                    const normId = normalizeValue(studentSession.id);
+                    const sheetRecord = privacyDb.find(p => normalizeValue(p.studentId) === normId);
+                    // If no record exists yet, default to false. If exists, respect its agreed status.
+                    const isAgreed = sheetRecord ? sheetRecord.agreed : false;
+
+                    if (isAgreed) {
+                      return (
+                        <div className="p-4.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              <span className="text-xs font-black text-emerald-800">개인정보 동의 상태 : 동의 완료(Active)</span>
+                            </div>
+                            <p className="text-[11px] text-emerald-705/80 font-semibold leading-relaxed">
+                              귀하는 원활한 타자 성적 조회 및 성취도 추적 관리를 지지하며 동의하였습니다.
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2 shrink-0 items-end">
+                            <span className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg uppercase tracking-widest text-center">
+                              ACTIVE
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm('개인정보 동의 기록을 로컬에서 초기화하고 로그아웃하시겠습니까? (로그인 시 동의 팝업 테스트 가능)')) {
+                                  const nId = normalizeValue(studentSession.id);
+                                  localStorage.removeItem('privacy_consent_' + nId);
+                                  setPrivacyDb(prev => prev.filter(p => normalizeValue(p.studentId) !== nId));
+                                  handleStudentLogout();
+                                }
+                              }}
+                              className="text-[9.5px] font-black text-stone-400 hover:text-rose-600 transition-colors underline cursor-pointer"
+                            >
+                              [동의 초기화 및 로그아웃]
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="p-4.5 bg-rose-50/50 border border-rose-100 rounded-2xl flex items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                              <span className="text-xs font-black text-rose-800">개인정보 동의 상태 : 동의 미완료 (N)</span>
+                            </div>
+                            <p className="text-[11px] text-rose-750/80 font-semibold leading-relaxed font-sans">
+                              현재 구글 스프레드시트 상의 개인정보 동의 상태가 'N'으로 비활성화되어 있습니다. 다음 로그인 시에 동의 수집 팝업이 다시 나타납니다.
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2 shrink-0 items-end">
+                            <span className="text-[10px] font-black bg-rose-600 text-white px-3 py-1.5 rounded-lg uppercase tracking-widest text-center">
+                              PENDING (N)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleStudentLogout}
+                              className="text-[9.5px] font-black text-indigo-600 hover:text-rose-600 transition-colors underline cursor-pointer"
+                            >
+                              [바로 로그아웃 및 다시 동의]
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+                  })()}
 
                   <div className="space-y-4">
                     <h4 className="text-xs font-black text-slate-800 flex items-center gap-1">
