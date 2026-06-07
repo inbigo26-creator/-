@@ -555,11 +555,12 @@ export default function App() {
     setIsAuthenticating(true);
 
     try {
-      // 1. Try to authenticate with current cached state first to give an INSTANT (0ms) login experience!
-      let currentAuth = authDb.find(
-        (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
-      );
+      // Force clear data cache to obtain the most up-to-date credential/consent status from the Google Sheet
+      try {
+        clearDataCache();
+      } catch (_) {}
 
+      let currentAuth = null;
       let freshData = {
         auth: authDb,
         english: englishDb,
@@ -568,10 +569,8 @@ export default function App() {
         privacy: privacyDb
       };
 
-      // If credentials are NOT matched in the local cache, or if the local database is empty, pull fresh data from the spreadsheet!
-      if (!currentAuth || authDb.length === 0) {
-        console.log('[Login Optimization] Credentials not found in local memory cache. Forcing a fresh spreadsheet pull...');
-        clearDataCache();
+      try {
+        console.log('[Login Optimization] Fetching the latest spreadsheet data during student login...');
         const pulledData = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
         freshData = pulledData;
         
@@ -585,8 +584,11 @@ export default function App() {
         currentAuth = pulledData.auth.find(
           (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
         );
-      } else {
-        console.log('[Login Optimization] Blazing fast login! Authenticated instantly with local memory cache.');
+      } catch (fetchErr) {
+        console.warn('[Login Fallback] Failed fetching fresh spreadsheet data, using cached local states:', fetchErr);
+        currentAuth = authDb.find(
+          (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
+        );
       }
 
       if (!currentAuth) {
@@ -627,6 +629,9 @@ export default function App() {
       if (sheetRecord) {
         hasConsented = sheetRecord.agreed;
         console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 기록 발견됨 - 동의 여부(agreed): ${sheetRecord.agreed}`);
+        if (!hasConsented) {
+          localStorage.removeItem('privacy_consent_' + normId);
+        }
       } else if (localConsented) {
         hasConsented = true;
         console.log(`[통계 및 동의 디버그] 학번: ${normId}, 브라우저 로컬 스토리지에 동의 기록이 존재하여 동의 지연을 우회(Bypass)합니다.`);

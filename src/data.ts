@@ -872,7 +872,8 @@ export async function saveConsentToSpreadsheet(
 
   // If we reached here, and we had an error or were not able to save anywhere
   if (lastError) {
-    throw lastError;
+    console.warn('[Offline Fallback] Google spreadsheets write failed, continuing with browser local storage fallback:', lastError.message || lastError);
+    return true; // Return true as fallback so the student is not blocked from logging in or using the app
   }
 
   // If no write configuration exists (e.g. read-only share-link CSV mode), bypass error and approve local storage fallback
@@ -881,7 +882,8 @@ export async function saveConsentToSpreadsheet(
     return true;
   }
 
-  throw new Error('데이터베이스에 동의 상태를 전송할 연동 장치(Apps Script 웹앱 또는 Google API 토큰)가 구성되어 있지 않습니다.');
+  console.warn('[Offline Fallback] No integration write device completed, using local storage fallback.');
+  return true;
 }
 
 // -----------------------------------------------------------------------------
