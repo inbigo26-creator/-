@@ -27,7 +27,7 @@ import {
   Sprout
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { SCHOOL_APPS_SCRIPT_URL } from './config';
+import { SCHOOL_SPREADSHEET_ID, SCHOOL_APPS_SCRIPT_URL } from './config';
 
 const isExcludedStudentName = (name: string): boolean => {
   if (!name) return false;
@@ -44,7 +44,7 @@ export default function App() {
 
   // Active configurations
   const [spreadsheetId, setSpreadsheetId] = useState(() => {
-    return localStorage.getItem('school_spreadsheet_id') || DEFAULT_SPREADSHEET_ID;
+    return localStorage.getItem('school_spreadsheet_id') || SCHOOL_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID;
   });
   const [googleToken, setGoogleToken] = useState<string | null>(() => {
     return localStorage.getItem('school_google_token') || null;

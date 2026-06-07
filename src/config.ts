@@ -12,4 +12,4 @@ export const SCHOOL_SPREADSHEET_ID = '1pmKwrT4XIheljpSZjpsarQe_GFwzWk2lAu71QBiFP
 
 // 2. Apps Script 웹 앱 배포 URL (있을 때만 입력, 없으면 빈값 ''로 유지)
 // CORS 보안 우회 장치(Apps Script)를 통해 학생 비밀번호를 즉시 조회하는 연결망 주소입니다.
-export const SCHOOL_APPS_SCRIPT_URL = '';
+export const SCHOOL_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyuxM6xiLO_ytASP61cAnljwYdvt6fZ-rYJh-fDRd0B0JT4Do7m1tFWT68ADMmry5wCUw/exec';

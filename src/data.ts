@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { SCHOOL_SPREADSHEET_ID } from './config';
 
 // -----------------------------------------------------------------------------
 // TYPES & INTERFACES
@@ -52,7 +53,7 @@ export interface SchoolRankEntry {
 // SAMPLE DATA / FALLBACKS
 // -----------------------------------------------------------------------------
 
-export const DEFAULT_SPREADSHEET_ID = '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o';
+export const DEFAULT_SPREADSHEET_ID = SCHOOL_SPREADSHEET_ID || '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o';
 
 export function getMonthNumber(monthStr: string | undefined | null): number {
   if (!monthStr) return 0;
