@@ -1021,6 +1021,33 @@ export function normalizeDepartment(dept: string | null | undefined): string {
   return d || '공통';
 }
 
+export function resolveStudentGradeAndDept(studentId: string, sheetGrade?: string | null, sheetDept?: string | null): { grade: string; department: string } {
+  const info = parseStudentIdInfo(studentId);
+  
+  let finalGrade = '';
+  if (info.grade && info.grade !== '기타' && info.grade !== '공통') {
+    finalGrade = info.grade;
+  } else {
+    finalGrade = sheetGrade ? String(sheetGrade).replace(/학년/g, '').trim() : '';
+  }
+  if (!finalGrade || finalGrade === '기타') {
+    finalGrade = '1';
+  }
+  finalGrade = finalGrade.replace(/학년/g, '').trim();
+
+  let finalDept = '';
+  if (info.department && info.department !== '기타' && info.department !== '공통') {
+    finalDept = info.department;
+  } else {
+    finalDept = normalizeDepartment(sheetDept);
+  }
+  if (!finalDept || finalDept === '기타') {
+    finalDept = '공통';
+  }
+
+  return { grade: finalGrade, department: finalDept };
+}
+
 // Simple and robust parser for double-quoted or standard CSV fields
 function parseCSV(text: string): string[][] {
   const lines: string[][] = [];

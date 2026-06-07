@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TypingRecord, StudentAuth } from '../types';
-import { getMonthNumber, parseStudentIdInfo, normalizeDepartment } from '../data';
+import { getMonthNumber, parseStudentIdInfo, normalizeDepartment, resolveStudentGradeAndDept } from '../data';
 import { 
   Award, TrendingUp, BarChart2, CheckCircle, Users, Lightbulb, 
   Settings, HelpCircle, Flame, Calendar, Trophy, AlertCircle, 
@@ -429,9 +429,7 @@ export function TeacherAnalytics({
 
       // 1. Korean Speed candidates
       const rawKorSpeedCandidates = korThisMonth.map(r => {
-        const info = parseStudentIdInfo(r.studentId);
-        const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
-        const rDept = normalizeDepartment(r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department);
+        const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
         return {
           studentId: r.studentId,
           name: r.name,
@@ -443,9 +441,7 @@ export function TeacherAnalytics({
 
       // 2. English Speed candidates
       const rawEngSpeedCandidates = engThisMonth.map(r => {
-        const info = parseStudentIdInfo(r.studentId);
-        const rGrade = r.grade && r.grade !== '기타' ? r.grade : info.grade;
-        const rDept = normalizeDepartment(r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department);
+        const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
         return {
           studentId: r.studentId,
           name: r.name,
@@ -464,9 +460,7 @@ export function TeacherAnalytics({
           if (prev) {
             const diff = curr.speed - prev.speed;
             if (diff > 0) {
-              const info = parseStudentIdInfo(curr.studentId);
-              const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
-              const rDept = normalizeDepartment(curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department);
+              const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(curr.studentId, curr.grade, curr.department);
               rawKorGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
@@ -489,9 +483,7 @@ export function TeacherAnalytics({
           if (prev) {
             const diff = curr.speed - prev.speed;
             if (diff > 0) {
-              const info = parseStudentIdInfo(curr.studentId);
-              const rGrade = curr.grade && curr.grade !== '기타' ? curr.grade : info.grade;
-              const rDept = normalizeDepartment(curr.department && curr.department !== '기타' && curr.department !== '공통' ? curr.department : info.department);
+              const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(curr.studentId, curr.grade, curr.department);
               rawEngGrowthCandidates.push({
                 studentId: curr.studentId,
                 name: curr.name,
@@ -596,8 +588,7 @@ export function TeacherAnalytics({
 
       if (sKor.length > 0) {
         const maxVal = Math.max(...sKor.map(r => r.speed));
-        const rGrade = sKor[0].grade && sKor[0].grade !== '기타' ? sKor[0].grade : info.grade;
-        const rDept = normalizeDepartment(sKor[0].department && sKor[0].department !== '기타' && sKor[0].department !== '공통' ? sKor[0].department : info.department);
+        const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(sid, sKor[0].grade, sKor[0].department);
 
         korSpeeds.push({
           studentId: sid,
@@ -625,8 +616,7 @@ export function TeacherAnalytics({
 
       if (sEng.length > 0) {
         const maxVal = Math.max(...sEng.map(r => r.speed));
-        const rGrade = sEng[0].grade && sEng[0].grade !== '기타' ? sEng[0].grade : info.grade;
-        const rDept = normalizeDepartment(sEng[0].department && sEng[0].department !== '기타' && sEng[0].department !== '공통' ? sEng[0].department : info.department);
+        const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(sid, sEng[0].grade, sEng[0].department);
 
         engSpeeds.push({
           studentId: sid,
@@ -709,10 +699,8 @@ export function TeacherAnalytics({
       const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
 
       const filtered = db.filter(r => {
-        const info = parseStudentIdInfo(r.studentId);
-        const rGradeRaw = r.grade || info.grade;
-        const rGradeNum = String(rGradeRaw).replace(/[^0-9]/g, '');
-        const rDept = r.department && r.department !== '기타' && r.department !== '공통' ? r.department : info.department;
+        const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
+        const rGradeNum = String(rGrade).replace(/[^0-9]/g, '');
 
         return (
           rGradeNum === targetGradeNum && 
@@ -731,9 +719,8 @@ export function TeacherAnalytics({
       const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
 
       const filtered = db.filter(r => {
-        const info = parseStudentIdInfo(r.studentId);
-        const rGradeRaw = r.grade || info.grade;
-        const rGradeNum = String(rGradeRaw).replace(/[^0-9]/g, '');
+        const { grade: rGrade } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
+        const rGradeNum = String(rGrade).replace(/[^0-9]/g, '');
 
         return (
           rGradeNum === targetGradeNum && 
