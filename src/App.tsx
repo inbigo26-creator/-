@@ -87,7 +87,7 @@ export default function App() {
     englishStats: StudentStats;
     koreanStats: StudentStats;
   } | null>(null);
-  const [privacyCheckboxChecked, setPrivacyCheckboxChecked] = useState(true);
+  const [privacyCheckboxChecked, setPrivacyCheckboxChecked] = useState(false);
   const [isSavingConsent, setIsSavingConsent] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [studentSession, setStudentSession] = useState<{
@@ -811,7 +811,7 @@ export default function App() {
       if (!hasConsented) {
         console.log(`[통계 및 동의 디버그] 학번: ${normId} - 동의 미완료 상태이므로 동의 수집 팝업(Pending)을 표시합니다.`);
         setPendingSession(session);
-        setPrivacyCheckboxChecked(true); // Default to TRUE (checked) as requested ("그거는 무조건 기본으로 해줘")
+        setPrivacyCheckboxChecked(false); // Default to FALSE (unchecked) as requested ("동의 여부 체크는 해제된 채로 해줘야지")
         setConsentError(null);
         setIsAuthenticating(false);
         return;
@@ -912,7 +912,36 @@ export default function App() {
       setPendingSession(null); // Only close modal on successful save!
     } catch (err: any) {
       console.error('Failed saving privacy consent:', err);
-      setConsentError(err.message || '동의 상태를 연동 저장하지 못했습니다. 관리자 설정 및 네트워크를 확인해 주세요.');
+      const errStr = String(err.message || err);
+      
+      // If the error is credentials mismatch or apps script issues, perform an elegant local fallback.
+      // Since the student has successfully logged in already, blocking them here due to an outdated/incorrect GAS deployed script is bad UX.
+      if (errStr.includes('일치하지 않습니다') || errStr.includes('Apps Script') || errStr.includes('유효한 JSON') || errStr.includes('접근 권한') || errStr.includes('실패')) {
+        const normId = normalizeValue(pendingSession.id);
+        localStorage.setItem('privacy_consent_' + normId, 'true');
+
+        setPrivacyDb(prev => [
+          ...prev.filter(p => normalizeValue(p.studentId) !== normId),
+          { studentId: pendingSession.id, name: pendingSession.name, agreed: true }
+        ]);
+
+        setStudentSession(pendingSession);
+        
+        // Trigger confetti celebration
+        const topImprovement = Math.max(pendingSession.englishStats.growth, pendingSession.koreanStats.growth);
+        if (topImprovement > 0) {
+          confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }
+        
+        setPendingSession(null);
+        alert(`로그인이 임시 완료되었습니다!\n\n⚠️ 디버그 안내: 스프레드시트에 개인정보 관련 동의 여부를 실시간 연동하여 저장하지 못했습니다.\n\n[원인]: 구글 스프레드시트에 연동되어 있는 구글 앱스 스크립트(Apps Script)가 본 시스템의 동의 저장 기능을 지원하지 않는 이전 버전이거나, 앱스 스크립트 웹앱 배포 권한([액세스 권한이 있는 사용자]를 [모든 사용자]로 설정)에 문제가 있을 수 있습니다.\n\n[조치 방법]: 관리자 패널의 2단계에서 'Apps Script 소스코드 복사' 버튼을 눌러 소스코드를 새로 복사한 뒤, 구글 스프레드시트의 [확장 프로그램 > Apps Script] 프로젝트에 붙여넣어 교체하고 꼭 [새 버전으로 웹앱 배포]를 진행해 주시기 바랍니다.`);
+      } else {
+        setConsentError(err.message || '동의 상태를 연동 저장하지 못했습니다. 관리자 설정 및 네트워크를 확인해 주세요.');
+      }
     } finally {
       setIsSavingConsent(false);
     }
