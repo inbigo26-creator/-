@@ -135,13 +135,15 @@ export default function App() {
   // 📋 Calculate student-level latest speed averages (excluding special status students) for school & grade comparison
   const statsAverages = React.useMemo(() => {
     // 1. Get unique student set from authDb
-    const studentMap = new Map<string, { studentId: string; name: string; grade: string }>();
+    const studentMap = new Map<string, { studentId: string; name: string; grade: string; department: string }>();
     authDb.forEach(s => {
       const info = parseStudentIdInfo(s.studentId);
+      const resolved = resolveStudentGradeAndDept(s.studentId, info.grade, info.department);
       studentMap.set(cleanStudentId(s.studentId), {
         studentId: s.studentId,
         name: s.name,
-        grade: info.grade
+        grade: resolved.grade,
+        department: resolved.department
       });
     });
 
@@ -166,25 +168,70 @@ export default function App() {
       };
     });
 
-    // 3. Compute Korean Averages
-    const korSchoolCount = studentsWithLatestSpeeds.length;
-    const korSchoolAvg = korSchoolCount > 0 ? Math.round(studentsWithLatestSpeeds.reduce((sum, s) => sum + s.korSpeed, 0) / korSchoolCount) : 0;
+    const listGrades = ['1', '2', '3'];
+    const listDepts = ['항공서비스', '부사관경영', 'SNS마케팅', '콘텐츠디자인'];
 
+    const getKorClassAvg = (grade: string, dept: string) => {
+      const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
+      const list = studentsWithLatestSpeeds.filter(s => {
+        const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
+        return sGradeNum === targetGradeNum && 
+          normalizeDepartment(s.department) === normalizeDepartment(dept) && 
+          s.korSpeed > 0;
+      });
+      if (list.length === 0) return 0;
+      const sum = list.reduce((acc, s) => acc + s.korSpeed, 0);
+      return Math.round(sum / list.length);
+    };
+
+    const getEngClassAvg = (grade: string, dept: string) => {
+      const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
+      const list = studentsWithLatestSpeeds.filter(s => {
+        const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
+        return sGradeNum === targetGradeNum && 
+          normalizeDepartment(s.department) === normalizeDepartment(dept) && 
+          s.engSpeed > 0;
+      });
+      if (list.length === 0) return 0;
+      const sum = list.reduce((acc, s) => acc + s.engSpeed, 0);
+      return Math.round(sum / list.length);
+    };
+
+    // Calculate Korean averages
     const korGradeAvg: { [grade: string]: number } = { '1': 0, '2': 0, '3': 0 };
-    ['1', '2', '3'].forEach(g => {
-      const list = studentsWithLatestSpeeds.filter(s => s.grade === g);
-      korGradeAvg[g] = list.length > 0 ? Math.round(list.reduce((sum, s) => sum + s.korSpeed, 0) / list.length) : 0;
+    const allKorClassAverages: number[] = [];
+
+    listGrades.forEach(g => {
+      const activeClassAverages: number[] = [];
+      listDepts.forEach(d => {
+        const classAvg = getKorClassAvg(g, d);
+        if (classAvg > 0) {
+          activeClassAverages.push(classAvg);
+          allKorClassAverages.push(classAvg);
+        }
+      });
+      korGradeAvg[g] = activeClassAverages.length > 0 ? Math.round(activeClassAverages.reduce((sum, a) => sum + a, 0) / activeClassAverages.length) : 0;
     });
 
-    // 4. Compute English Averages
-    const engSchoolCount = studentsWithLatestSpeeds.length;
-    const engSchoolAvg = engSchoolCount > 0 ? Math.round(studentsWithLatestSpeeds.reduce((sum, s) => sum + s.engSpeed, 0) / engSchoolCount) : 0;
+    const korSchoolAvg = allKorClassAverages.length > 0 ? Math.round(allKorClassAverages.reduce((sum, a) => sum + a, 0) / allKorClassAverages.length) : 0;
 
+    // Calculate English averages
     const engGradeAvg: { [grade: string]: number } = { '1': 0, '2': 0, '3': 0 };
-    ['1', '2', '3'].forEach(g => {
-      const list = studentsWithLatestSpeeds.filter(s => s.grade === g);
-      engGradeAvg[g] = list.length > 0 ? Math.round(list.reduce((sum, s) => sum + s.engSpeed, 0) / list.length) : 0;
+    const allEngClassAverages: number[] = [];
+
+    listGrades.forEach(g => {
+      const activeClassAverages: number[] = [];
+      listDepts.forEach(d => {
+        const classAvg = getEngClassAvg(g, d);
+        if (classAvg > 0) {
+          activeClassAverages.push(classAvg);
+          allEngClassAverages.push(classAvg);
+        }
+      });
+      engGradeAvg[g] = activeClassAverages.length > 0 ? Math.round(activeClassAverages.reduce((sum, a) => sum + a, 0) / activeClassAverages.length) : 0;
     });
+
+    const engSchoolAvg = allEngClassAverages.length > 0 ? Math.round(allEngClassAverages.reduce((sum, a) => sum + a, 0) / allEngClassAverages.length) : 0;
 
     return {
       korean: {

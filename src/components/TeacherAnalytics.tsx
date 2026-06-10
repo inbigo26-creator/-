@@ -715,33 +715,36 @@ export function TeacherAnalytics({
     };
 
     const getGradeAverage = (lang: 'english' | 'korean', grade: string, mStr: string) => {
-      const db = lang === 'english' ? englishDb : koreanDb;
       const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
+      const classAveragesOfGrade: number[] = [];
 
-      const filtered = db.filter(r => {
-        const { grade: rGrade } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
-        const rGradeNum = String(rGrade).replace(/[^0-9]/g, '');
-
-        return (
-          rGradeNum === targetGradeNum && 
-          !isExcludedStudentName(r.name) &&
-          getMonthNumber(r.month) === getMonthNumber(mStr)
-        );
+      listDepts.forEach(dept => {
+        const cellAvg = getAverageForCell(lang, targetGradeNum, dept, mStr);
+        if (cellAvg > 0) {
+          classAveragesOfGrade.push(cellAvg);
+        }
       });
-      if (filtered.length === 0) return 0;
-      const sum = filtered.reduce((acc, r) => acc + r.speed, 0);
-      return Math.round(sum / filtered.length);
+
+      if (classAveragesOfGrade.length === 0) return 0;
+      const sum = classAveragesOfGrade.reduce((acc, val) => acc + val, 0);
+      return Math.round(sum / classAveragesOfGrade.length);
     };
 
     const flexOverallAverage = (lang: 'english' | 'korean', mStr: string) => {
-      const db = lang === 'english' ? englishDb : koreanDb;
-      const filtered = db.filter(r => 
-        !isExcludedStudentName(r.name) &&
-        getMonthNumber(r.month) === getMonthNumber(mStr)
-      );
-      if (filtered.length === 0) return 0;
-      const sum = filtered.reduce((acc, r) => acc + r.speed, 0);
-      return Math.round(sum / filtered.length);
+      const activeClassAverages: number[] = [];
+
+      listGrades.forEach(g => {
+        listDepts.forEach(dept => {
+          const cellAvg = getAverageForCell(lang, g, dept, mStr);
+          if (cellAvg > 0) {
+            activeClassAverages.push(cellAvg);
+          }
+        });
+      });
+
+      if (activeClassAverages.length === 0) return 0;
+      const sum = activeClassAverages.reduce((acc, val) => acc + val, 0);
+      return Math.round(sum / activeClassAverages.length);
     };
 
     // Compact layout mapping -> full display per request
