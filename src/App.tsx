@@ -24,7 +24,7 @@ import { TeacherAnalytics } from './components/TeacherAnalytics';
 import { 
   Keyboard, LogIn, GraduationCap, Lock, HelpCircle, 
   Settings, AlertCircle, BookOpen, LogOut, Medal, Sparkles,
-  Sprout
+  Sprout, Star, TrendingUp
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { SCHOOL_SPREADSHEET_ID, SCHOOL_APPS_SCRIPT_URL } from './config';
@@ -36,6 +36,14 @@ const isExcludedStudentName = (name: string): boolean => {
 };
 
 const cleanStudentId = (id: string) => String(id || '').trim().replace(/[^0-9A-Za-z]/g, '');
+
+const maskName = (name: string): string => {
+  if (!name) return '';
+  const trimmed = name.trim();
+  if (trimmed.length <= 1) return trimmed;
+  if (trimmed.length === 2) return trimmed[0] + '○';
+  return trimmed[0] + '○' + trimmed.slice(2);
+};
 
 export default function App() {
   // Input fields
@@ -71,7 +79,7 @@ export default function App() {
     englishStats: StudentStats;
     koreanStats: StudentStats;
   } | null>(null);
-  const [privacyCheckboxChecked, setPrivacyCheckboxChecked] = useState(false);
+  const [privacyCheckboxChecked, setPrivacyCheckboxChecked] = useState(true);
   const [isSavingConsent, setIsSavingConsent] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [studentSession, setStudentSession] = useState<{
@@ -754,26 +762,27 @@ export default function App() {
       // Search from the end of the array to prioritize the latest record in case there are multiple rows for this student
       const sheetRecord = [...(freshData.privacy || [])].reverse().find(p => normalizeValue(p.studentId) === normId);
       
-      // Determine consent status with clear logging: Prioritize the live spreadsheet record over local storage as the absolute source of truth!
+      // Determine consent status with clear logging: Prioritize local storage (current device session) to prevent replication delay / cache resets!
       let hasConsented = false;
-      if (sheetRecord) {
+      if (localConsented) {
+        hasConsented = true;
+        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 브라우저 로컬 스토리지에 동의 기록이 존재하여 동의를 자동 인정합니다.`);
+      } else if (sheetRecord) {
         hasConsented = sheetRecord.agreed;
         console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 기록 발견됨 - 동의 여부(agreed): ${sheetRecord.agreed}`);
-        if (!hasConsented) {
-          localStorage.removeItem('privacy_consent_' + normId);
+        if (sheetRecord.agreed) {
+          // Sync back to local storage if agreed on sheet but not yet local
+          localStorage.setItem('privacy_consent_' + normId, 'true');
         }
-      } else if (localConsented) {
-        hasConsented = true;
-        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 브라우저 로컬 스토리지에 동의 기록이 존재하여 동의 지연을 우회(Bypass)합니다.`);
       } else {
         hasConsented = false;
         console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 및 로컬 동의 기록 없음.`);
       }
 
       if (!hasConsented) {
-        console.log(`[통계 및 동의 디버그] 학번: ${normId} - 동의 미완료(N) 상태이므로 동의 수집 팝업(Pending)을 표시합니다.`);
+        console.log(`[통계 및 동의 디버그] 학번: ${normId} - 동의 미완료 상태이므로 동의 수집 팝업(Pending)을 표시합니다.`);
         setPendingSession(session);
-        setPrivacyCheckboxChecked(false);
+        setPrivacyCheckboxChecked(true); // Default to TRUE (checked) as requested ("그거는 무조건 기본으로 해줘")
         setConsentError(null);
         setIsAuthenticating(false);
         return;
@@ -1307,7 +1316,7 @@ export default function App() {
                                 className={`px-3 py-1.5 text-[10.5px] font-black rounded-lg transition-all cursor-pointer ${
                                   isSelected
                                     ? 'bg-rose-600 text-white shadow-3xs'
-                                    : 'text-stone-500 hover:bg-stone-150 hover:text-stone-900 bg-white border border-stone-200/50'
+                                    : 'text-stone-500 hover:bg-stone-155 hover:text-stone-900 bg-white border border-stone-200/50'
                                 }`}
                               >
                                 {m}
@@ -1318,86 +1327,140 @@ export default function App() {
                       </div>
 
                       {activeHallMonth ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 font-sans text-xs">
-                          {/* 한글 최고 속도상 */}
-                          <div className="p-4 bg-gradient-to-b from-purple-50/20 to-white border border-purple-100 rounded-2xl space-y-3.5 shadow-3xs">
-                            <span className="text-[10px] font-black text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-1 rounded-lg block text-center uppercase">한글 최고 속도상</span>
-                            <div className="space-y-2">
-                              {monthlyKorSpeed.length === 0 ? (
-                                <p className="text-[10px] text-stone-450 text-center py-6 font-medium">시상 결과가 없습니다.</p>
-                              ) : (
-                                monthlyKorSpeed.map((w, idx) => (
-                                  <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl shadow-4xs font-sans">
-                                    <p className="text-[9.5px] font-semibold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
-                                    <div className="flex justify-between items-center font-black mt-0.5">
-                                      <span className="text-stone-850">{w.department}</span>
-                                      <span className="text-purple-600 font-mono font-black">{w.value}타</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          
+                          {/* section: Speeds */}
+                          <div className="space-y-6">
+                            
+                            {/* Kor Speed */}
+                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                              <h4 className="text-xs font-black text-rose-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
+                                <Star className="h-4 w-4" />
+                                한글 타자 최고 타수 (3명)
+                              </h4>
+                              
+                              <div className="space-y-2.5">
+                                {monthlyKorSpeed.length === 0 ? (
+                                  <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
+                                ) : (
+                                  monthlyKorSpeed.map((w, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-rose-50/40 border border-rose-100 flex-row text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded-lg bg-rose-200 text-rose-800 text-[10px] font-black">
+                                          {w.grade}학년 대표
+                                        </span>
+                                        <div>
+                                          <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
+                                          <p className="text-[10px] text-stone-400">{w.grade}학년 {w.department}</p>
+                                        </div>
+                                      </div>
+                                      <span className="font-mono text-sm text-rose-700 font-extrabold">{w.value}타 최고</span>
                                     </div>
-                                  </div>
-                                ))
-                              )}
+                                  ))
+                                )}
+                              </div>
                             </div>
+
+                            {/* Eng Speed */}
+                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                              <h4 className="text-xs font-black text-indigo-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
+                                <Star className="h-4 w-4" />
+                                영어 타자 최고 타수 (3명)
+                              </h4>
+                              
+                              <div className="space-y-2.5">
+                                {monthlyEngSpeed.length === 0 ? (
+                                  <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
+                                ) : (
+                                  monthlyEngSpeed.map((w, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/40 border border-indigo-100 flex-row text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded-lg bg-indigo-200 text-indigo-850 text-[10px] font-black">
+                                          {w.grade}학년 대표
+                                        </span>
+                                        <div>
+                                          <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
+                                          <p className="text-[10px] text-stone-400">{w.grade}학년 {w.department}</p>
+                                        </div>
+                                      </div>
+                                      <span className="font-mono text-sm text-indigo-700 font-extrabold">{w.value}타 최고</span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                            
                           </div>
 
-                          {/* 영어 최고 속도상 */}
-                          <div className="p-4 bg-gradient-to-b from-indigo-50/20 to-white border border-indigo-100 rounded-2xl space-y-3.5 shadow-3xs">
-                            <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg block text-center uppercase">영어 최고 속도상</span>
-                            <div className="space-y-2">
-                              {monthlyEngSpeed.length === 0 ? (
-                                <p className="text-[10px] text-stone-450 text-center py-6 font-medium">시상 결과가 없습니다.</p>
-                              ) : (
-                                monthlyEngSpeed.map((w, idx) => (
-                                  <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl shadow-4xs font-sans">
-                                    <p className="text-[9.5px] font-semibold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
-                                    <div className="flex justify-between items-center font-black mt-0.5">
-                                      <span className="text-stone-850">{w.department}</span>
-                                      <span className="text-indigo-650 font-mono font-black">{w.value}타</span>
+                          {/* section: Cumulative Improvements */}
+                          <div className="space-y-6">
+                            
+                            {/* Kor growth */}
+                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                              <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
+                                <TrendingUp className="h-4 w-4" />
+                                한글 타자 최고 향상 (3명)
+                              </h4>
+                              
+                              <div className="space-y-2.5">
+                                {monthlyKorGrowth.length === 0 ? (
+                                  <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
+                                ) : (
+                                  monthlyKorGrowth.map((w, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex-row text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded-lg bg-emerald-200 text-emerald-800 text-[10px] font-black">
+                                          {w.grade}학년 대표
+                                        </span>
+                                        <div>
+                                          <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
+                                          <p className="text-[10px] text-stone-450">{w.grade}학년 {w.department}</p>
+                                        </div>
+                                      </div>
+                                      <span className="text-right">
+                                        <strong className="font-mono text-sm text-emerald-600 block">+{w.value}타 ▲</strong>
+                                        <span className="text-[9px] text-stone-400 font-mono">시작대비 우상향</span>
+                                      </span>
                                     </div>
-                                  </div>
-                                ))
-                              )}
+                                  ))
+                                )}
+                              </div>
                             </div>
+
+                            {/* Eng growth */}
+                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                              <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
+                                <TrendingUp className="h-4 w-4" />
+                                영어 타자 최고 향상 (3명)
+                              </h4>
+                              
+                              <div className="space-y-2.5">
+                                {monthlyEngGrowth.length === 0 ? (
+                                  <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
+                                ) : (
+                                  monthlyEngGrowth.map((w, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex-row text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded-lg bg-emerald-200 text-emerald-800 text-[10px] font-black">
+                                          {w.grade}학년 대표
+                                        </span>
+                                        <div>
+                                          <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
+                                          <p className="text-[10px] text-stone-450">{w.grade}학년 {w.department}</p>
+                                        </div>
+                                      </div>
+                                      <span className="text-right">
+                                        <strong className="font-mono text-sm text-emerald-600 block">+{w.value}타 ▲</strong>
+                                        <span className="text-[9px] text-stone-400 font-mono">시작대비 우상향</span>
+                                      </span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+
                           </div>
 
-                          {/* 한글 최고 성장상 */}
-                          <div className="p-4 bg-gradient-to-b from-emerald-50/20 to-white border border-emerald-100 rounded-2xl space-y-3.5 shadow-3xs text-xs">
-                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg block text-center uppercase font-sans">한글 최고 성장상</span>
-                            <div className="space-y-2">
-                              {monthlyKorGrowth.length === 0 ? (
-                                <p className="text-[10px] text-stone-450 text-center py-6 font-medium">시상 결과가 없습니다.</p>
-                              ) : (
-                                monthlyKorGrowth.map((w, idx) => (
-                                  <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl shadow-4xs font-sans">
-                                    <p className="text-[9.5px] font-semibold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
-                                    <div className="flex justify-between items-center font-black mt-0.5">
-                                      <span className="text-stone-850">{w.department}</span>
-                                      <span className="text-emerald-600 font-mono font-black">+{w.value}타</span>
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </div>
-
-                          {/* 영어 최고 성장상 */}
-                          <div className="p-4 bg-gradient-to-b from-rose-50/20 to-white border border-rose-100 rounded-2xl space-y-3.5 shadow-3xs font-sans">
-                            <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-lg block text-center uppercase font-sans">영어 최고 성장상</span>
-                            <div className="space-y-2">
-                              {monthlyEngGrowth.length === 0 ? (
-                                <p className="text-[10px] text-stone-455 text-center py-6 font-medium">시상 결과가 없습니다.</p>
-                              ) : (
-                                monthlyEngGrowth.map((w, idx) => (
-                                  <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl shadow-4xs font-sans">
-                                    <p className="text-[9.5px] font-semibold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
-                                    <div className="flex justify-between items-center font-black mt-0.5">
-                                      <span className="text-stone-850">{w.department}</span>
-                                      <span className="text-rose-600 font-mono font-black">+{w.value}타</span>
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </div>
                         </div>
                       ) : (
                         <p className="text-stone-400 text-xs text-center py-10 font-bold">지정 가능한 시상 연월이 존재하지 않습니다.</p>
@@ -1418,70 +1481,140 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 font-sans text-xs">
-                      {/* 한글 최고 속도상 */}
-                      <div className="p-4 bg-gradient-to-b from-purple-50/20 to-white border border-purple-100 rounded-2xl space-y-3.5">
-                        <span className="text-[10px] font-black text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-1 rounded-lg block text-center">한글 최고 속도상</span>
-                        <div className="space-y-2">
-                          {cumulativeFinalAwards.korSpeed.map((w, idx) => (
-                            <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
-                              <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
-                              <div className="flex justify-between items-center font-black mt-0.5">
-                                <span className="text-stone-800">{w.department}</span>
-                                <span className="text-purple-600 font-mono font-black">{w.value}타</span>
-                              </div>
-                            </div>
-                          ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                      
+                      {/* section: Speeds */}
+                      <div className="space-y-6">
+                        
+                        {/* Kor Speed */}
+                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                          <h4 className="text-xs font-black text-rose-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
+                            <Star className="h-4 w-4 text-rose-500" />
+                            한글 타자 최고 타수 (최종 3명)
+                          </h4>
+
+                          <div className="space-y-2.5">
+                            {cumulativeFinalAwards.korSpeed.length === 0 ? (
+                              <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
+                            ) : (
+                              cumulativeFinalAwards.korSpeed.map((s, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-rose-50/40 border border-rose-100 flex-row text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded-lg bg-rose-200 text-rose-800 text-[10px] font-black">
+                                      {s.grade}학년 1위
+                                    </span>
+                                    <div>
+                                      <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
+                                      <p className="text-[10px] text-stone-400">{s.grade}학년 {s.department}</p>
+                                    </div>
+                                  </div>
+                                  <span className="font-mono text-sm text-rose-700 font-extrabold">{s.value}타 최고</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
+
+                        {/* Eng Speed */}
+                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                          <h4 className="text-xs font-black text-indigo-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
+                            <Star className="h-4 w-4" />
+                            영어 타자 최고 타수 (최종 3명)
+                          </h4>
+
+                          <div className="space-y-2.5">
+                            {cumulativeFinalAwards.engSpeed.length === 0 ? (
+                              <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
+                            ) : (
+                              cumulativeFinalAwards.engSpeed.map((s, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/40 border border-indigo-100 flex-row text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded-lg bg-indigo-200 text-indigo-850 text-[10px] font-black">
+                                      {s.grade}학년 1위
+                                    </span>
+                                    <div>
+                                      <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
+                                      <p className="text-[10px] text-stone-404">{s.grade}학년 {s.department}</p>
+                                    </div>
+                                  </div>
+                                  <span className="font-mono text-sm text-indigo-700 font-extrabold">{s.value}타 최고</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
                       </div>
 
-                      {/* 영어 최고 속도상 */}
-                      <div className="p-4 bg-gradient-to-b from-indigo-50/20 to-white border border-indigo-100 rounded-2xl space-y-3.5">
-                        <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg block text-center">영어 최고 속도상</span>
-                        <div className="space-y-2">
-                          {cumulativeFinalAwards.engSpeed.map((w, idx) => (
-                            <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
-                              <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
-                              <div className="flex justify-between items-center font-black mt-0.5">
-                                <span className="text-stone-800">{w.department}</span>
-                                <span className="text-indigo-650 font-mono font-black">{w.value}타</span>
-                              </div>
-                            </div>
-                          ))}
+                      {/* section: Cumulative Improvements */}
+                      <div className="space-y-6">
+                        
+                        {/* Kor growth */}
+                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                          <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
+                            <TrendingUp className="h-4 w-4 text-emerald-600" />
+                            한글 타자 최고 향상 (최종 3명)
+                          </h4>
+
+                          <div className="space-y-2.5">
+                            {cumulativeFinalAwards.korGrowth.length === 0 ? (
+                              <p className="text-center text-xs text-stone-400 py-8 leading-normal font-medium font-sans">기록 측정을 위한 2회차 이상의<br/>기록 입력 축적이 필요합니다.</p>
+                            ) : (
+                              cumulativeFinalAwards.korGrowth.map((s, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex-row text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded-lg bg-emerald-200 text-emerald-800 text-[10px] font-black">
+                                      {s.grade}학년 1위
+                                    </span>
+                                    <div>
+                                      <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
+                                      <p className="text-[10px] text-stone-450">{s.grade}학년 {s.department}</p>
+                                    </div>
+                                  </div>
+                                  <span className="text-right">
+                                    <strong className="font-mono text-sm text-emerald-600 block">+{s.value}타 ▲</strong>
+                                    <span className="text-[9px] text-stone-400 font-mono">시작대비 우상향</span>
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
+
+                        {/* Eng growth */}
+                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                          <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
+                            <TrendingUp className="h-4 w-4 text-emerald-600" />
+                            영어 타자 최고 향상 (최종 3명)
+                          </h4>
+
+                          <div className="space-y-2.5">
+                            {cumulativeFinalAwards.engGrowth.length === 0 ? (
+                              <p className="text-center text-xs text-stone-400 py-8 leading-normal font-medium font-sans">기록 측정을 위한 2회차 이상의<br/>기록 입력 축적이 필요합니다.</p>
+                            ) : (
+                              cumulativeFinalAwards.engGrowth.map((s, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex-row text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded-lg bg-emerald-200 text-emerald-800 text-[10px] font-black">
+                                      {s.grade}학년 1위
+                                    </span>
+                                    <div>
+                                      <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
+                                      <p className="text-[10px] text-stone-450">{s.grade}학년 {s.department}</p>
+                                    </div>
+                                  </div>
+                                  <span className="text-right">
+                                    <strong className="font-mono text-sm text-emerald-600 block">+{s.value}타 ▲</strong>
+                                    <span className="text-[9px] text-stone-400 font-mono">시작대비 우상향</span>
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
                       </div>
 
-                      {/* 한글 최고 성장상 */}
-                      <div className="p-4 bg-gradient-to-b from-emerald-50/20 to-white border border-emerald-100 rounded-2xl space-y-3.5">
-                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg block text-center">한글 최고 성장상</span>
-                        <div className="space-y-2">
-                          {cumulativeFinalAwards.korGrowth.map((w, idx) => (
-                            <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
-                              <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
-                              <div className="flex justify-between items-center font-black mt-0.5">
-                                <span className="text-stone-800">{w.department}</span>
-                                <span className="text-emerald-600 font-mono font-black">+{w.value}타</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 영어 최고 성장상 */}
-                      <div className="p-4 bg-gradient-to-b from-rose-50/20 to-white border border-rose-100 rounded-2xl space-y-3.5">
-                        <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-lg block text-center">영어 최고 성장상</span>
-                        <div className="space-y-2">
-                          {cumulativeFinalAwards.engGrowth.map((w, idx) => (
-                            <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl">
-                              <p className="text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
-                              <div className="flex justify-between items-center font-black mt-0.5">
-                                <span className="text-stone-800">{w.department}</span>
-                                <span className="text-rose-600 font-mono font-black">+{w.value}타</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
