@@ -517,19 +517,28 @@ export async function fetchSpreadsheetData(
             })).filter(item => item.type && item.level);
           } else if (sheetKey === 'privacy') {
             // Parse columns: 학번, 이름, 동의 
-            const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
-            const idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
-            const idxAgreed = findIndexByNames(headers, ['동의', 'consent', 'agreed', '동의여부']);
+            let idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+            let idxName = findIndexByNames(headers, ['이름', '성명', '학생명', 'name']);
+            let idxAgreed = findIndexByNames(headers, ['동의', 'consent', 'agreed', '동의여부']);
 
             // Detect if this sheet is actually students_auth due to gviz/tq fallback
             const idxPinInPrivacy = findIndexByNames(headers, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
 
-            if (idxId === -1 || idxName === -1 || idxPinInPrivacy !== -1) {
+            if (idxPinInPrivacy !== -1) {
               continue; // try next candidate (or reject fallback to auth sheet)
             }
 
+            // Fallback to indexes 0, 1, 2 if headers aren't detected but we have rows
+            if (idxId === -1 && rows.length > 0 && rows[0].length >= 1) idxId = 0;
+            if (idxName === -1 && rows.length > 0 && rows[0].length >= 2) idxName = 1;
+            if (idxAgreed === -1 && rows.length > 0 && rows[0].length >= 3) idxAgreed = 2;
+
+            if (idxId === -1 || idxName === -1) {
+              continue; // try next candidate (or reject if we can't find core values)
+            }
+
             parsedResults = rows.slice(1).map(row => {
-              const rawAgreed = row[idxAgreed];
+              const rawAgreed = idxAgreed !== -1 ? row[idxAgreed] : undefined;
               const hasAgreed = idxAgreed !== -1 ? isAgreedValue(rawAgreed) : false;
               return {
                 studentId: cleanCodeValue(row[idxId]),
@@ -921,7 +930,18 @@ const cleanCodeValue = (val: string | number | undefined | null): string => {
 function isAgreedValue(val: string | number | undefined | null): boolean {
   if (val === undefined || val === null) return false;
   const s = String(val).trim().toLowerCase();
-  return s === 'y' || s === 'yes' || s === '동의' || s === 'true' || s === '1' || s === 'o';
+  return (
+    s === 'y' ||
+    s === 'yes' ||
+    s === 'true' ||
+    s === '1' ||
+    s === 'o' ||
+    s.includes('동의') ||
+    s === '예' ||
+    s === '여' ||
+    s === '확인' ||
+    s.includes('agree')
+  );
 }
 
 // Generate typing records statistics for grade breakdown rank list view

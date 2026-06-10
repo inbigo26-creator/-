@@ -1669,12 +1669,13 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 동의 완료 확인 카드 (시트 기준 동적 렌더링) */}
+                  {/* 동의 완료 확인 카드 (시트 및 로컬스토리지 복합 검증) */}
                   {(() => {
                     const normId = normalizeValue(studentSession.id);
                     const sheetRecord = privacyDb.find(p => normalizeValue(p.studentId) === normId);
-                    // If no record exists yet, default to false. If exists, respect its agreed status.
-                    const isAgreed = sheetRecord ? sheetRecord.agreed : false;
+                    const localConsented = localStorage.getItem('privacy_consent_' + normId) === 'true';
+                    // Count as agreed if either local storage has it or the spreadsheet records it as agreed!
+                    const isAgreed = localConsented || (sheetRecord ? sheetRecord.agreed : false);
 
                     if (isAgreed) {
                       return (
