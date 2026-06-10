@@ -764,30 +764,38 @@ export default function App() {
       // Check if student has already consented to privacy terms
       const normId = normalizeValue(currentAuth.studentId);
       
-      // Google Sheets replication delay bypass: Prioritize local storage verification for the current device/browser session
+      // Google Sheets replication delay bypass cache
       const localConsented = localStorage.getItem('privacy_consent_' + normId) === 'true';
       
       // Search from the end of the array to prioritize the latest record in case there are multiple rows for this student
       const sheetRecord = [...(freshData.privacy || [])].reverse().find(p => normalizeValue(p.studentId) === normId);
       
-      // Determine consent status: Prioritize Sheet record if it exists so developers/teachers can reset or manage it from the Excel Sheet itself!
+      // Determine consent status: Prioritize Sheet record if we have a real spreadsheet connection!
       let hasConsented = false;
-      if (sheetRecord) {
-        hasConsented = sheetRecord.agreed;
-        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트에 기록 발견됨 - 동의 여부(agreed): ${sheetRecord.agreed}`);
-        if (sheetRecord.agreed) {
-          // Sync back to local storage
-          localStorage.setItem('privacy_consent_' + normId, 'true');
+      const isRealSpreadsheet = spreadsheetId && spreadsheetId !== '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o';
+
+      if (isRealSpreadsheet) {
+        if (sheetRecord) {
+          hasConsented = sheetRecord.agreed;
+          console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트에 기록 발견됨 - 동의 여부(agreed): ${sheetRecord.agreed}`);
+          if (sheetRecord.agreed) {
+            // Sync back to local storage
+            localStorage.setItem('privacy_consent_' + normId, 'true');
+          } else {
+            // Explicitly cleared or 'N' in sheet, so sync clear local storage as well!
+            localStorage.removeItem('privacy_consent_' + normId);
+          }
         } else {
-          // Explicitly cleared or 'N' in sheet, so sync clear local storage as well!
+          // IMPORTANT: If they are NOT recorded in the sheet, it is their FIRST login (최초 로그인)!
+          // We MUST unconditionally display the consent popup, completely ignoring any old browser localStorage cache.
+          hasConsented = false;
+          console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 기록 없음 (최초 로그인) -> 무조건 동의 팝업을 표시합니다.`);
           localStorage.removeItem('privacy_consent_' + normId);
         }
-      } else if (localConsented) {
-        hasConsented = true;
-        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 브라우저 로컬 스토리지에 동의 기록이 존재하여 동의를 자동 인정합니다.`);
       } else {
-        hasConsented = false;
-        console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 및 로컬 동의 기록 없음.`);
+        // Fallback to localStorage only in demo/placeholder mode where no real spreadsheet exists
+        hasConsented = localConsented;
+        console.log(`[통계 및 동의 디버그] 데모/플레이스홀더 모드 - 로컬 스토리지 기준 동의 여부: ${localConsented}`);
       }
 
       if (!hasConsented) {
@@ -1184,35 +1192,13 @@ export default function App() {
                   )}
 
                   {/* 🔐 Privacy Policy viewer for student before logging in */}
-                  <div className="text-center pt-2 flex flex-col items-center gap-1.5 justify-center">
+                  <div className="text-center pt-2">
                     <button
                       type="button"
                       onClick={() => setShowPrivacyOnlyModal(true)}
                       className="text-[11px] text-emerald-750 hover:text-emerald-800 hover:underline font-black transition-all cursor-pointer font-sans"
                     >
                       [개인정보 수집·이용 동의 안내 보기]
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Clear all local storage privacy consent keys
-                        let clearedCount = 0;
-                        for (let i = localStorage.length - 1; i >= 0; i--) {
-                          const key = localStorage.key(i);
-                          if (key && key.startsWith('privacy_consent_')) {
-                            localStorage.removeItem(key);
-                            clearedCount++;
-                          }
-                        }
-                        // Clear data cache as well
-                        try {
-                          clearDataCache();
-                        } catch (_) {}
-                        alert('브라우저에 저장되었던 모든 개인정보 동의 이력(캐시)이 초기화되었습니다! 이제 학번 입력 후 로그인 시 동의 팝업이 즉시 다시 나타납니다.');
-                      }}
-                      className="text-[10px] text-indigo-600 hover:text-indigo-805 hover:underline font-bold transition-all cursor-pointer font-sans"
-                    >
-                      🔄 동의 팝업 다시 띄우기 (테스트/초기화용)
                     </button>
                   </div>
 
