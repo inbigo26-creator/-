@@ -534,7 +534,7 @@ export default function App() {
       
       setIsInitialLoading(true);
       try {
-        const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
+        const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl, true);
         setAuthDb(data.auth);
         setEnglishDb(data.english);
         setKoreanDb(data.korean);
@@ -564,7 +564,7 @@ export default function App() {
     setSyncMessage(null);
     try {
       clearDataCache();
-      const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
+      const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl, true);
       setAuthDb(data.auth);
       setEnglishDb(data.english);
       setKoreanDb(data.korean);
@@ -599,7 +599,7 @@ export default function App() {
             clearDataCache();
           } catch (_) {}
         }
-        const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
+        const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl, isTeacher);
         setAuthDb(data.auth);
         setEnglishDb(data.english);
         setKoreanDb(data.korean);
@@ -717,7 +717,7 @@ export default function App() {
 
       try {
         console.log('[Login Optimization] Fetching the latest spreadsheet data during student login...');
-        const pulledData = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
+        const pulledData = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl, true);
         freshData = pulledData;
         
         // Update local state with fresh data

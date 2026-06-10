@@ -107,10 +107,11 @@ export function clearDataCache() {
   resolvedSheetTitles = {};
 
   try {
-    // Clear all resolved_sheets_ and school_db_cache_ keys from localStorage
+    // Only clear resolved_sheets_ keys to ensure we can re-resolve sheet titles if needed,
+    // but NEVER proactively delete the raw school_db_cache_ from localStorage! This acts as our rock-solid offline/emergency fallback.
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith('resolved_sheets_') || key.startsWith('school_db_cache_'))) {
+      if (key && key.startsWith('resolved_sheets_')) {
         localStorage.removeItem(key);
       }
     }
@@ -123,7 +124,8 @@ export function clearDataCache() {
 export async function fetchSpreadsheetData(
   spreadsheetId: string,
   accessToken?: string | null,
-  appsScriptUrl?: string | null
+  appsScriptUrl?: string | null,
+  forceFresh: boolean = false
 ): Promise<{
     auth: StudentAuth[];
     english: TypingRecord[];
@@ -145,42 +147,44 @@ export async function fetchSpreadsheetData(
 
   // 0. CHECK PERSISTENT LOCALSTORAGE OFFSET CACHE (5 minutes TTL for instant loading)
   const dbCacheKey = `school_db_cache_${spreadsheetId}`;
-  try {
-    const cachedStr = localStorage.getItem(dbCacheKey);
-    if (cachedStr) {
-      const cachedObj = JSON.parse(cachedStr);
-      const now = Date.now();
-      // 5 minutes TTL (300,000ms)
-      if (now - cachedObj.timestamp < 300000) {
-        console.log('[Cache Optimization] Loaded spreadsheet database from localStorage cache (TTL valid). Instant load!');
-        cachedSpreadsheetAuth = cachedObj.auth || [];
-        cachedSpreadsheetEnglish = cachedObj.english || [];
-        cachedSpreadsheetKorean = cachedObj.korean || [];
-        cachedSpreadsheetLevels = cachedObj.levels || [];
-        cachedSpreadsheetPrivacy = cachedObj.privacy || [];
-        
-        return {
-          auth: cachedSpreadsheetAuth || [],
-          english: cachedSpreadsheetEnglish || [],
-          korean: cachedSpreadsheetKorean || [],
-          levels: cachedSpreadsheetLevels || [],
-          privacy: cachedSpreadsheetPrivacy || []
-        };
+  if (!forceFresh) {
+    try {
+      const cachedStr = localStorage.getItem(dbCacheKey);
+      if (cachedStr) {
+        const cachedObj = JSON.parse(cachedStr);
+        const now = Date.now();
+        // 5 minutes TTL (300,005ms)
+        if (now - cachedObj.timestamp < 300000) {
+          console.log('[Cache Optimization] Loaded spreadsheet database from localStorage cache (TTL valid). Instant load!');
+          cachedSpreadsheetAuth = cachedObj.auth || [];
+          cachedSpreadsheetEnglish = cachedObj.english || [];
+          cachedSpreadsheetKorean = cachedObj.korean || [];
+          cachedSpreadsheetLevels = cachedObj.levels || [];
+          cachedSpreadsheetPrivacy = cachedObj.privacy || [];
+          
+          return {
+            auth: cachedSpreadsheetAuth || [],
+            english: cachedSpreadsheetEnglish || [],
+            korean: cachedSpreadsheetKorean || [],
+            levels: cachedSpreadsheetLevels || [],
+            privacy: cachedSpreadsheetPrivacy || []
+          };
+        }
       }
+    } catch (e) {
+      console.warn('[Cache Optimization] Failed parsing cached spreadsheet database.', e);
     }
-  } catch (e) {
-    console.warn('[Cache Optimization] Failed parsing cached spreadsheet database.', e);
-  }
 
-  // If already cached in memory, return it to prevent multiple duplicate network calls
-  if (cachedSpreadsheetAuth && cachedSpreadsheetEnglish && cachedSpreadsheetKorean && cachedSpreadsheetLevels) {
-    return {
-      auth: cachedSpreadsheetAuth,
-      english: cachedSpreadsheetEnglish,
-      korean: cachedSpreadsheetKorean,
-      levels: cachedSpreadsheetLevels,
-      privacy: cachedSpreadsheetPrivacy || []
-    };
+    // If already cached in memory, return it to prevent multiple duplicate network calls
+    if (cachedSpreadsheetAuth && cachedSpreadsheetEnglish && cachedSpreadsheetKorean && cachedSpreadsheetLevels) {
+      return {
+        auth: cachedSpreadsheetAuth,
+        english: cachedSpreadsheetEnglish,
+        korean: cachedSpreadsheetKorean,
+        levels: cachedSpreadsheetLevels,
+        privacy: cachedSpreadsheetPrivacy || []
+      };
+    }
   }
 
   // If Apps Script URL is specified, query it first
