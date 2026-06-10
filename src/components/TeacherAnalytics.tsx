@@ -823,7 +823,7 @@ export function TeacherAnalytics({
             교사용 종합 데이터 분석 대시보드
           </h2>
           <p className="text-xs text-stone-400 font-medium font-sans">
-            구글 스프레드시트와 직접 소통하여 학급 등급 달성률, 월별 간식 수혜자(중복 제외), 종합 시상을 자동 연산합니다.
+            구글 스프레드시트와 직접 소통하여 학급 등급 달성률, 월별 명예의 전당 수상자(중복 제외), 종합 시상을 자동 연산합니다.
           </p>
         </div>
 
@@ -863,7 +863,7 @@ export function TeacherAnalytics({
           }`}
         >
           <Calendar className="h-4 w-4" />
-          <span>월별 간식 시상 (중복 배제)</span>
+          <span>월별 명예의 전당 (중복 배제)</span>
         </button>
 
         <button
@@ -1298,7 +1298,7 @@ export function TeacherAnalytics({
 
 
 
-          {/* 🟡 TAB 2: MONTHLY SNACK AWARDS (CHRONOLOGICAL ROLL-OVER) */}
+          {/* 🟡 TAB 2: MONTHLY HALL OF FAME AWARDS (CHRONOLOGICAL ROLL-OVER) */}
           {activeTab === 'monthly_snacks' && (
             <div className="space-y-6 animate-fade-in">
               
@@ -1309,9 +1309,9 @@ export function TeacherAnalytics({
                   ★ 중복 수령 방지 및 이월 이력 시스템 연동 로직
                 </span>
                 <p className="text-[11.2px] text-amber-800 font-medium leading-relaxed">
-                  매달 시상 시 <strong>이미 이전 달에 한 번이라도 간식을 받은 학생은 순위권에서 제외</strong>됩니다. 
+                  매달 시상 시 <strong>이미 이전 달에 한 번이라도 명예의 전당 수상자에 선정된 학생은 순위권에서 제외</strong>됩니다. 
                   보상은 다음 순위 학생(4위, 5위...)에게 돌아갑니다. 
-                  아래에서 월(5월~10월)을 누르시면 해당 월의 <strong>간식 당첨 학생 6명</strong> 및 사유와 제외된 후보 명단을 확인하실 수 있습니다.
+                  아래에서 월(5월~10월)을 누르시면 해당 월의 <strong>명예의 전당 선정 학생 6명</strong> 및 사유와 제외된 후보 명단을 확인하실 수 있습니다.
                 </p>
               </div>
 
@@ -1333,56 +1333,149 @@ export function TeacherAnalytics({
               </div>
 
               {/* Monthly Results Display */}
-              {monthlyDataHistory[selectedMonth] && (
-                <div className="space-y-6">
-                  
-                  {/* Snack Winners Card */}
-                  <div className="bg-white rounded-2xl border border-indigo-100 shadow-xs p-6 space-y-4">
-                    <div className="flex justify-between items-center pb-2 border-b border-indigo-50">
-                      <h4 className="text-sm font-black text-indigo-950 flex items-center gap-2">
-                        <Award className="h-5 w-5 text-indigo-600" />
-                        🎁 {selectedMonth} 최종 상속자 및 간식 증정 명단 (총 6명)
-                      </h4>
-                      <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100">
-                        Past Winners Excluded
-                      </span>
-                    </div>
+              {monthlyDataHistory[selectedMonth] && (() => {
+                const winnersList = monthlyDataHistory[selectedMonth].winners || [];
+                const monthlyKorSpeed = winnersList.filter(w => w.reason.includes('한글 최고 속도'));
+                const monthlyEngSpeed = winnersList.filter(w => w.reason.includes('영어 최고 속도'));
+                const monthlyKorGrowth = winnersList.filter(w => w.reason.includes('한글 최고 향상도'));
+                const monthlyEngGrowth = winnersList.filter(w => w.reason.includes('영어 최고 향상도'));
 
-                    {monthlyDataHistory[selectedMonth].winners.length === 0 ? (
-                      <p className="text-center text-stone-400 text-xs py-8">이 달의 당첨 데이터 또는 참가 기록이 충족되지 않았습니다.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {monthlyDataHistory[selectedMonth].winners.map((w, idx) => (
-                          <div 
-                            key={idx} 
-                            className="bg-stone-50 border border-slate-200 relative p-4 rounded-xl space-y-3 shadow-2xs hover:border-indigo-300 transition-colors"
-                          >
-                            <span className="absolute top-3 right-3 text-lg">🎁</span>
-                            <div className="space-y-0.5">
-                              <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-black rounded border border-emerald-200">
-                                {w.reason}
-                              </span>
-                              <h4 className="text-base font-black text-stone-900 mt-1.5">{w.name}</h4>
-                              <p className="text-[10.5px] text-stone-400 font-bold font-sans">
-                                학번 {w.studentId} | {w.grade}학년 {w.department}
-                              </p>
-                            </div>
-                            <div className="pt-2 border-t border-dashed flex justify-between items-center text-xs">
-                              <span className="text-stone-400 font-semibold">동작 수치 :</span>
-                              <strong className="font-mono text-sm text-indigo-700 font-black">
-                                {w.value} {w.reason.includes('향상') ? '타 성정 ▲' : '타 최고'}
-                              </strong>
+                return (
+                  <div className="space-y-6">
+                    
+                    {/* Monthly Selected Winners Grid */}
+                    <div className="bg-white rounded-2xl border border-indigo-100 shadow-xs p-6 space-y-5">
+                      <div className="flex justify-between items-center pb-2 border-b border-indigo-50">
+                        <h4 className="text-sm font-black text-indigo-950 flex items-center gap-2">
+                          <Award className="h-5 w-5 text-indigo-600" />
+                          🏆 {selectedMonth} 월별 명예의 전당 시상자 및 수혜 명단
+                        </h4>
+                        <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100">
+                          중복 수혜 비대상 제외 처리 완료
+                        </span>
+                      </div>
+
+                      {winnersList.length === 0 ? (
+                        <p className="text-center text-stone-400 text-xs py-8">이 달의 시상 데이터 또는 참가 기록이 충족되지 않았습니다.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-sans text-xs">
+                          
+                          {/* 한글 최고 속도상 */}
+                          <div className="bg-white rounded-2xl border border-stone-200/80 p-4 space-y-3.5 shadow-3xs">
+                            <h5 className="text-[10px] font-black text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-1 rounded-lg block text-center uppercase">
+                              한글 최고 속도상
+                            </h5>
+                            <div className="space-y-2">
+                              {monthlyKorSpeed.length === 0 ? (
+                                <p className="text-[10px] text-stone-400 text-center py-6">시상 결과가 없습니다.</p>
+                              ) : (
+                                monthlyKorSpeed.map((w, idx) => (
+                                  <div key={idx} className="p-3 bg-purple-50/20 border border-purple-100 rounded-xl space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="px-1.5 py-0.5 rounded bg-purple-150 text-purple-800 text-[9px] font-black">
+                                        {w.grade}학년 대표
+                                      </span>
+                                      <span className="font-mono text-xs text-purple-700 font-extrabold">{w.value}타 최고</span>
+                                    </div>
+                                    <div className="pt-1">
+                                      <p className="font-extrabold text-stone-900">{w.name}</p>
+                                      <p className="text-[10px] text-stone-405">{w.grade}학년 {w.department} ({w.studentId})</p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Candidate Pools for inspection (총 12개 순위 리스트 관리 - 4개 부문 각 Top 5) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    {/* Pool 1: Korean Speed Top 5 */}
+                          {/* 영어 최고 속도상 */}
+                          <div className="bg-white rounded-2xl border border-stone-200/80 p-4 space-y-3.5 shadow-3xs">
+                            <h5 className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg block text-center uppercase">
+                              영어 최고 속도상
+                            </h5>
+                            <div className="space-y-2">
+                              {monthlyEngSpeed.length === 0 ? (
+                                <p className="text-[10px] text-stone-400 text-center py-6">시상 결과가 없습니다.</p>
+                              ) : (
+                                monthlyEngSpeed.map((w, idx) => (
+                                  <div key={idx} className="p-3 bg-indigo-50/20 border border-indigo-100 rounded-xl space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="px-1.5 py-0.5 rounded bg-indigo-150 text-indigo-850 text-[9px] font-black">
+                                        {w.grade}학년 대표
+                                      </span>
+                                      <span className="font-mono text-xs text-indigo-700 font-extrabold">{w.value}타 최고</span>
+                                    </div>
+                                    <div className="pt-1">
+                                      <p className="font-extrabold text-stone-900">{w.name}</p>
+                                      <p className="text-[10px] text-stone-405">{w.grade}학년 {w.department} ({w.studentId})</p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 한글 최고 성장상 */}
+                          <div className="bg-white rounded-2xl border border-stone-200/80 p-4 space-y-3.5 shadow-3xs">
+                            <h5 className="text-[10px] font-black text-emerald-800 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg block text-center uppercase">
+                              한글 최고 성장상
+                            </h5>
+                            <div className="space-y-2">
+                              {monthlyKorGrowth.length === 0 ? (
+                                <p className="text-[10px] text-stone-400 text-center py-6">시상 결과가 없습니다.</p>
+                              ) : (
+                                monthlyKorGrowth.map((w, idx) => (
+                                  <div key={idx} className="p-3 bg-emerald-50/20 border border-emerald-100 rounded-xl space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="px-1.5 py-0.5 rounded bg-emerald-150 text-emerald-800 text-[9px] font-black">
+                                        {w.grade}학년 대표
+                                      </span>
+                                      <span className="font-mono text-xs text-emerald-600 font-extrabold">+{w.value}타 ▲</span>
+                                    </div>
+                                    <div className="pt-1">
+                                      <p className="font-extrabold text-stone-900">{w.name}</p>
+                                      <p className="text-[10px] text-stone-405">{w.grade}학년 {w.department} ({w.studentId})</p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 영어 최고 성장상 */}
+                          <div className="bg-white rounded-2xl border border-stone-200/80 p-4 space-y-3.5 shadow-3xs">
+                            <h5 className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-lg block text-center uppercase">
+                              영어 최고 성장상
+                            </h5>
+                            <div className="space-y-2">
+                              {monthlyEngGrowth.length === 0 ? (
+                                <p className="text-[10px] text-stone-400 text-center py-6">시상 결과가 없습니다.</p>
+                              ) : (
+                                monthlyEngGrowth.map((w, idx) => (
+                                  <div key={idx} className="p-3 bg-rose-50/20 border border-rose-100 rounded-xl space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="px-1.5 py-0.5 rounded bg-rose-200 text-rose-800 text-[9px] font-black">
+                                        {w.grade}학년 대표
+                                      </span>
+                                      <span className="font-mono text-xs text-rose-600 font-extrabold">+{w.value}타 ▲</span>
+                                    </div>
+                                    <div className="pt-1">
+                                      <p className="font-extrabold text-stone-900">{w.name}</p>
+                                      <p className="text-[10px] text-stone-405">{w.grade}학년 {w.department} ({w.studentId})</p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Candidate Pools for inspection (총 12개 순위 리스트 관리 - 4개 부문 각 Top 5) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Pool 1: Korean Speed Top 5 */}
                     <div className="bg-white rounded-2xl border border-stone-200/60 p-5 space-y-3.5 shadow-2xs">
                       <h4 className="text-xs font-black text-stone-850 border-b pb-2 flex justify-between items-center">
                         <span>한글 최고속도 부문 후보 풀 (Top 5)</span>
@@ -1402,7 +1495,7 @@ export function TeacherAnalytics({
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-amber-700 font-bold">{c.value}타</span>
                                 {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">기합격 이월 ⏭️</span>}
-                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">간식당첨 🎁</span>}
+                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">월별시상 🏆</span>}
                               </div>
                             </div>
                           );
@@ -1430,7 +1523,7 @@ export function TeacherAnalytics({
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-purple-700 font-bold">{c.value}타</span>
                                 {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">기합격 이월 ⏭️</span>}
-                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">간식당첨 🎁</span>}
+                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">월별시상 🏆</span>}
                               </div>
                             </div>
                           );
@@ -1452,7 +1545,7 @@ export function TeacherAnalytics({
                         ) : (
                           monthlyDataHistory[selectedMonth].rawCandidates.korGrowth.slice(0, 5).map((c, idx) => {
                             const isPastWinner = monthlyDataHistory[selectedMonth].blacklistAtStart.has(c.studentId);
-                            const isMatchedWinner = monthlyDataHistory[selectedMonth].winners.some(w => w.studentId === c.studentId && w.reason.includes('한글 타자 최고 향상'));
+                            const isMatchedWinner = monthlyDataHistory[selectedMonth].winners.some(w => w.studentId === c.studentId && w.reason.includes('한글 최고 향상도'));
                             
                             return (
                               <div key={idx} className={`flex items-center justify-between p-2 rounded-lg text-xs ${isMatchedWinner ? 'bg-indigo-50/70 border border-indigo-200 font-bold' : 'bg-stone-50 border border-stone-150'}`}>
@@ -1463,7 +1556,7 @@ export function TeacherAnalytics({
                                 <div className="flex items-center gap-2">
                                   <span className="font-mono text-emerald-600 font-bold">+{c.value}타 성장</span>
                                   {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">기합격 이월 ⏭️</span>}
-                                  {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">간식당첨 🎁</span>}
+                                  {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">월별시상 🏆</span>}
                                 </div>
                               </div>
                             );
@@ -1486,7 +1579,7 @@ export function TeacherAnalytics({
                         ) : (
                           monthlyDataHistory[selectedMonth].rawCandidates.engGrowth.slice(0, 5).map((c, idx) => {
                             const isPastWinner = monthlyDataHistory[selectedMonth].blacklistAtStart.has(c.studentId);
-                            const isMatchedWinner = monthlyDataHistory[selectedMonth].winners.some(w => w.studentId === c.studentId && w.reason.includes('영어 타자 최고 향상'));
+                            const isMatchedWinner = monthlyDataHistory[selectedMonth].winners.some(w => w.studentId === c.studentId && w.reason.includes('영어 최고 향상도'));
                             
                             return (
                               <div key={idx} className={`flex items-center justify-between p-2 rounded-lg text-xs ${isMatchedWinner ? 'bg-indigo-50/70 border border-indigo-200 font-bold' : 'bg-stone-50 border border-stone-150'}`}>
@@ -1497,7 +1590,7 @@ export function TeacherAnalytics({
                                 <div className="flex items-center gap-2">
                                   <span className="font-mono text-emerald-600 font-bold">+{c.value}타 성장</span>
                                   {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">기합격 이월 ⏭️</span>}
-                                  {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">간식당첨 🎁</span>}
+                                  {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">월별시상 🏆</span>}
                                 </div>
                               </div>
                             );
@@ -1505,14 +1598,15 @@ export function TeacherAnalytics({
                         )}
                       </div>
                     </div>
-
                   </div>
-
                 </div>
-              )}
+              );
+            })()}
 
             </div>
           )}
+
+
 
           {/* 🟢 TAB 3: CUMULATIVE MAIN SEMESTER AWARDS (NO EXCLUSIONS) */}
           {activeTab === 'final_awards' && (

@@ -83,6 +83,7 @@ export default function App() {
     koreanStats: StudentStats;
   } | null>(null);
   const [studentTab, setStudentTab] = useState<'my_stats' | 'hall_of_fame' | 'privacy_consent'>('my_stats');
+  const [selectedHallMonth, setSelectedHallMonth] = useState<string>('');
   const [showPrivacyOnlyModal, setShowPrivacyOnlyModal] = useState(false);
 
   // Modals toggle
@@ -104,7 +105,22 @@ export default function App() {
 
   // Teacher authentication states
   const [isTeacher, setIsTeacher] = useState<boolean>(() => {
-    return localStorage.getItem('is_teacher_authenticated') === 'true';
+    const isAuth = localStorage.getItem('is_teacher_authenticated') === 'true';
+    if (!isAuth) return false;
+    
+    const lastActivityStr = localStorage.getItem('teacher_last_activity_at');
+    if (!lastActivityStr) return false;
+    
+    const lastActivity = parseInt(lastActivityStr, 10);
+    // 30 minutes check (30 * 60 * 1000 = 1,800,000 ms)
+    if (Date.now() - lastActivity > 1800000) {
+      localStorage.removeItem('is_teacher_authenticated');
+      localStorage.removeItem('teacher_last_activity_at');
+      return false;
+    }
+    // Set current active time
+    localStorage.setItem('teacher_last_activity_at', String(Date.now()));
+    return true;
   });
   const [showTeacherLogin, setShowTeacherLogin] = useState(false);
   const [teacherPasswordInput, setTeacherPasswordInput] = useState('');
@@ -113,6 +129,7 @@ export default function App() {
   const handleTeacherLogout = () => {
     setIsTeacher(false);
     localStorage.removeItem('is_teacher_authenticated');
+    localStorage.removeItem('teacher_last_activity_at');
   };
 
   // 📋 Calculate student-level latest speed averages (excluding special status students) for school & grade comparison
@@ -436,14 +453,42 @@ export default function App() {
     };
   }, [englishDb, koreanDb]);
 
-  const handleTeacherLoginSubmit = (e: React.FormEvent) => {
+  const handleTeacherLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTeacherPasswordError(null);
     if (teacherPasswordInput === '1004') {
       setIsTeacher(true);
+      const now = Date.now();
       localStorage.setItem('is_teacher_authenticated', 'true');
+      localStorage.setItem('teacher_last_activity_at', String(now));
       setShowTeacherLogin(false);
       setTeacherPasswordInput('');
+      
+      // Clear cache so the teacher always loads completely fresh data right after login
+      try {
+        clearDataCache();
+      } catch (_) {}
+      
+      setIsInitialLoading(true);
+      try {
+        const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
+        setAuthDb(data.auth);
+        setEnglishDb(data.english);
+        setKoreanDb(data.korean);
+        setLevelRulesDb(data.levels);
+        setPrivacyDb(data.privacy || []);
+        
+        setSheetMetrics({
+          success: true,
+          authRows: data.auth.length,
+          totalEng: data.english.length,
+          totalKor: data.korean.length
+        });
+      } catch (err: any) {
+        console.error('Failed to reload sheet post login:', err);
+      } finally {
+        setIsInitialLoading(false);
+      }
     } else {
       setTeacherPasswordError('비밀번호가 올바르지 않습니다.');
     }
@@ -485,6 +530,12 @@ export default function App() {
       setIsInitialLoading(true);
       setSheetLoadError(null);
       try {
+        // If a teacher is authenticated when mounting, bypass cache to guarantee latest view
+        if (isTeacher) {
+          try {
+            clearDataCache();
+          } catch (_) {}
+        }
         const data = await fetchSpreadsheetData(spreadsheetId, googleToken, appsScriptUrl);
         setAuthDb(data.auth);
         setEnglishDb(data.english);
@@ -512,7 +563,48 @@ export default function App() {
       }
     }
     loadSheets();
-  }, [spreadsheetId, googleToken, appsScriptUrl]);
+  }, [spreadsheetId, googleToken, appsScriptUrl, isTeacher]);
+
+  // 🕒 Teacher autologout logic (30 minutes of inactivity)
+  useEffect(() => {
+    if (!isTeacher) return;
+
+    // Tick checking every 5 seconds
+    const intervalId = setInterval(() => {
+      const lastActivityStr = localStorage.getItem('teacher_last_activity_at');
+      if (lastActivityStr) {
+        const lastActivity = parseInt(lastActivityStr, 10);
+        const now = Date.now();
+        // 30 minutes in milliseconds = 30 * 60 * 1000 = 1,800,000 ms
+        if (now - lastActivity > 1800000) {
+          setIsTeacher(false);
+          localStorage.removeItem('is_teacher_authenticated');
+          localStorage.removeItem('teacher_last_activity_at');
+        }
+      } else {
+        setIsTeacher(false);
+        localStorage.removeItem('is_teacher_authenticated');
+      }
+    }, 5000);
+
+    const handleUserActivity = () => {
+      localStorage.setItem('teacher_last_activity_at', String(Date.now()));
+    };
+
+    // Listeners for activity extension (sliding window)
+    window.addEventListener('click', handleUserActivity);
+    window.addEventListener('keypress', handleUserActivity);
+    window.addEventListener('mousemove', handleUserActivity);
+    window.addEventListener('scroll', handleUserActivity);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('click', handleUserActivity);
+      window.removeEventListener('keypress', handleUserActivity);
+      window.removeEventListener('mousemove', handleUserActivity);
+      window.removeEventListener('scroll', handleUserActivity);
+    };
+  }, [isTeacher]);
 
   // Normalization function to handle common Google Sheets formatting anomalies (like .0 float artifacts, commas, or extra spacing)
   const normalizeValue = (val: any): string => {
@@ -1131,51 +1223,139 @@ export default function App() {
                 </button>
               </div>
 
-              {studentTab === 'hall_of_fame' && (
-                <div className="space-y-8 animate-fade-in font-sans">
-                  {/* 🍿 1. Monthly Snack Awards Column */}
-                  <div className="bg-white rounded-3xl border border-rose-100 p-6 space-y-6 shadow-sm">
-                    <div className="flex items-center gap-3 pb-3 border-b border-rose-100">
-                      <span className="p-2 bg-rose-50 text-rose-600 rounded-xl text-lg">🍿</span>
-                      <div>
-                        <h3 className="text-sm font-black text-slate-800 tracking-wide font-sans">
-                          월별 명예의 전당 (5월~10월)
-                        </h3>
-                        <p className="text-[10px] text-stone-400 font-bold font-sans">
-                          [안내] 월별 명예의 전당 선정자는 이후 대상에서 제외됩니다. (이름 비공개)
-                        </p>
-                      </div>
-                    </div>
+              {studentTab === 'hall_of_fame' && (() => {
+                const activeHallMonth = selectedHallMonth || (sortedMonths.length > 0 ? sortedMonths[sortedMonths.length - 1] : '');
+                const winners = monthlySnackWinnersHistory[activeHallMonth]?.winners || [];
+                const monthlyKorSpeed = winners.filter(w => w.reason.includes('한글 최고 속도'));
+                const monthlyEngSpeed = winners.filter(w => w.reason.includes('영어 최고 속도'));
+                const monthlyKorGrowth = winners.filter(w => w.reason.includes('한글 최고 향상도'));
+                const monthlyEngGrowth = winners.filter(w => w.reason.includes('영어 최고 향상도'));
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-sans">
-                      {sortedMonths.map((m) => {
-                        const winners = monthlySnackWinnersHistory[m]?.winners || [];
-                        return (
-                          <div key={m} className="bg-stone-50/60 border border-stone-200/80 rounded-2xl p-4 space-y-3 hover:border-rose-300 transition-colors shadow-3xs">
-                            <div className="flex justify-between items-center pb-2 border-b border-stone-200/40">
-                              <span className="text-[10.5px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-lg">{m} 간식 수상자</span>
-                              <span className="text-[10px] font-bold text-stone-400 font-mono">{winners.length}명</span>
-                            </div>
-                            {winners.length === 0 ? (
-                              <p className="text-[10px] text-stone-400 text-center py-6 font-medium">이 달의 시상 데이터가 없습니다.</p>
-                            ) : (
-                              <div className="space-y-2">
-                                {winners.map((w, idx) => (
-                                  <div key={idx} className="flex flex-col gap-0.5 p-2.5 bg-white rounded-xl border border-stone-150 text-[11px]">
-                                    <div className="flex justify-between items-center font-bold">
-                                      <span className="text-stone-800 font-black">{w.grade}학년 {w.department}과</span>
-                                      <span className="text-rose-600 font-black font-mono text-xs">{w.value}타</span>
-                                    </div>
-                                    <span className="text-[9px] font-bold text-stone-400 block">{w.reason}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                return (
+                  <div className="space-y-8 animate-fade-in font-sans">
+                    {/* 1. Monthly Awards Block */}
+                    <div className="bg-white rounded-3xl border border-rose-100 p-6 space-y-6 shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-rose-100">
+                        <div className="flex items-center gap-3">
+                          <span className="p-2 bg-rose-50 text-rose-600 rounded-xl text-lg">🏆</span>
+                          <div>
+                            <h3 className="text-sm font-black text-slate-800 tracking-wide font-sans">
+                              월별 명예의 전당 (5월~10월)
+                            </h3>
+                            <p className="text-[10px] text-stone-400 font-bold font-sans">
+                              [안내] 월별 명예의 전당 선정자는 이후 대상에서 제외됩니다. (이름 비공개)
+                            </p>
                           </div>
-                        );
-                      })}
+                        </div>
+
+                        {/* Month selector switcher tabs */}
+                        <div className="flex flex-wrap gap-1 bg-stone-50 border border-stone-150 p-1 rounded-xl">
+                          {sortedMonths.map((m) => {
+                            const isSelected = activeHallMonth === m;
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setSelectedHallMonth(m)}
+                                className={`px-3 py-1.5 text-[10.5px] font-black rounded-lg transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-rose-600 text-white shadow-3xs'
+                                    : 'text-stone-500 hover:bg-stone-150 hover:text-stone-900 bg-white border border-stone-200/50'
+                                }`}
+                              >
+                                {m}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {activeHallMonth ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 font-sans text-xs">
+                          {/* 한글 최고 속도상 */}
+                          <div className="p-4 bg-gradient-to-b from-purple-50/20 to-white border border-purple-100 rounded-2xl space-y-3.5 shadow-3xs">
+                            <span className="text-[10px] font-black text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-1 rounded-lg block text-center uppercase">한글 최고 속도상</span>
+                            <div className="space-y-2">
+                              {monthlyKorSpeed.length === 0 ? (
+                                <p className="text-[10px] text-stone-450 text-center py-6 font-medium">시상 결과가 없습니다.</p>
+                              ) : (
+                                monthlyKorSpeed.map((w, idx) => (
+                                  <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl shadow-4xs font-sans">
+                                    <p className="text-[9.5px] font-semibold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
+                                    <div className="flex justify-between items-center font-black mt-0.5">
+                                      <span className="text-stone-850">{w.department}</span>
+                                      <span className="text-purple-600 font-mono font-black">{w.value}타</span>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 영어 최고 속도상 */}
+                          <div className="p-4 bg-gradient-to-b from-indigo-50/20 to-white border border-indigo-100 rounded-2xl space-y-3.5 shadow-3xs">
+                            <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg block text-center uppercase">영어 최고 속도상</span>
+                            <div className="space-y-2">
+                              {monthlyEngSpeed.length === 0 ? (
+                                <p className="text-[10px] text-stone-450 text-center py-6 font-medium">시상 결과가 없습니다.</p>
+                              ) : (
+                                monthlyEngSpeed.map((w, idx) => (
+                                  <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl shadow-4xs font-sans">
+                                    <p className="text-[9.5px] font-semibold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
+                                    <div className="flex justify-between items-center font-black mt-0.5">
+                                      <span className="text-stone-850">{w.department}</span>
+                                      <span className="text-indigo-650 font-mono font-black">{w.value}타</span>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 한글 최고 성장상 */}
+                          <div className="p-4 bg-gradient-to-b from-emerald-50/20 to-white border border-emerald-100 rounded-2xl space-y-3.5 shadow-3xs text-xs">
+                            <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg block text-center uppercase font-sans">한글 최고 성장상</span>
+                            <div className="space-y-2">
+                              {monthlyKorGrowth.length === 0 ? (
+                                <p className="text-[10px] text-stone-450 text-center py-6 font-medium">시상 결과가 없습니다.</p>
+                              ) : (
+                                monthlyKorGrowth.map((w, idx) => (
+                                  <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl shadow-4xs font-sans">
+                                    <p className="text-[9.5px] font-semibold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
+                                    <div className="flex justify-between items-center font-black mt-0.5">
+                                      <span className="text-stone-850">{w.department}</span>
+                                      <span className="text-emerald-600 font-mono font-black">+{w.value}타</span>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 영어 최고 성장상 */}
+                          <div className="p-4 bg-gradient-to-b from-rose-50/20 to-white border border-rose-100 rounded-2xl space-y-3.5 shadow-3xs font-sans">
+                            <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-lg block text-center uppercase font-sans">영어 최고 성장상</span>
+                            <div className="space-y-2">
+                              {monthlyEngGrowth.length === 0 ? (
+                                <p className="text-[10px] text-stone-455 text-center py-6 font-medium">시상 결과가 없습니다.</p>
+                              ) : (
+                                monthlyEngGrowth.map((w, idx) => (
+                                  <div key={idx} className="p-2.5 bg-white border border-stone-150 rounded-xl shadow-4xs font-sans">
+                                    <p className="text-[9.5px] font-semibold text-stone-400 uppercase tracking-wider">{w.grade}학년 대표</p>
+                                    <div className="flex justify-between items-center font-black mt-0.5">
+                                      <span className="text-stone-850">{w.department}</span>
+                                      <span className="text-rose-600 font-mono font-black">+{w.value}타</span>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-stone-400 text-xs text-center py-10 font-bold">지정 가능한 시상 연월이 존재하지 않습니다.</p>
+                      )}
                     </div>
-                  </div>
 
                   {/* 👑 2. Cumulative Final Awards Block */}
                   <div className="bg-white rounded-3xl border border-amber-100 p-6 space-y-6 shadow-sm">
@@ -1258,7 +1438,8 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              )}
+              );
+            })()}
 
               {studentTab === 'my_stats' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in font-sans">
