@@ -660,11 +660,20 @@ function saveConsentGas(studentId, name, agreement) {
   if (idxAgreed === -1) idxAgreed = 2;
   
   var foundRowIndex = -1;
-  var searchId = String(studentId).trim();
   
+  function normalizeIdGasTemp(val) {
+    if (val === null || val === undefined) return '';
+    var s = String(val).trim().replace(/['"“”\s]/g, '');
+    if (s.indexOf('.0') !== -1 && s.endsWith('.0')) {
+      s = s.substring(0, s.length - 2);
+    }
+    return s;
+  }
+  
+  var searchId = normalizeIdGasTemp(studentId);
   for (var i = 1; i < values.length; i++) {
-    var curId = String(values[i][idxId]).trim().replace(/\s/g, '');
-    if (curId === searchId.replace(/\s/g, '')) {
+    var curId = normalizeIdGasTemp(values[i][idxId]);
+    if (curId && curId === searchId) {
       foundRowIndex = i + 1;
       break;
     }

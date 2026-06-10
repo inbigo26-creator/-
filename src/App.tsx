@@ -776,21 +776,31 @@ export default function App() {
 
       if (isRealSpreadsheet) {
         if (sheetRecord) {
-          hasConsented = sheetRecord.agreed;
-          console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트에 기록 발견됨 - 동의 여부(agreed): ${sheetRecord.agreed}`);
           if (sheetRecord.agreed) {
-            // Sync back to local storage
+            hasConsented = true;
+            console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트에 기록 발견됨 - 동의 여부(agreed): true`);
             localStorage.setItem('privacy_consent_' + normId, 'true');
           } else {
-            // Explicitly cleared or 'N' in sheet, so sync clear local storage as well!
-            localStorage.removeItem('privacy_consent_' + normId);
+            // Sheet has 'N' or explicitly cleared, but bypass minor Google CDN/API replication delay
+            if (localConsented) {
+              hasConsented = true;
+              console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트는 'N'이나 로컬 브라우저 동의 승인상태('true') 조건 충족으로 임시 허용 (복제 지연 방지)`);
+            } else {
+              hasConsented = false;
+              console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트에 미동의('N') 기록됨 -> 무조건 동의 팝업을 표시합니다.`);
+              localStorage.removeItem('privacy_consent_' + normId);
+            }
           }
         } else {
           // IMPORTANT: If they are NOT recorded in the sheet, it is their FIRST login (최초 로그인)!
-          // We MUST unconditionally display the consent popup, completely ignoring any old browser localStorage cache.
-          hasConsented = false;
-          console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 기록 없음 (최초 로그인) -> 무조건 동의 팝업을 표시합니다.`);
-          localStorage.removeItem('privacy_consent_' + normId);
+          if (localConsented) {
+            hasConsented = true;
+            console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트 기록은 없으나 로컬 동의 승인 상태 유지 -> 임시 승인`);
+          } else {
+            hasConsented = false;
+            console.log(`[통계 및 동의 디버그] 학번: ${normId}, 시트 기록 없음 (최초 로그인) -> 무조건 동의 팝업을 표시합니다.`);
+            localStorage.removeItem('privacy_consent_' + normId);
+          }
         }
       } else {
         // Fallback to localStorage only in demo/placeholder mode where no real spreadsheet exists

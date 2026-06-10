@@ -748,11 +748,26 @@ export async function saveConsentToSpreadsheet(
         ? `${cleanUrl}&action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent(agreementStatus)}&t=${Date.now()}`
         : `${cleanUrl}?action=saveConsent&studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}&agreement=${encodeURIComponent(agreementStatus)}&t=${Date.now()}`;
       
-      const res = await fetch(fetchUrl);
+      const res = await fetch(fetchUrl, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit'
+      });
       if (!res.ok) {
         throw new Error(`Apps Script API 응답 실패 (코드: ${res.status})`);
       }
-      const json = await res.json().catch(() => ({ success: true }));
+      
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = JSON.parse(text);
+      } catch (parseErr) {
+        if (text.includes('google-signin') || text.includes('Sign in') || text.includes('DOCTYPE html') || text.includes('login') || text.includes('service_login')) {
+          throw new Error('구글 앱스 스크립트 접근 권한이 올바르지 않습니다. 웹앱 배포 시 [액세스 권한이 있는 사용자(Who has access)]를 [모든 사용자(Anyone)]로 설정했는지 확인해 주세요. (스프레드시트 동의여부 수정을 위해 필수적입니다)');
+        }
+        throw new Error('앱스 스크립트 응답이 유효한 JSON 형식이 아닙니다. 웹앱 배포 상태를 재확인해 주세요.');
+      }
+
       if (json && json.success !== false) {
         console.log(`Privacy consent (${agreementStatus}) logged successfully via Apps Script web app API.`);
         return true;
@@ -912,6 +927,9 @@ export async function saveConsentToSpreadsheet(
 
   // If we reached here, and we had an error or were not able to save anywhere
   if (lastError) {
+    if (appsScriptUrl && appsScriptUrl.trim()) {
+      throw lastError;
+    }
     console.warn('[Offline Fallback] Google spreadsheets write failed, continuing with browser local storage fallback:', lastError.message || lastError);
     return true; // Return true as fallback so the student is not blocked from logging in or using the app
   }
