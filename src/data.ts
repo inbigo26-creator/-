@@ -226,10 +226,7 @@ export async function fetchSpreadsheetData(
         throw new Error(json.message || 'Apps Script 처리 중 오류가 발생했습니다.');
       }
     } catch (e: any) {
-      console.error('Apps Script Fetch Failed. Falling back to Google Sheets direct access.', e);
-      if (!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') {
-        throw new Error(`구글 앱스 스크립트(GAS) 연동 실패: ${e.message || e}`);
-      }
+      console.warn('Apps Script Fetch Failed. Falling back to Google Sheets direct access.', e);
     }
   }
 
@@ -612,7 +609,36 @@ export async function fetchSpreadsheetData(
 
   } catch (error: any) {
     console.error('Spreadsheet Load Error:', error);
-    throw error;
+    
+    // EMERGENCY FALLBACK: Check if we have ANY previously stored cache in localStorage (regardless of TTL)
+    try {
+      const dbCacheKey = `school_db_cache_${spreadsheetId}`;
+      const cachedStr = localStorage.getItem(dbCacheKey);
+      if (cachedStr) {
+        const cachedObj = JSON.parse(cachedStr);
+        console.warn('[Offline Fallback] 네트워크 오류 또는 권한 문제로 인해 보관된 이전 로컬 캐시 데이터를 성공적으로 불러왔습니다.');
+        cachedSpreadsheetAuth = cachedObj.auth || [];
+        cachedSpreadsheetEnglish = cachedObj.english || [];
+        cachedSpreadsheetKorean = cachedObj.korean || [];
+        cachedSpreadsheetLevels = cachedObj.levels || [];
+        cachedSpreadsheetPrivacy = cachedObj.privacy || [];
+        
+        return {
+          auth: cachedSpreadsheetAuth || [],
+          english: cachedSpreadsheetEnglish || [],
+          korean: cachedSpreadsheetKorean || [],
+          levels: cachedSpreadsheetLevels || [],
+          privacy: cachedSpreadsheetPrivacy || []
+        };
+      }
+    } catch (_) {}
+
+    // If no cache is found and we have no spreadsheet config, or direct fetch failed, throw a friendly explanation
+    if (!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') {
+      throw new Error(`구글 스프레드시트 연동 실패: ${error.message || error}. 스프레드시트 공유 권한 설정을 '링크가 있는 모든 사용자에게 뷰어'로 공개해 주시거나 Apps Script 설정을 다시 점검해 주세요.`);
+    }
+    
+    throw new Error(`구글 스프레드시트 [ID: ${spreadsheetId}] 로딩 실패: ${error.message || error}. 스프레드시트의 공유 권한을 '링크가 있는 모든 사용자(뷰어)'로 설정하거나 관리자 패널의 Apps Script URL을 재확인해주십시오.`);
   }
 }
 

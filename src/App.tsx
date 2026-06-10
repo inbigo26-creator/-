@@ -52,13 +52,21 @@ export default function App() {
 
   // Active configurations
   const [spreadsheetId, setSpreadsheetId] = useState(() => {
-    return localStorage.getItem('school_spreadsheet_id') || SCHOOL_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID;
+    const localVal = localStorage.getItem('school_spreadsheet_id');
+    if (localVal && localVal.trim() && localVal !== '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') {
+      return localVal;
+    }
+    return SCHOOL_SPREADSHEET_ID || DEFAULT_SPREADSHEET_ID;
   });
   const [googleToken, setGoogleToken] = useState<string | null>(() => {
     return localStorage.getItem('school_google_token') || null;
   });
   const [appsScriptUrl, setAppsScriptUrl] = useState<string | null>(() => {
-    return localStorage.getItem('school_apps_script_url') || SCHOOL_APPS_SCRIPT_URL || null;
+    const localVal = localStorage.getItem('school_apps_script_url');
+    if (localVal && localVal.trim()) {
+      return localVal;
+    }
+    return SCHOOL_APPS_SCRIPT_URL || null;
   });
 
   // State loaded databases
