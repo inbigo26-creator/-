@@ -102,13 +102,13 @@ export const TypingChart: React.FC<TypingChartProps> = ({
           {gradeAverage !== undefined && gradeAverage > 0 && (
             <span className="text-[10px] bg-indigo-50/75 text-indigo-700 border border-indigo-100/60 px-2.5 py-0.5 rounded-full font-sans font-bold flex items-center gap-1 shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>
-              학년 평균: {gradeAverage}타
+              학년: {gradeAverage}타
             </span>
           )}
           {schoolAverage !== undefined && schoolAverage > 0 && (
             <span className="text-[10px] bg-orange-50/75 text-orange-700 border border-orange-100/60 px-2.5 py-0.5 rounded-full font-sans font-bold flex items-center gap-1 shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
-              전체 평균: {schoolAverage}타
+              전체: {schoolAverage}타
             </span>
           )}
           <span className="text-xs text-slate-500 font-mono font-bold bg-slate-50/80 border border-slate-150 px-2 py-0.5 rounded-lg shrink-0">기록: {dataCount}회</span>
@@ -217,28 +217,48 @@ export const TypingChart: React.FC<TypingChartProps> = ({
               <g key={`point-${idx}`} className="group cursor-pointer">
                 {/* 학년 평균 도트 (내 점수보다 작게 표기) */}
                 {hasGradeAvg && (
-                  <circle 
-                    cx={p.x} 
-                    cy={yGrade} 
-                    r="3" 
-                    fill="#ffffff" 
-                    stroke="#818cf8" 
-                    strokeWidth="1.5"
-                    className="opacity-60 transition-opacity group-hover:opacity-100"
-                  />
+                  <g>
+                    <circle 
+                      cx={p.x} 
+                      cy={yGrade} 
+                      r="3" 
+                      fill="#ffffff" 
+                      stroke="#818cf8" 
+                      strokeWidth="1.5"
+                      className="opacity-60 transition-opacity group-hover:opacity-100"
+                    />
+                    <text 
+                      x={p.x} 
+                      y={yGrade - 7} 
+                      textAnchor="middle" 
+                      className="fill-indigo-400 font-mono text-[9px] font-bold opacity-60 group-hover:opacity-100 transition-opacity"
+                    >
+                      {gradeAverage}
+                    </text>
+                  </g>
                 )}
 
                 {/* 전체 평균 도트 (내 점수보다 작게 표기) */}
                 {hasSchoolAvg && (
-                  <circle 
-                    cx={p.x} 
-                    cy={ySchool} 
-                    r="3" 
-                    fill="#ffffff" 
-                    stroke="#fb923c" 
-                    strokeWidth="1.5"
-                    className="opacity-60 transition-opacity group-hover:opacity-100"
-                  />
+                  <g>
+                    <circle 
+                      cx={p.x} 
+                      cy={ySchool} 
+                      r="3" 
+                      fill="#ffffff" 
+                      stroke="#fb923c" 
+                      strokeWidth="1.5"
+                      className="opacity-60 transition-opacity group-hover:opacity-100"
+                    />
+                    <text 
+                      x={p.x} 
+                      y={ySchool + 13} 
+                      textAnchor="middle" 
+                      className="fill-orange-400 font-mono text-[9px] font-bold opacity-60 group-hover:opacity-100 transition-opacity"
+                    >
+                      {schoolAverage}
+                    </text>
+                  </g>
                 )}
 
                 {/* 노드 백그라운드 후광 효과 */}
