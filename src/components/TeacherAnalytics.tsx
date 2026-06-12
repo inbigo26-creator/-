@@ -79,7 +79,7 @@ export function TeacherAnalytics({
   onShowSettings,
   spreadsheetId
 }: TeacherAnalyticsProps) {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('achievement');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('integrated_stats');
   const [selectedMonth, setSelectedMonth] = useState<string>('6월');
 
   // Bottom student grid lookup filters
@@ -844,10 +844,22 @@ export function TeacherAnalytics({
       </div>
 
       {/* 🗂️ Interactive Responsive Dashboard Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-stone-200 pb-1">
+      <div className="flex flex-row overflow-x-auto flex-nowrap border-b border-stone-200 pb-1 scrollbar-none gap-1 sm:gap-2">
+        <button
+          onClick={() => setActiveTab('integrated_stats')}
+          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 shrink-0 cursor-pointer ${
+            activeTab === 'integrated_stats' 
+              ? 'border-indigo-600 text-indigo-600' 
+              : 'border-transparent text-stone-400 hover:text-stone-700'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          <span>전체 현황</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('achievement')}
-          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
+          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 shrink-0 cursor-pointer ${
             activeTab === 'achievement' 
               ? 'border-indigo-600 text-indigo-600' 
               : 'border-transparent text-stone-400 hover:text-stone-750'
@@ -859,7 +871,7 @@ export function TeacherAnalytics({
 
         <button
           onClick={() => setActiveTab('monthly_snacks')}
-          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
+          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 shrink-0 cursor-pointer ${
             activeTab === 'monthly_snacks' 
               ? 'border-indigo-600 text-indigo-600' 
               : 'border-transparent text-stone-400 hover:text-stone-700'
@@ -871,7 +883,7 @@ export function TeacherAnalytics({
 
         <button
           onClick={() => setActiveTab('final_awards')}
-          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
+          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 shrink-0 cursor-pointer ${
             activeTab === 'final_awards' 
               ? 'border-indigo-600 text-indigo-600' 
               : 'border-transparent text-stone-400 hover:text-stone-700'
@@ -883,7 +895,7 @@ export function TeacherAnalytics({
 
         <button
           onClick={() => setActiveTab('growth_trends')}
-          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
+          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 shrink-0 cursor-pointer ${
             activeTab === 'growth_trends' 
               ? 'border-indigo-600 text-indigo-600' 
               : 'border-transparent text-stone-400 hover:text-stone-700'
@@ -891,18 +903,6 @@ export function TeacherAnalytics({
         >
           <TrendingUp className="h-4 w-4" />
           <span>인비 챌린지 타자 성장 그래프</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('integrated_stats')}
-          className={`px-4 py-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
-            activeTab === 'integrated_stats' 
-              ? 'border-indigo-600 text-indigo-600' 
-              : 'border-transparent text-stone-400 hover:text-stone-700'
-          }`}
-        >
-          <Users className="h-4 w-4" />
-          <span>전체 현황</span>
         </button>
       </div>
 
