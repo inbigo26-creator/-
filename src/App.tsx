@@ -781,15 +781,11 @@ export default function App() {
             console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트에 기록 발견됨 - 동의 여부(agreed): true`);
             localStorage.setItem('privacy_consent_' + normId, 'true');
           } else {
-            // Sheet has 'N' or explicitly cleared, but bypass minor Google CDN/API replication delay
-            if (localConsented) {
-              hasConsented = true;
-              console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트는 'N'이나 로컬 브라우저 동의 승인상태('true') 조건 충족으로 임시 허용 (복제 지연 방지)`);
-            } else {
-              hasConsented = false;
-              console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트에 미동의('N') 기록됨 -> 무조건 동의 팝업을 표시합니다.`);
-              localStorage.removeItem('privacy_consent_' + normId);
-            }
+            // 스프레드시트에서 동의여부 상태가 Y가 아닌 경우 (예: 선생님이 시트에서 직접 N으로 강제 수정했거나 체크 해제한 경우)
+            // 브라우저의 로컬 캐시를 우회하지 않고, 무조건 시트의 기준(N)을 최우선 적용하여 동의 팝업이 다시 뜨도록 함!
+            hasConsented = false;
+            console.log(`[통계 및 동의 디버그] 학번: ${normId}, 구글 시트에 미동의('N' 또는 false)로 기록됨 -> 동의 팝업 강제 노출 및 로컬 캐시 삭제`);
+            localStorage.removeItem('privacy_consent_' + normId);
           }
         } else {
           // IMPORTANT: If they are NOT recorded in the sheet, it is their FIRST login (최초 로그인)!
