@@ -158,50 +158,30 @@ export const TypingChart: React.FC<TypingChartProps> = ({
 
           {/* 학년별 평균 기준선 */}
           {gradeAverage !== undefined && gradeAverage > 0 && (
-            <g className="transition-all">
-              <line 
-                x1={paddingLeft} 
-                y1={getY(gradeAverage)} 
-                x2={chartWidth - paddingRight} 
-                y2={getY(gradeAverage)} 
-                stroke="#6366f1" 
-                strokeWidth="1.2"
-                strokeDasharray="3 3"
-                className="opacity-60"
-              />
-              <text 
-                x={chartWidth - paddingRight - 6} 
-                y={getY(gradeAverage) - 5} 
-                textAnchor="end" 
-                className="fill-indigo-600 font-sans text-[9px] font-bold"
-              >
-                학년 평균 ({gradeAverage}타)
-              </text>
-            </g>
+            <line 
+              x1={paddingLeft} 
+              y1={getY(gradeAverage)} 
+              x2={chartWidth - paddingRight} 
+              y2={getY(gradeAverage)} 
+              stroke="#6366f1" 
+              strokeWidth="1"
+              strokeDasharray="3 3"
+              className="opacity-30"
+            />
           )}
 
           {/* 전체 평균 기준선 */}
           {schoolAverage !== undefined && schoolAverage > 0 && (
-            <g className="transition-all">
-              <line 
-                x1={paddingLeft} 
-                y1={getY(schoolAverage)} 
-                x2={chartWidth - paddingRight} 
-                y2={getY(schoolAverage)} 
-                stroke="#f97316" 
-                strokeWidth="1.2"
-                strokeDasharray="3 3"
-                className="opacity-60"
-              />
-              <text 
-                x={paddingLeft + 6} 
-                y={getY(schoolAverage) - 5} 
-                textAnchor="start" 
-                className="fill-orange-600 font-sans text-[9px] font-bold"
-              >
-                전체 평균 ({schoolAverage}타)
-              </text>
-            </g>
+            <line 
+              x1={paddingLeft} 
+              y1={getY(schoolAverage)} 
+              x2={chartWidth - paddingRight} 
+              y2={getY(schoolAverage)} 
+              stroke="#f97316" 
+              strokeWidth="1"
+              strokeDasharray="3 3"
+              className="opacity-30"
+            />
           )}
 
           {/* 2. 면적 그라데이션 채우기 */}
@@ -227,49 +207,82 @@ export const TypingChart: React.FC<TypingChartProps> = ({
           )}
 
           {/* 4. 노드별 데이터 서클 및 텍스트 핀 매핑 */}
-          {points.map((p, idx) => (
-            <g key={`point-${idx}`} className="group cursor-pointer">
-              {/* 노드 백그라운드 후광 효과 */}
-              <circle 
-                cx={p.x} 
-                cy={p.y} 
-                r="7" 
-                fill={strokeColor} 
-                className="opacity-0 group-hover:opacity-20 transition-all duration-200" 
-              />
-              
-              {/* 리얼 데이터 도트 */}
-              <circle 
-                cx={p.x} 
-                cy={p.y} 
-                r="4.5" 
-                fill="#ffffff" 
-                stroke={strokeColor} 
-                strokeWidth="2.5" 
-                className="transition-transform duration-200 hover:scale-125"
-              />
+          {points.map((p, idx) => {
+            const hasGradeAvg = gradeAverage !== undefined && gradeAverage > 0;
+            const hasSchoolAvg = schoolAverage !== undefined && schoolAverage > 0;
+            const yGrade = hasGradeAvg ? getY(gradeAverage) : 0;
+            const ySchool = hasSchoolAvg ? getY(schoolAverage) : 0;
 
-              {/* 각 포인트별 현재 속도 숫자 표시 */}
-              <text 
-                x={p.x} 
-                y={p.y - 12} 
-                textAnchor="middle" 
-                className="fill-gray-700 font-mono text-[11px] font-bold"
-              >
-                {p.speed}
-              </text>
+            return (
+              <g key={`point-${idx}`} className="group cursor-pointer">
+                {/* 학년 평균 도트 (내 점수보다 작게 표기) */}
+                {hasGradeAvg && (
+                  <circle 
+                    cx={p.x} 
+                    cy={yGrade} 
+                    r="3" 
+                    fill="#ffffff" 
+                    stroke="#818cf8" 
+                    strokeWidth="1.5"
+                    className="opacity-60 transition-opacity group-hover:opacity-100"
+                  />
+                )}
 
-              {/* X축 월 이름 표시 */}
-              <text 
-                x={p.x} 
-                y={paddingTop + graphHeight + 18} 
-                textAnchor="middle" 
-                className="fill-gray-400 font-sans text-[11px] font-medium"
-              >
-                {p.month}
-              </text>
-            </g>
-          ))}
+                {/* 전체 평균 도트 (내 점수보다 작게 표기) */}
+                {hasSchoolAvg && (
+                  <circle 
+                    cx={p.x} 
+                    cy={ySchool} 
+                    r="3" 
+                    fill="#ffffff" 
+                    stroke="#fb923c" 
+                    strokeWidth="1.5"
+                    className="opacity-60 transition-opacity group-hover:opacity-100"
+                  />
+                )}
+
+                {/* 노드 백그라운드 후광 효과 */}
+                <circle 
+                  cx={p.x} 
+                  cy={p.y} 
+                  r="7" 
+                  fill={strokeColor} 
+                  className="opacity-0 group-hover:opacity-20 transition-all duration-200" 
+                />
+                
+                {/* 리얼 데이터 도트 */}
+                <circle 
+                  cx={p.x} 
+                  cy={p.y} 
+                  r="4.5" 
+                  fill="#ffffff" 
+                  stroke={strokeColor} 
+                  strokeWidth="2.5" 
+                  className="transition-transform duration-200 hover:scale-125 font-bold"
+                />
+
+                {/* 각 포인트별 현재 속도 숫자 표시 */}
+                <text 
+                  x={p.x} 
+                  y={p.y - 12} 
+                  textAnchor="middle" 
+                  className="fill-gray-700 font-mono text-[11px] font-bold"
+                >
+                  {p.speed}
+                </text>
+
+                {/* X축 월 이름 표시 */}
+                <text 
+                  x={p.x} 
+                  y={paddingTop + graphHeight + 18} 
+                  textAnchor="middle" 
+                  className="fill-gray-400 font-sans text-[11px] font-medium"
+                >
+                  {p.month}
+                </text>
+              </g>
+            );
+          })}
 
           {/* 하단 바닥 기준축 그리기 */}
           <line 
