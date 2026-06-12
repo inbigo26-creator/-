@@ -1527,7 +1527,7 @@ export default function App() {
                       <span className="p-2 bg-amber-50 text-amber-600 rounded-xl text-lg">👑</span>
                       <div>
                         <h3 className="text-sm font-black text-slate-800 tracking-wide font-sans">
-                          최종 종합 (5월~10월) 명예의 전당
+                          명예의 전당 (5월~10월 누적 최종 선정) 
                         </h3>
                         <p className="text-[10px] text-stone-400 font-bold font-sans">
                           전 기간 중 각 학년별/부문별 최고 실적 및 최대 성장을 이루어낸 자랑스런 영광의 수상자입니다.

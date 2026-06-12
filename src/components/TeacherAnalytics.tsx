@@ -816,17 +816,17 @@ export function TeacherAnalytics({
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1 px-3 py-1 bg-indigo-50 border border-indigo-150 text-indigo-700 text-[10px] font-bold rounded-lg uppercase tracking-wider">
               <Award className="h-3.5 w-3.5 text-indigo-600 animate-bounce" />
-              인비고 타자 챌린지 원격 결과 통계 센터
+              인비고 타자 챌린지 통계 센터
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 text-[9.5px] font-bold rounded-lg font-mono">
-              실시간 데이터 연동 중 🔗
+              데이터 연동 중 🔗
             </span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-            교사용 종합 데이터 분석 대시보드
+            교사용 데이터 분석 대시보드
           </h2>
           <p className="text-xs text-stone-400 font-medium font-sans">
-            구글 스프레드시트와 직접 소통하여 학급 등급 달성률, 월별 명예의 전당 수상자(중복 제외), 종합 시상을 자동 연산합니다.
+            구글 스프레드시트와 연동되어 있으며 등급 달성률, 월간 MVP,  명예의 전당 대상자를 추출합니다.
           </p>
         </div>
 
@@ -838,7 +838,7 @@ export function TeacherAnalytics({
             className="px-4.5 py-2.5 rounded-2xl text-xs font-extrabold text-white bg-slate-800 hover:bg-slate-900 shadow-xs transition-colors flex items-center gap-2 cursor-pointer border border-slate-755"
           >
             <Settings className="h-4 w-4 text-slate-350" />
-            <span>수련 연동 설정</span>
+            <span>스프레드시트스 연동 설정</span>
           </button>
         </div>
       </div>
@@ -854,7 +854,7 @@ export function TeacherAnalytics({
           }`}
         >
           <BarChart2 className="h-4 w-4" />
-          <span>기본 분석 & 급수 수집</span>
+          <span>학생 타자 급수 취득 현황</span>
         </button>
 
         <button
@@ -866,7 +866,7 @@ export function TeacherAnalytics({
           }`}
         >
           <Calendar className="h-4 w-4" />
-          <span>월별 명예의 전당 (중복 배제)</span>
+          <span>월간 MVP</span>
         </button>
 
         <button
@@ -878,7 +878,7 @@ export function TeacherAnalytics({
           }`}
         >
           <Trophy className="h-4 w-4" />
-          <span>5~10월 누적 최종 시상</span>
+          <span>명예의 전당</span>
         </button>
 
         <button
@@ -902,7 +902,7 @@ export function TeacherAnalytics({
           }`}
         >
           <Users className="h-4 w-4" />
-          <span>학년·학과 통합 수련현황</span>
+          <span>전체 현황</span>
         </button>
       </div>
 
@@ -938,9 +938,9 @@ export function TeacherAnalytics({
                     <Users className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">전체 active 학생</p>
+                    <p className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">전체 학생</p>
                     <h4 className="text-xl font-black text-stone-900 tracking-tight font-mono mt-0.5">{aggregateStats.totalCount}명</h4>
-                    <p className="text-[9.5px] font-bold text-stone-400 mt-0.5">자격 인증 및 연동 추적</p>
+                    <p className="text-[9.5px] font-bold text-stone-400 mt-0.5">챌린지 참여 전체 학생</p>
                   </div>
                 </div>
 
@@ -949,7 +949,7 @@ export function TeacherAnalytics({
                     <CheckCircle className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">최종 인증 성공률</p>
+                    <p className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">3급 이상 인증 성공률</p>
                     <h4 className="text-xl font-black text-emerald-700 tracking-tight font-mono mt-0.5">{aggregateStats.certRate}%</h4>
                     <p className="text-[9.5px] font-bold text-stone-400 mt-0.5">{aggregateStats.certifiedCount}명 합격 / {aggregateStats.failCount}명 미달</p>
                   </div>
@@ -960,9 +960,9 @@ export function TeacherAnalytics({
                     <TrendingUp className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">평균 한글 속도</p>
+                    <p className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">평균 한글 타자 속도</p>
                     <h4 className="text-xl font-black text-amber-700 tracking-tight font-mono mt-0.5">{aggregateStats.avgKor}타</h4>
-                    <p className="text-[9.5px] font-bold text-stone-400 mt-0.5">전체 학생 가중치 평균속도</p>
+                    <p className="text-[9.5px] font-bold text-stone-400 mt-0.5">전체 학생의 한글 타자 평균 속도</p>
                   </div>
                 </div>
 
@@ -971,9 +971,9 @@ export function TeacherAnalytics({
                     <Flame className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">평균 영어 속도</p>
+                    <p className="text-[10px] text-stone-450 font-bold uppercase tracking-wider">평균 영어 타자 속도</p>
                     <h4 className="text-xl font-black text-violet-700 tracking-tight font-mono mt-0.5">{aggregateStats.avgEng}타</h4>
-                    <p className="text-[9.5px] font-bold text-stone-400 mt-0.5">전체 학생 가중치 평균속도</p>
+                    <p className="text-[9.5px] font-bold text-stone-400 mt-0.5">전체 학생의 영어 타자 평균 속도</p>
                   </div>
                 </div>
 
@@ -987,17 +987,17 @@ export function TeacherAnalytics({
                   <div className="pb-2 border-b border-stone-100 flex justify-between items-center">
                     <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5">
                       <AlertCircle className="h-4 w-4 text-rose-500 animate-pulse" />
-                      인증서 미달성 요인 추이 분석 (Bottleneck)
+                      급수 미달 요인 분석 
                     </h4>
-                    <span className="text-[10px] font-bold text-rose-650 bg-rose-50 px-2 py-0.5 rounded-lg">미달성자 {aggregateStats.bottleneck.totalFails}명 정밀 진단</span>
+                    <span className="text-[10px] font-bold text-rose-650 bg-rose-50 px-2 py-0.5 rounded-lg">미달성자 {aggregateStats.bottleneck.totalFails}명 분석</span>
                   </div>
 
                   {aggregateStats.bottleneck.totalFails === 0 ? (
                     <div className="text-center py-10 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-6">
                       <Flame className="h-8 w-8 text-emerald-600 mx-auto mb-2 animate-bounce" />
-                      <h4 className="text-xs font-black text-emerald-800">훈련 낙제생 전원 극복!</h4>
+                      <h4 className="text-xs font-black text-emerald-800">전체 학생 급수 획득!</h4>
                       <p className="text-[11.5px] text-emerald-600 mt-1 leading-relaxed">
-                        현재 전체 활성 학생이 한문 및 영문 자격 인증인 최저 3급 수준을 동시 만족하고 있습니다.
+                        현재 전체 학생이 한글 및 영어 타자 자격 인증 최저인 3급 이상을 동시에 달성하였습니다!
                       </p>
                     </div>
                   ) : (
@@ -1007,17 +1007,17 @@ export function TeacherAnalytics({
                       <div className="p-3.5 bg-stone-50 border border-stone-200/80 rounded-xl text-xs space-y-1">
                         <span className="font-extrabold text-stone-850 flex items-center gap-1.5">
                           <Lightbulb className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                          훈련 교사 보고용 분석 리포트
+                          분석 리포트
                         </span>
                         <p className="text-[11.1px] text-stone-600 font-medium leading-relaxed">
                           {(() => {
                             const b = aggregateStats.bottleneck;
                             if (b.engRate > b.korRate && b.engRate > b.bothRate) {
-                              return `인비고 미달성 학생의 무려 ${b.engRate}%가 '영어 타수 부족'으로 인해 인증서를 입수하지 못하고 있습니다. 영어 단어 및 문장 타자 훈련 기회를 30% 늘릴 유도가 필요합니다.`;
+                              return `인비고 미달성 학생의 ${b.engRate}%가 '영어 타자 실력 부족'으로 인해 급수를 취득하지 못하고 있습니다. 영어 타자 연습에 조금 더 힘써주세요!`;
                             } else if (b.korRate > b.engRate && b.korRate > b.bothRate) {
-                              return `인비고 미달성 학생의 ${b.korRate}%가 '한글 타수 미충족'이 병목이며, 한자 및 장문 타이핑 정석 운지법 보충이 지목됩니다.`;
+                              return `인비고 미달성 학생의 ${b.korRate}%가 '한글 타자 실력 부족'으로 인해 급수를 취득하지 못하고 있습니다. 영어 타자 연습에 조금 더 힘써주세요!`;
                             } else {
-                              return `다수의 학생(${b.bothRate}%)이 한글과 영어 타자 모두에서 최저 수련 등급(100/150타)을 도달하지 못해, 포괄적 기초 타자 집중 훈련이 요청됩니다.`;
+                              return `다수의 학생(${b.bothRate}%)이 한글과 영어 타자 모두에서 최저 등급(100/150타)을 도달하지 못해, 한글/영어 모두 집중 훈련이 필요합니다.`;
                             }
                           })()}
                         </p>
@@ -1029,7 +1029,7 @@ export function TeacherAnalytics({
                         {/* English fail bottle */}
                         <div className="space-y-1">
                           <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                            <span>영어 타수만 미달 (영어 병목형)</span>
+                            <span>영어 타자만 미달</span>
                             <span className="font-mono text-rose-600">{aggregateStats.bottleneck.engRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.engCount}명)</span></span>
                           </div>
                           <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
@@ -1041,7 +1041,7 @@ export function TeacherAnalytics({
                         {/* Korean fail bottle */}
                         <div className="space-y-1">
                           <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                            <span>한글 타수만 미달 (한글 병목형)</span>
+                            <span>한글 타자만 미달</span>
                             <span className="font-mono text-rose-600">{aggregateStats.bottleneck.korRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.korCount}명)</span></span>
                           </div>
                           <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
@@ -1053,7 +1053,7 @@ export function TeacherAnalytics({
                         {/* Both fail bottle */}
                         <div className="space-y-1">
                           <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                            <span>한글/영어 모두 미달 (복합 누적 요인)</span>
+                            <span>한글/영어 타자 모두 미달</span>
                             <span className="font-mono text-rose-600">{aggregateStats.bottleneck.bothRate}% <span className="text-stone-400 font-normal">({aggregateStats.bottleneck.bothCount}명)</span></span>
                           </div>
                           <div className="h-3.5 w-full bg-stone-100 rounded-full overflow-hidden">
@@ -1072,7 +1072,7 @@ export function TeacherAnalytics({
                 <div className="bg-white rounded-2xl border border-stone-200/60 p-6 space-y-4 shadow-2xs flex flex-col justify-between">
                   <div className="space-y-4">
                     <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase pb-2 border-b border-stone-100">
-                      인비 챌린지 최종 자격급수 보유 통계
+                      인비 챌린지 자격 급수 보유 통계
                     </h4>
                     <div className="grid grid-cols-2 gap-3 text-center">
                       <div className="p-4 bg-rose-50 border border-slate-100 rounded-2xl animate-fade-in">
@@ -1095,7 +1095,7 @@ export function TeacherAnalytics({
                   </div>
 
                   <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl text-[11px] text-indigo-850 font-medium leading-relaxed font-sans mt-4">
-                    💡 <strong>인증 달성 팁:</strong> 학생들의 한글 타수와 영어 타수 모두가 자격 기준을 통과해야 인증서가 정상 발급됩니다. 미달 요인 학생들을 파악하여 지도해 보세요.
+                    💡 <strong>인증 달성 팁:</strong> 학생들의 한글 타자와 영어 타자 모두가 자격 기준을 통과해야 타자 급수를 취득합니다. 
                   </div>
                 </div>
 
@@ -1109,9 +1109,9 @@ export function TeacherAnalytics({
                   <div className="space-y-1">
                     <h4 className="text-[13px] font-black text-stone-900 tracking-wider uppercase flex items-center gap-1.5 font-sans">
                       <UserCheck className="h-4 w-4 text-indigo-600" />
-                      전교(학년/학과) 학생 타자 급수 명단
+                      전교(학년/학과) 학생 타자 기록 및 급수 취득 현황
                     </h4>
-                    <p className="text-[11px] text-stone-400 font-sans">전체 학생의 한글/영어 누적 최고 성적 대조서입니다.</p>
+                    <p className="text-[11px] text-stone-400 font-sans">전체 학생의 한글/영어 타자의 최고 성적 결과입니다.</p>
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-[10px] text-stone-400 font-bold block">조건 필터링 결과</span>
@@ -1203,7 +1203,7 @@ export function TeacherAnalytics({
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="학생 이름 또는 학번 검색..."
+                          placeholder="이름 또는 학번 검색"
                           className="w-full pl-8 pr-3 py-1.5 text-xs border border-stone-200 rounded-lg bg-white placeholder-stone-400 text-stone-700 focus:outline-none focus:border-indigo-500 font-bold font-sans"
                         />
                       </div>
@@ -1230,7 +1230,7 @@ export function TeacherAnalytics({
                       {filteredStudents.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="py-12 text-center text-stone-400 font-semibold">
-                            지정한 조건 조회의 필터 결과와 부합하는 학생이 없습니다.
+                            조건에 맞는 학생이 없습니다.
                           </td>
                         </tr>
                       ) : (
@@ -1239,7 +1239,7 @@ export function TeacherAnalytics({
                           if (s.finalPoints === 3) displayFinal = '🥇 타자 1급';
                           else if (s.finalPoints === 2) displayFinal = '🥈 타자 2급';
                           else if (s.finalPoints === 1) displayFinal = '🥉 타자 3급';
-                          else displayFinal = '급수 없음 (연습 중)';
+                          else displayFinal = '타자 꿈나무';
 
                           return (
                             <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
@@ -1309,12 +1309,12 @@ export function TeacherAnalytics({
               <div className="bg-amber-50/50 border border-amber-200/65 rounded-2xl p-5 space-y-2 text-xs">
                 <span className="font-black text-amber-850 flex items-center gap-1.5 uppercase">
                   <Star className="h-4 w-4 text-amber-600 animate-spin" />
-                  ★ 중복 수령 방지 및 이월 이력 시스템 연동 로직
+                  ★ 월간 MVP 선정 방식
                 </span>
                 <p className="text-[11.2px] text-amber-800 font-medium leading-relaxed">
-                  매달 시상 시 <strong>이미 이전 달에 한 번이라도 명예의 전당 수상자에 선정된 학생은 순위권에서 제외</strong>됩니다. 
-                  보상은 다음 순위 학생(4위, 5위...)에게 돌아갑니다. 
-                  아래에서 월(5월~10월)을 누르시면 해당 월의 <strong>명예의 전당 선정 학생 6명</strong> 및 사유와 제외된 후보 명단을 확인하실 수 있습니다.
+                  월간 MVP는 <strong>이전 달에 한 번이라도 수상한 경우는 순위권에서 제외</strong>됩니다. 
+                  이전 달에 월간 MVP에 수상한 학생이 1위인 경우, MVP는 다음 순위 학생에게 돌아갑니다. 
+                  아래에서 월(5월~10월)을 누르시면 해당 월의 <strong>MVP 선정 학생 6명</strong> 및 제외 학생(사유 포함)의 명단을 확인하실 수 있습니다.
                 </p>
               </div>
 
@@ -1330,7 +1330,7 @@ export function TeacherAnalytics({
                         : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 bg-white border border-stone-200/50'
                     }`}
                   >
-                    {m} 시상보상 {idx === 0 && '(선배정)'}
+                    {m}  MVP{idx === 0 && '(선배정)'}
                   </button>
                 ))}
               </div>
@@ -1351,7 +1351,7 @@ export function TeacherAnalytics({
                       <div className="flex justify-between items-center pb-2 border-b border-indigo-50">
                         <h4 className="text-sm font-black text-indigo-950 flex items-center gap-2">
                           <Award className="h-5 w-5 text-indigo-600" />
-                          🏆 {selectedMonth} 월별 명예의 전당 시상자 및 수혜 명단
+                          🏆 {selectedMonth} MVP
                         </h4>
                         <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100">
                           중복 수혜 비대상 제외 처리 완료
@@ -1370,7 +1370,7 @@ export function TeacherAnalytics({
                             <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                               <h4 className="text-xs font-black text-rose-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                                 <Star className="h-4 w-4" />
-                                한글 타자 최고 타수 (기관리용 3명)
+                                한글 타자 최고 속도 MVP (각 학년 1명)
                               </h4>
                               
                               <div className="space-y-2.5">
@@ -1388,7 +1388,7 @@ export function TeacherAnalytics({
                                           <p className="text-[10px] text-stone-400">{w.grade}학년 {w.department} ({w.studentId})</p>
                                         </div>
                                       </div>
-                                      <span className="font-mono text-sm text-rose-700 font-extrabold">{w.value}타 최고</span>
+                                      <span className="font-mono text-sm text-rose-700 font-extrabold">{w.value}타</span>
                                     </div>
                                   ))
                                 )}
@@ -1399,7 +1399,7 @@ export function TeacherAnalytics({
                             <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                               <h4 className="text-xs font-black text-indigo-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                                 <Star className="h-4 w-4" />
-                                영어 타자 최고 타수 (기관리용 3명)
+                                영어 타자 최고 속도 MVP (각 학년 1명)
                               </h4>
                               
                               <div className="space-y-2.5">
@@ -1417,7 +1417,7 @@ export function TeacherAnalytics({
                                           <p className="text-[10px] text-stone-400">{w.grade}학년 {w.department} ({w.studentId})</p>
                                         </div>
                                       </div>
-                                      <span className="font-mono text-sm text-indigo-700 font-extrabold">{w.value}타 최고</span>
+                                      <span className="font-mono text-sm text-indigo-700 font-extrabold">{w.value}타</span>
                                     </div>
                                   ))
                                 )}
@@ -1433,7 +1433,7 @@ export function TeacherAnalytics({
                             <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                               <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                                 <TrendingUp className="h-4 w-4" />
-                                한글 타자 최고 향상 (기관리용 3명)
+                                한글 타자 최고 향상 MVP (각 학년 1명)
                               </h4>
                               
                               <div className="space-y-2.5">
@@ -1465,7 +1465,7 @@ export function TeacherAnalytics({
                             <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                               <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                                 <TrendingUp className="h-4 w-4" />
-                                영어 타자 최고 향상 (기관리용 3명)
+                                영어 타자 최고 향상 MVP (각 학년 1명)
                               </h4>
                               
                               <div className="space-y-2.5">
@@ -1505,8 +1505,8 @@ export function TeacherAnalytics({
                       {/* Pool 1: Korean Speed Top 5 */}
                     <div className="bg-white rounded-2xl border border-stone-200/60 p-5 space-y-3.5 shadow-2xs">
                       <h4 className="text-xs font-black text-stone-850 border-b pb-2 flex justify-between items-center">
-                        <span>한글 최고속도 부문 후보 풀 (Top 5)</span>
-                        <span className="text-[10px] text-slate-400 font-semibold">원시 기록</span>
+                        <span>한글 최고 속도 부문 후보 (Top 5)</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">최고 속도</span>
                       </h4>
                       <div className="space-y-2">
                         {monthlyDataHistory[selectedMonth].rawCandidates.korSpeed.slice(0, 5).map((c, idx) => {
@@ -1533,8 +1533,8 @@ export function TeacherAnalytics({
                     {/* Pool 2: English Speed Top 5 */}
                     <div className="bg-white rounded-2xl border border-stone-200/60 p-5 space-y-3.5 shadow-2xs">
                       <h4 className="text-xs font-black text-stone-850 border-b pb-2 flex justify-between items-center">
-                        <span>영어 최고속도 부문 후보 풀 (Top 5)</span>
-                        <span className="text-[10px] text-slate-400 font-semibold">원시 기록</span>
+                        <span>영어 최고 속도 부문 후보 (Top 5)</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">최고 속도</span>
                       </h4>
                       <div className="space-y-2">
                         {monthlyDataHistory[selectedMonth].rawCandidates.engSpeed.slice(0, 5).map((c, idx) => {
@@ -1561,13 +1561,13 @@ export function TeacherAnalytics({
                     {/* Pool 3: Korean Growth Top 5 */}
                     <div className="bg-white rounded-2xl border border-stone-200/60 p-5 space-y-3.5 shadow-2xs">
                       <h4 className="text-xs font-black text-stone-850 border-b pb-2 flex justify-between items-center">
-                        <span>한글 향상도(성장도) 후보 풀 (Top 5)</span>
+                        <span>한글 타자 최고 향상 후보 (Top 5)</span>
                         <span className="text-[9.2px] text-stone-450 font-bold">당월 - 전월</span>
                       </h4>
                       <div className="space-y-2">
                         {selectedMonth === '5월' ? (
                           <p className="text-center text-xs text-stone-400 py-6 leading-relaxed">
-                            성장(향상)도는 6월부터 측정이 가능한 수치입니다.<br/>5월은 첫 기준점 설정 달입니다.
+                            향상도는 6월부터 시상이 가능합니다.<br/>(5월은 대상자 없음)
                           </p>
                         ) : (
                           monthlyDataHistory[selectedMonth].rawCandidates.korGrowth.slice(0, 5).map((c, idx) => {
@@ -1595,13 +1595,13 @@ export function TeacherAnalytics({
                     {/* Pool 4: English Growth Top 5 */}
                     <div className="bg-white rounded-2xl border border-stone-200/60 p-5 space-y-3.5 shadow-2xs">
                       <h4 className="text-xs font-black text-stone-850 border-b pb-2 flex justify-between items-center">
-                        <span>영어 향상도(성장도) 후보 풀 (Top 5)</span>
+                        <span>영어 타자 최고 향상 후보 (Top 5)</span>
                         <span className="text-[9.2px] text-stone-450 font-bold">당월 - 전월</span>
                       </h4>
                       <div className="space-y-2">
                         {selectedMonth === '5월' ? (
                           <p className="text-center text-xs text-stone-400 py-6 leading-relaxed">
-                            성장(향상)도는 6월부터 측정이 가능한 수치입니다.<br/>5월은 첫 기준점 설정 달입니다.
+                            향상도는 6월부터 시상이 가능합니다.<br/>(5월은 대상자 없음)
                           </p>
                         ) : (
                           monthlyDataHistory[selectedMonth].rawCandidates.engGrowth.slice(0, 5).map((c, idx) => {
@@ -1644,11 +1644,11 @@ export function TeacherAnalytics({
                 <div className="space-y-1">
                   <span className="text-amber-400 text-xs font-black uppercase tracking-widest flex items-center gap-1">
                     <Trophy className="h-4 w-4 animate-bounce" />
-                    2026학년도 타자 챌린지 5월 ~ 10월 최종 종합 명예의 전당
+                    2026학년도 타자 챌린지 (5월~10월)
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-black tracking-tight">수련 기간 종합 누적 우승자 시상 보상 체계</h3>
+                  <h3 className="text-xl sm:text-2xl font-black tracking-tight">명예의 전당</h3>
                   <p className="text-slate-300 text-xs max-w-2xl leading-relaxed font-medium">
-                    본 시상은 월별 간식 수여 블랙리스트 필터링 제하와 무관하게, 한 학기 동안의 모든 수련 이력을 통합해 오직 순수 성적과 순수 격차 향상도만으로 최종 12명의 선봉 레이서를 선발합니다.
+                    2026학년도 타자 챌린지 각 분야 최고 학생을 선발합니다.
                   </p>
                 </div>
               </div>
@@ -1663,7 +1663,7 @@ export function TeacherAnalytics({
                   <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-rose-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                       <Star className="h-4 w-4" />
-                      한글 타자 최고 타수 (최종 3명)
+                      한글 타자 최고 속도 (각 학년 1명)
                     </h4>
 
                     <div className="space-y-2.5">
@@ -1678,7 +1678,7 @@ export function TeacherAnalytics({
                               <p className="text-[10px] text-stone-400">{s.grade}학년 {s.department}</p>
                             </div>
                           </div>
-                          <span className="font-mono text-sm text-rose-700 font-extrabold">{s.value}타 최고</span>
+                          <span className="font-mono text-sm text-rose-700 font-extrabold">{s.value}타</span>
                         </div>
                       ))}
                     </div>
@@ -1688,7 +1688,7 @@ export function TeacherAnalytics({
                   <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-indigo-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                       <Star className="h-4 w-4" />
-                      영어 타자 최고 타수 (최종 3명)
+                      영어 타자 최고 속도 (각 학년 1명)
                     </h4>
 
                     <div className="space-y-2.5">
@@ -1703,7 +1703,7 @@ export function TeacherAnalytics({
                               <p className="text-[10px] text-stone-400">{s.grade}학년 {s.department}</p>
                             </div>
                           </div>
-                          <span className="font-mono text-sm text-indigo-700 font-extrabold">{s.value}타 최고</span>
+                          <span className="font-mono text-sm text-indigo-700 font-extrabold">{s.value}타</span>
                         </div>
                       ))}
                     </div>
@@ -1718,12 +1718,12 @@ export function TeacherAnalytics({
                   <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                       <TrendingUp className="h-4 w-4" />
-                      한글 타자 최고 향상 (최종 3명)
+                      한글 타자 최고 향상 (각 학년 1명)
                     </h4>
 
                     <div className="space-y-2.5">
                       {cumulativeFinalAwards.korGrowth.length === 0 ? (
-                        <p className="text-center text-xs text-stone-400 py-8 leading-normal">성장 기록 측정을 위한 2회차 이상의<br/>기록 입력 축적이 필요합니다.</p>
+                        <p className="text-center text-xs text-stone-400 py-8 leading-normal">6월부터 제공 가능합니다.</p>
                       ) : (
                         cumulativeFinalAwards.korGrowth.map((s, idx) => (
                           <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex-row text-xs">
@@ -1750,12 +1750,12 @@ export function TeacherAnalytics({
                   <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
                     <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                       <TrendingUp className="h-4 w-4" />
-                      영어 타자 최고 향상 (최종 3명)
+                      영어 타자 최고 향상 (각 학년 1명)
                     </h4>
 
                     <div className="space-y-2.5">
                       {cumulativeFinalAwards.engGrowth.length === 0 ? (
-                        <p className="text-center text-xs text-stone-400 py-8 leading-normal">성장 기록 측정을 위한 2회차 이상의<br/>기록 입력 축적이 필요합니다.</p>
+                        <p className="text-center text-xs text-stone-400 py-8 leading-normal">6월부터 제공 가능합니다.</p>
                       ) : (
                         cumulativeFinalAwards.engGrowth.map((s, idx) => (
                           <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/40 border border-emerald-100 flex-row text-xs">
@@ -1791,9 +1791,9 @@ export function TeacherAnalytics({
               <div className="flex justify-between items-center pb-2 border-b">
                 <div>
                   <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase font-sans">
-                    학기 수련 타자 프로그램 도입 전교생 효과 분석 흐름
+                    인비 타자 챌린지 전교생 효과 분석
                   </h4>
-                  <p className="text-[10px] text-stone-400 font-medium font-sans">5월 기준 우상향 선 차트 및 각 월별 실제 수련 실적 바 차트 연계</p>
+                  <p className="text-[10px] text-stone-400 font-medium font-sans">학생들의 성장을 그래프 흐름으로 활인할 수 있십니다.</p>
                 </div>
                 <span className="inline-flex items-center gap-1 bg-emerald-55 text-emerald-700 text-[9px] border px-2.5 py-1 rounded-lg font-black font-sans">
                   인비 챌린지 검정 효과 분석 입증용 🚀
@@ -1803,7 +1803,7 @@ export function TeacherAnalytics({
               {/* Graphical Plot container */}
               {growthTrendsTimeline.length < 2 ? (
                 <div className="text-center py-16 text-stone-400 text-xs font-sans">
-                  최소 2개 이상의 월별 훈련 기록이 입력되면 성장 우상향 곡선이 즉각 표기됩니다.
+                  6월부터 제공 가능합니다.
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -2051,12 +2051,12 @@ export function TeacherAnalytics({
                   <div className="flex justify-between items-center pb-3 border-b border-stone-100">
                     <div>
                       <h4 className="text-sm font-black text-stone-900 tracking-wider uppercase">
-                        학년·학과 통합 수련 현황 (랭킹 및 누적 통계)
+                        학년·학과 전체 현황
                       </h4>
-                      <p className="text-[10.5px] text-stone-400 font-medium">학년·학과별 최고 타수 기준 평균 랭킹 및 5월~10월 월별 실시간 평균 수집 현황을 모니터링합니다.</p>
+                      <p className="text-[10.5px] text-stone-400 font-medium">학년·학과별 평균 현황 및 랭킹을 모니터링합니다.</p>
                     </div>
                     <div className="shrink-0 text-right bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-xl font-sans text-[10px] text-purple-755 font-bold">
-                      <span>2026 전체 통합 통계</span>
+                      <span>2026 타자 챌린지 통계</span>
                     </div>
                   </div>
 
@@ -2064,10 +2064,10 @@ export function TeacherAnalytics({
                   <div className="bg-amber-50/50 border border-amber-200/65 rounded-2xl p-5 space-y-2 text-xs">
                     <span className="font-black text-amber-850 flex items-center gap-1.5 uppercase font-sans">
                       <Trophy className="h-4 w-4 text-amber-600 animate-bounce" />
-                      ★ 학급별 평균 수련 랭킹 정렬 안내 (개별 최고타수 기준)
+                      ★ 학급별 평균 랭킹 
                     </span>
                     <p className="text-[11.2px] text-amber-800 font-medium leading-relaxed font-sans">
-                      각 학생의 <strong>전체 기간 최고 타수</strong>를 기준으로 산출한 반별 평균속도 랭킹입니다. 한글(150타 이상), 영어(100타 이상) 급수 취득 비율이 개별 표시되며 재적 인원만 정밀 산정됩니다.
+                      각 학생의 <strong>전체 기간 최고 타수</strong>를 기준으로 계산한 반별 평균 랭킹입니다. 한글(150타 이상), 영어(100타 이상) 급수 취득 비율이 개별 표시되며 실제 참여 대상만 포함되어 있습니다.
                     </p>
                   </div>
 
@@ -2183,7 +2183,7 @@ export function TeacherAnalytics({
                       <div className="flex items-center gap-2 border-b border-purple-100/50 pb-2">
                         <span className="w-2.5 h-2.5 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-full animate-pulse" />
                         <h5 className="text-xs font-black text-stone-850 tracking-wider flex items-center gap-1">
-                          한글 타수 현황판 <span className="text-[10px] text-purple-600 font-bold font-mono">(Korean Typing Speed)</span>
+                          한글 타수 평균 현황판 <span className="text-[10px] text-purple-600 font-bold font-mono">(Korean Typing Speed)</span>
                         </h5>
                       </div>
                       
@@ -2256,7 +2256,7 @@ export function TeacherAnalytics({
                       <div className="flex items-center gap-2 border-b border-stone-200 pb-2">
                         <span className="w-2.5 h-2.5 bg-gradient-to-tr from-indigo-600 to-sky-500 rounded-full animate-pulse" />
                         <h5 className="text-xs font-black text-stone-850 tracking-wider flex items-center gap-1">
-                          영어 타수 현황판 <span className="text-[10px] text-indigo-600 font-bold font-mono">(English Typing Speed)</span>
+                          영어 타수 평균 현황판 <span className="text-[10px] text-indigo-600 font-bold font-mono">(English Typing Speed)</span>
                         </h5>
                       </div>
                       
