@@ -577,7 +577,7 @@ export default function App() {
         totalEng: data.english.length,
         totalKor: data.korean.length
       });
-      setSyncMessage('스프레드시트 최신 정보(인증번호 1234 등) 실시간 연동 완료!');
+      setSyncMessage('스프레드시트 최신 정보 연동 완료!');
       setTimeout(() => setSyncMessage(null), 5000);
     } catch (err: any) {
       console.error(err);
@@ -738,7 +738,7 @@ export default function App() {
       }
 
       if (!currentAuth) {
-        setAuthError('입력하신 학번 또는 인증번호가 일치하지 않습니다. 다시 확인해 드립니다.');
+        setAuthError('입력하신 학번 또는 생년월일이 일치하지 않습니다. 다시 확인해 주세요.');
         setIsAuthenticating(false);
         return;
       }
@@ -844,7 +844,7 @@ export default function App() {
 
     } catch (err: any) {
       console.error('Computation/fetching error during login:', err);
-      setAuthError('통합 타자 계산 및 스프레드시트 연동 중 오류가 발생하였습니다: ' + (err.message || err));
+      setAuthError('통합 스프레드시트 연동 중 오류가 발생하였습니다: ' + (err.message || err));
     } finally {
       setIsAuthenticating(false);
     }
@@ -1191,7 +1191,7 @@ export default function App() {
                       className="w-full bg-linear-to-r from-emerald-600 to-green-600 text-white font-extrabold py-3.5 px-4 rounded-2xl hover:brightness-105 active:scale-[0.99] transition-all text-sm cursor-pointer shadow-lg shadow-emerald-100/50 flex items-center justify-center gap-1.5"
                     >
                       <LogIn className="h-4.5 w-4.5" />
-                      {isAuthenticating ? '인증 매칭 연동 중...' : '내 기록 확인하기'}
+                      {isAuthenticating ? '시간이 조금 걸릴 수 있습니다...' : '내 기록 확인하기'}
                     </button>
                   </form>
 
@@ -1250,7 +1250,7 @@ export default function App() {
                       className="px-4.5 py-2.5 text-[11px] font-black text-slate-600 hover:text-indigo-700 bg-stone-55 hover:bg-indigo-50 border border-slate-200 rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs w-full"
                     >
                       <Lock className="h-4 w-4 text-slate-500" />
-                      선생님 로그인 (결과 통계 확인)
+                      선생님 로그인 (통계 확인)
                     </button>
                   </div>
                 </div>
@@ -1280,7 +1280,7 @@ export default function App() {
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight font-sans">
                     <span className="text-emerald-700">{studentSession.name}</span> 학생의 성장 기록
                   </h2>
-                  <p className="text-xs text-stone-400 font-medium tracking-tight font-sans">로그인 학번 : {studentSession.id} / 원격 데이터 동기화 완료</p>
+                  <p className="text-xs text-stone-400 font-medium tracking-tight font-sans">로그인 학번 : {studentSession.id} / 데이터 동기화 완료</p>
                 </div>
 
                 <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4 md:max-w-xs flex items-start gap-3 shadow-2xs font-sans">
@@ -1350,10 +1350,10 @@ export default function App() {
                           <span className="p-2 bg-rose-50 text-rose-600 rounded-xl text-lg">🏆</span>
                           <div>
                             <h3 className="text-sm font-black text-slate-800 tracking-wide font-sans">
-                              월별 명예의 전당 (5월~10월)
+                              월간 MVP (5월~10월)
                             </h3>
                             <p className="text-[10px] text-stone-400 font-bold font-sans">
-                              [안내] 월별 명예의 전당 선정자는 이후 대상에서 제외됩니다. (이름 비공개)
+                              [안내] 월간 MVP 선정은 최초 1회만, 다음달 기회는 다른 학생들에게 돌아갑니다.
                             </p>
                           </div>
                         </div>
