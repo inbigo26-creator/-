@@ -1112,7 +1112,9 @@ export default function App() {
         </header>
 
         {/* Content Viewport */}
-        <main className="flex-1 bg-stone-50 p-4 sm:p-8 flex flex-col justify-center items-center min-w-0">
+        <main className={`flex-1 bg-stone-50 p-4 sm:p-8 flex flex-col items-center min-w-0 ${
+          (studentSession || isTeacher) && !isInitialLoading ? 'justify-start' : 'justify-center'
+        }`}>
 
           {/* 1. INITIAL LOADING BANNER */}
           {isInitialLoading && (

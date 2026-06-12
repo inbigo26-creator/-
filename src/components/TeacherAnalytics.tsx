@@ -866,7 +866,7 @@ export function TeacherAnalytics({
           }`}
         >
           <BarChart2 className="h-4 w-4" />
-          <span>학생 타자 급수 취득 현황</span>
+          <span>급수 취득 현황</span>
         </button>
 
         <button
