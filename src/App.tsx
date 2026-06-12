@@ -1690,6 +1690,8 @@ export default function App() {
                     <TypingChart 
                       history={studentSession.koreanStats.history} 
                       type="korean" 
+                      gradeAverage={statsAverages.korean.gradeAverage[studentSession.grade || '1']}
+                      schoolAverage={statsAverages.korean.schoolAverage}
                     />
                   </div>
 
@@ -1706,6 +1708,8 @@ export default function App() {
                     <TypingChart 
                       history={studentSession.englishStats.history} 
                       type="english" 
+                      gradeAverage={statsAverages.english.gradeAverage[studentSession.grade || '1']}
+                      schoolAverage={statsAverages.english.schoolAverage}
                     />
                   </div>
                 </div>

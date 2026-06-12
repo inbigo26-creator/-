@@ -9,9 +9,16 @@ import { TypingRecord } from '../types';
 interface TypingChartProps {
   history: TypingRecord[];
   type: 'english' | 'korean';
+  gradeAverage?: number;
+  schoolAverage?: number;
 }
 
-export const TypingChart: React.FC<TypingChartProps> = ({ history, type }) => {
+export const TypingChart: React.FC<TypingChartProps> = ({ 
+  history, 
+  type,
+  gradeAverage,
+  schoolAverage
+}) => {
   if (history.length === 0) {
     return (
       <div className="h-64 flex items-center justify-center border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
@@ -35,7 +42,8 @@ export const TypingChart: React.FC<TypingChartProps> = ({ history, type }) => {
 
   // 1. 최대 속도 및 Y축 최소/최대값 정하기
   const speeds = history.map(r => r.speed);
-  const maxSpeedValue = Math.max(...speeds, 50); // 최하 50타수 기준
+  // 최하 50타수 기준 및 평균값들도 스케일에 포함하여 눈금선 이탈 방지
+  const maxSpeedValue = Math.max(...speeds, gradeAverage || 0, schoolAverage || 0, 50); 
   const minSpeedValue = 0;
 
   // Y축을 눈금 4칸으로 나누기 위한 기준값 계산
@@ -85,12 +93,26 @@ export const TypingChart: React.FC<TypingChartProps> = ({ history, type }) => {
 
   return (
     <div className="w-full bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm bg-linear-to-b from-white to-emerald-50/5">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
         <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 font-sans">
           <span className={`w-2 h-2 rounded-full inline-block ${isEnglish ? 'bg-emerald-500' : 'bg-green-500'}`}></span>
           {isEnglish ? 'English Trend' : 'Korean Trend'}
         </h4>
-        <span className="text-xs text-slate-500 font-mono font-medium">기록: {dataCount}회</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {gradeAverage !== undefined && gradeAverage > 0 && (
+            <span className="text-[10px] bg-indigo-50/75 text-indigo-700 border border-indigo-100/60 px-2.5 py-0.5 rounded-full font-sans font-bold flex items-center gap-1 shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>
+              학년 평균: {gradeAverage}타
+            </span>
+          )}
+          {schoolAverage !== undefined && schoolAverage > 0 && (
+            <span className="text-[10px] bg-orange-50/75 text-orange-700 border border-orange-100/60 px-2.5 py-0.5 rounded-full font-sans font-bold flex items-center gap-1 shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
+              전체 평균: {schoolAverage}타
+            </span>
+          )}
+          <span className="text-xs text-slate-500 font-mono font-bold bg-slate-50/80 border border-slate-150 px-2 py-0.5 rounded-lg shrink-0">기록: {dataCount}회</span>
+        </div>
       </div>
 
       {/* SVG 그래프 내부 렌더러 */}
@@ -133,6 +155,54 @@ export const TypingChart: React.FC<TypingChartProps> = ({ history, type }) => {
               </g>
             );
           })}
+
+          {/* 학년별 평균 기준선 */}
+          {gradeAverage !== undefined && gradeAverage > 0 && (
+            <g className="transition-all">
+              <line 
+                x1={paddingLeft} 
+                y1={getY(gradeAverage)} 
+                x2={chartWidth - paddingRight} 
+                y2={getY(gradeAverage)} 
+                stroke="#6366f1" 
+                strokeWidth="1.2"
+                strokeDasharray="3 3"
+                className="opacity-60"
+              />
+              <text 
+                x={chartWidth - paddingRight - 6} 
+                y={getY(gradeAverage) - 5} 
+                textAnchor="end" 
+                className="fill-indigo-600 font-sans text-[9px] font-bold"
+              >
+                학년 평균 ({gradeAverage}타)
+              </text>
+            </g>
+          )}
+
+          {/* 전체 평균 기준선 */}
+          {schoolAverage !== undefined && schoolAverage > 0 && (
+            <g className="transition-all">
+              <line 
+                x1={paddingLeft} 
+                y1={getY(schoolAverage)} 
+                x2={chartWidth - paddingRight} 
+                y2={getY(schoolAverage)} 
+                stroke="#f97316" 
+                strokeWidth="1.2"
+                strokeDasharray="3 3"
+                className="opacity-60"
+              />
+              <text 
+                x={paddingLeft + 6} 
+                y={getY(schoolAverage) - 5} 
+                textAnchor="start" 
+                className="fill-orange-600 font-sans text-[9px] font-bold"
+              >
+                전체 평균 ({schoolAverage}타)
+              </text>
+            </g>
+          )}
 
           {/* 2. 면적 그라데이션 채우기 */}
           {areaPathD && (
