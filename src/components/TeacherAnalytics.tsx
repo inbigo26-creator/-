@@ -960,7 +960,7 @@ export function TeacherAnalytics({
             className="px-4.5 py-2.5 rounded-2xl text-xs font-extrabold text-white bg-slate-800 hover:bg-slate-900 shadow-xs transition-colors flex items-center gap-2 cursor-pointer border border-slate-755"
           >
             <Settings className="h-4 w-4 text-slate-350" />
-            <span>스프레드시트스 연동 설정</span>
+            <span>관리자 설정</span>
           </button>
         </div>
       </div>
