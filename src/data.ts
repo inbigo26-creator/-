@@ -292,7 +292,7 @@ export async function fetchSpreadsheetData(
               firstSheetParsedResults = firstSheetRows.slice(1).map(row => ({
                 studentId: cleanCodeValue(row[idxId]),
                 name: cleanCellValue(row[idxName]),
-                pin: cleanCodeValue(row[idxPin])
+                pin: cleanPinValue(row[idxPin])
               })).filter(item => item.studentId && item.pin);
             } else if (idxId !== -1 && idxName !== -1 && idxAgreed !== -1) {
               firstSheetKeyDiscovered = 'privacy';
@@ -408,7 +408,7 @@ export async function fetchSpreadsheetData(
             parsedResults = rows.slice(1).map(row => ({
               studentId: cleanCodeValue(row[idxId]),
               name: cleanCellValue(row[idxName]),
-              pin: cleanCodeValue(row[idxPin])
+              pin: cleanPinValue(row[idxPin])
             })).filter(item => item.studentId && item.pin);
 
           } else if (sheetKey === 'english_all' || sheetKey === 'korean_all') {
@@ -944,6 +944,157 @@ export async function saveConsentToSpreadsheet(
   return true;
 }
 
+// Save updated Student Pin/Password back to Spreadsheet
+export async function saveStudentPinToSpreadsheet(
+  spreadsheetId: string,
+  studentId: string,
+  newPin: string,
+  googleToken?: string | null,
+  appsScriptUrl?: string | null
+): Promise<boolean> {
+  // Offline or Demo Mode
+  if ((!spreadsheetId || spreadsheetId === '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') && (!appsScriptUrl || !appsScriptUrl.trim())) {
+    console.log('Student pin stored locally in demo/placeholder mode.');
+    return true;
+  }
+
+  let lastError: any = null;
+
+  // 1. Try to save using Apps Script custom action if available
+  if (appsScriptUrl && appsScriptUrl.trim()) {
+    try {
+      const cleanUrl = appsScriptUrl.trim();
+      const fetchUrl = cleanUrl.includes('?')
+        ? `${cleanUrl}&action=saveStudentPin&studentId=${encodeURIComponent(studentId)}&pin=${encodeURIComponent(newPin)}&t=${Date.now()}`
+        : `${cleanUrl}?action=saveStudentPin&studentId=${encodeURIComponent(studentId)}&pin=${encodeURIComponent(newPin)}&t=${Date.now()}`;
+      
+      const res = await fetch(fetchUrl, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      if (!res.ok) {
+        throw new Error(`Apps Script API 응답 실패 (코드: ${res.status})`);
+      }
+      
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = JSON.parse(text);
+      } catch (parseErr) {
+        if (text.includes('google-signin') || text.includes('Sign in') || text.includes('DOCTYPE html') || text.includes('login') || text.includes('service_login')) {
+          throw new Error('구글 앱스 스크립트 접근 권한이 올바르지 않습니다. 웹앱 배포 시 [액세스 권한이 있는 사용자(Who has access)]를 [모든 사용자(Anyone)]로 설정했는지 확인해 주세요.');
+        }
+        throw new Error('앱스 스크립트 응답이 유효한 JSON 형식이 아닙니다.');
+      }
+
+      if (json && json.success !== false) {
+        console.log(`Student password override logged successfully via Apps Script web app API.`);
+        return true;
+      } else {
+        throw new Error(json?.message || 'Apps Script에서 비밀번호 변경 실패 응답을 보냈습니다.');
+      }
+    } catch (err: any) {
+      console.error('GAS Apps Script pin swap failed:', err);
+      lastError = err;
+    }
+  }
+
+  // 2. Play direct sheet overwrite using Google Sheets API (v4)
+  if (googleToken) {
+    try {
+      // Look up candidate sheet names for students_auth
+      const sheetsMetaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
+      const metaRes = await fetch(sheetsMetaUrl, {
+        headers: { Authorization: `Bearer ${googleToken}` }
+      });
+      let activeSheetName = 'students_auth';
+      if (metaRes.ok) {
+        const metaData = await metaRes.json();
+        const sheetTitles = (metaData.sheets || []).map((s: any) => s.properties.title);
+        const candidates = ['students_auth', 'student_auth', 'students', 'auth', '인증', '학생명부', '학생_auth'];
+        const matched = sheetTitles.find((title: string) => 
+          candidates.some(cand => cand.toLowerCase() === title.trim().toLowerCase())
+        );
+        if (matched) {
+          activeSheetName = matched;
+        }
+      }
+
+      // Fetch values to analyze student row index and pin column index
+      const getUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(activeSheetName)}?valueRenderOption=FORMATTED_VALUE`;
+      const getRes = await fetch(getUrl, {
+        headers: { Authorization: `Bearer ${googleToken}` }
+      });
+
+      if (getRes.ok) {
+        const getData = await getRes.json();
+        const values = getData.values || [];
+        if (values.length > 0) {
+          const headers = values[0].map((h: any) => String(h || '').trim());
+          const idxId = findIndexByNames(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+          const idxPin = findIndexByNames(headers, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
+
+          if (idxId !== -1) {
+            const targetCleanId = studentId.trim().replace(/\s/g, '');
+            let foundRowIndex = -1;
+            for (let i = 1; i < values.length; i++) {
+              const rowId = String(values[i][idxId] || '').trim().replace(/\s/g, '');
+              if (rowId === targetCleanId) {
+                foundRowIndex = i + 1; // 1-based index (header is 1, row 2 is index 1...)
+                break;
+              }
+            }
+
+            if (foundRowIndex !== -1) {
+              const updateColIndex = idxPin !== -1 ? idxPin : 2; // C column default
+              const colLetter = String.fromCharCode(65 + updateColIndex); // A, B, C...
+              const updateRange = `${activeSheetName}!${colLetter}${foundRowIndex}`;
+              
+              const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(updateRange)}?valueInputOption=USER_ENTERED`;
+              const updateRes = await fetch(updateUrl, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${googleToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  values: [[newPin]]
+                })
+              });
+              if (updateRes.ok) {
+                console.log(`Directly updated password cell ${updateRange} to cell values.`);
+                return true;
+              } else {
+                throw new Error(`비밀번호 셀 업데이트 쓰기 실패: ${await updateRes.text()}`);
+              }
+            }
+          }
+        }
+      }
+      throw new Error('학생 명부 시트에서 해당 학생을 찾을 수 없습니다.');
+    } catch (err: any) {
+      console.error('Direct Google Sheets pin write failed:', err);
+      lastError = err;
+    }
+  }
+
+  if (lastError) {
+    if (appsScriptUrl && appsScriptUrl.trim()) {
+      throw lastError;
+    }
+    console.warn('[Offline Fallback] Google spreadsheets pin write failed, continuing with local overrides:', lastError.message || lastError);
+    return true;
+  }
+
+  if (!appsScriptUrl && !googleToken) {
+    console.log('No write integration config matches. PIN updated in local sandbox mode.');
+    return true;
+  }
+
+  return true;
+}
+
 // -----------------------------------------------------------------------------
 // ANALYTICS & UTILS
 // -----------------------------------------------------------------------------
@@ -972,6 +1123,15 @@ const cleanCodeValue = (val: string | number | undefined | null): string => {
     }
   }
   return clean.replace(/[^0-9A-Za-z]/g, '');
+};
+
+const cleanPinValue = (val: string | number | undefined | null): string => {
+  if (val === undefined || val === null) return '';
+  let clean = String(val).trim();
+  if (clean.endsWith('.0')) {
+    clean = clean.substring(0, clean.length - 2);
+  }
+  return clean.replace(/[\r\n\t]/g, '');
 };
 
 // Check if a cell represents a yes consent status

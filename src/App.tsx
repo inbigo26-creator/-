@@ -13,7 +13,8 @@ import {
   parseStudentIdInfo,
   saveConsentToSpreadsheet,
   normalizeDepartment,
-  resolveStudentGradeAndDept
+  resolveStudentGradeAndDept,
+  saveStudentPinToSpreadsheet
 } from './data';
 import { StudentAuth, TypingRecord, LevelRule, StudentStats } from './types';
 import { StudentStatsCard } from './components/StudentCards';
@@ -102,6 +103,15 @@ export default function App() {
   const [selectedHallMonth, setSelectedHallMonth] = useState<string>('');
   const [showPrivacyOnlyModal, setShowPrivacyOnlyModal] = useState(false);
 
+  // Student own Password change states
+  const [showStudentPasswordChangeModal, setShowStudentPasswordChangeModal] = useState(false);
+  const [studentCurrentPinInput, setStudentCurrentPinInput] = useState('');
+  const [studentNewPinInput, setStudentNewPinInput] = useState('');
+  const [studentNewPinConfirmInput, setStudentNewPinConfirmInput] = useState('');
+  const [studentPasswordChangeError, setStudentPasswordChangeError] = useState<string | null>(null);
+  const [studentPasswordChangeSuccess, setStudentPasswordChangeSuccess] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   // Modals toggle
   const [showAdmin, setShowAdmin] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
@@ -146,6 +156,54 @@ export default function App() {
     setIsTeacher(false);
     localStorage.removeItem('is_teacher_authenticated');
     localStorage.removeItem('teacher_last_activity_at');
+  };
+
+  // 🏆 Monthly MVP Lock States
+  const [mvpLocks, setMvpLocks] = useState<{[month: string]: boolean}>(() => {
+    try {
+      const stored = localStorage.getItem(`school_mvp_locks_${spreadsheetId}`);
+      return stored ? JSON.parse(stored) : {};
+    } catch (_) {
+      return {};
+    }
+  });
+
+  const [frozenMvpWinners, setFrozenMvpWinners] = useState<{[month: string]: any[]}>(() => {
+    try {
+      const stored = localStorage.getItem(`school_mvp_frozen_winners_${spreadsheetId}`);
+      return stored ? JSON.parse(stored) : {};
+    } catch (_) {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      // Correct spreadsheet change sync
+      const storedLocks = localStorage.getItem(`school_mvp_locks_${spreadsheetId}`);
+      setMvpLocks(storedLocks ? JSON.parse(storedLocks) : {});
+
+      const storedWinners = localStorage.getItem(`school_mvp_frozen_winners_${spreadsheetId}`);
+      setFrozenMvpWinners(storedWinners ? JSON.parse(storedWinners) : {});
+    } catch (e) {
+      console.error('Error reloading MVP lock configuration:', e);
+    }
+  }, [spreadsheetId]);
+
+  const handleToggleMvpLock = (month: string, currentWinners: any[]) => {
+    const isLocked = !!mvpLocks[month];
+    const nextLocks = { ...mvpLocks, [month]: !isLocked };
+    setMvpLocks(nextLocks);
+    localStorage.setItem(`school_mvp_locks_${spreadsheetId}`, JSON.stringify(nextLocks));
+
+    const nextWinners = { ...frozenMvpWinners };
+    if (!isLocked) {
+      nextWinners[month] = currentWinners;
+    } else {
+      delete nextWinners[month];
+    }
+    setFrozenMvpWinners(nextWinners);
+    localStorage.setItem(`school_mvp_frozen_winners_${spreadsheetId}`, JSON.stringify(nextWinners));
   };
 
   // 📋 Calculate student-level latest speed averages (excluding special status students) for school & grade comparison
@@ -289,124 +347,134 @@ export default function App() {
     const cumulativeSnackWinners = new Set<string>();
 
     sortedMonths.forEach((month, monthIdx) => {
-      const korThisMonth = koreanDb.filter(r => r.month === month);
-      const engThisMonth = englishDb.filter(r => r.month === month);
-      const prevMonthName = monthIdx > 0 ? sortedMonths[monthIdx - 1] : null;
-
-      // Kor Speed
-      const rawKorSpeedCandidates = korThisMonth.map(r => {
-        const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
-        return {
-          studentId: r.studentId,
-          name: r.name,
-          grade: rGrade,
-          department: rDept,
-          value: r.speed
-        };
-      }).sort((a,b) => b.value - a.value);
-
-      // Eng Speed
-      const rawEngSpeedCandidates = engThisMonth.map(r => {
-        const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
-        return {
-          studentId: r.studentId,
-          name: r.name,
-          grade: rGrade,
-          department: rDept,
-          value: r.speed
-        };
-      }).sort((a,b) => b.value - a.value);
-
-      // Kor Growth
-      const rawKorGrowthCandidates: Winner[] = [];
-      if (prevMonthName) {
-        const korPrev = koreanDb.filter(r => r.month === prevMonthName);
-        korThisMonth.forEach(curr => {
-          const prev = korPrev.find(p => cleanStudentId(p.studentId) === cleanStudentId(curr.studentId));
-          if (prev) {
-            const diff = curr.speed - prev.speed;
-            if (diff > 0) {
-              const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(curr.studentId, curr.grade, curr.department);
-              rawKorGrowthCandidates.push({
-                studentId: curr.studentId,
-                name: curr.name,
-                grade: rGrade,
-                department: rDept,
-                value: diff
-              });
-            }
-          }
-        });
-      }
-      rawKorGrowthCandidates.sort((a,b) => b.value - a.value);
-
-      // Eng Growth
-      const rawEngGrowthCandidates: Winner[] = [];
-      if (prevMonthName) {
-        const engPrev = englishDb.filter(r => r.month === prevMonthName);
-        engThisMonth.forEach(curr => {
-          const prev = engPrev.find(p => cleanStudentId(p.studentId) === cleanStudentId(curr.studentId));
-          if (prev) {
-            const diff = curr.speed - prev.speed;
-            if (diff > 0) {
-              const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(curr.studentId, curr.grade, curr.department);
-              rawEngGrowthCandidates.push({
-                studentId: curr.studentId,
-                name: curr.name,
-                grade: rGrade,
-                department: rDept,
-                value: diff
-              });
-            }
-          }
-        });
-      }
-      rawEngGrowthCandidates.sort((a,b) => b.value - a.value);
-
-      const selectedWinners: { studentId: string; name: string; department: string; grade: string; reason: string; value: number }[] = [];
+      const isLocked = !!mvpLocks[month];
+      let selectedWinners: { studentId: string; name: string; department: string; grade: string; reason: string; value: number }[] = [];
       const localSelectedSet = new Set<string>();
 
-      const trySelectWinnerForGrade = (list: Winner[], gradeVal: string, reasonTag: string) => {
-        for (let i = 0; i < list.length; i++) {
-          const s = list[i];
-          const cleanId = cleanStudentId(s.studentId);
-          const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
-          const targetGradeNum = String(gradeVal).replace(/[^0-9]/g, '');
+      if (isLocked && frozenMvpWinners && frozenMvpWinners[month]) {
+        selectedWinners = frozenMvpWinners[month];
+        selectedWinners.forEach(w => {
+          const cleanId = cleanStudentId(w.studentId);
+          localSelectedSet.add(cleanId);
+          cumulativeSnackWinners.add(cleanId);
+        });
+      } else {
+        const korThisMonth = koreanDb.filter(r => r.month === month);
+        const engThisMonth = englishDb.filter(r => r.month === month);
+        const prevMonthName = monthIdx > 0 ? sortedMonths[monthIdx - 1] : null;
 
-          if (sGradeNum !== targetGradeNum) continue;
-          if (isExcludedStudentName(s.name)) continue;
+        // Kor Speed
+        const rawKorSpeedCandidates = korThisMonth.map(r => {
+          const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
+          return {
+            studentId: r.studentId,
+            name: r.name,
+            grade: rGrade,
+            department: rDept,
+            value: r.speed
+          };
+        }).sort((a,b) => b.value - a.value);
 
-          if (!cumulativeSnackWinners.has(cleanId) && !localSelectedSet.has(cleanId)) {
-            selectedWinners.push({
-              studentId: s.studentId,
-              name: s.name,
-              department: s.department,
-              grade: s.grade,
-              reason: `${gradeVal}학년 ${reasonTag}`,
-              value: s.value
-            });
-            localSelectedSet.add(cleanId);
-            cumulativeSnackWinners.add(cleanId);
-            break;
-          }
+        // Eng Speed
+        const rawEngSpeedCandidates = engThisMonth.map(r => {
+          const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(r.studentId, r.grade, r.department);
+          return {
+            studentId: r.studentId,
+            name: r.name,
+            grade: rGrade,
+            department: rDept,
+            value: r.speed
+          };
+        }).sort((a,b) => b.value - a.value);
+
+        // Kor Growth
+        const rawKorGrowthCandidates: Winner[] = [];
+        if (prevMonthName) {
+          const korPrev = koreanDb.filter(r => r.month === prevMonthName);
+          korThisMonth.forEach(curr => {
+            const prev = korPrev.find(p => cleanStudentId(p.studentId) === cleanStudentId(curr.studentId));
+            if (prev) {
+              const diff = curr.speed - prev.speed;
+              if (diff > 0) {
+                const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(curr.studentId, curr.grade, curr.department);
+                rawKorGrowthCandidates.push({
+                  studentId: curr.studentId,
+                  name: curr.name,
+                  grade: rGrade,
+                  department: rDept,
+                  value: diff
+                });
+              }
+            }
+          });
         }
-      };
+        rawKorGrowthCandidates.sort((a,b) => b.value - a.value);
 
-      ['1', '2', '3'].forEach(g => {
-        trySelectWinnerForGrade(rawKorSpeedCandidates, g, '한글 최고 속도');
-      });
-      ['1', '2', '3'].forEach(g => {
-        trySelectWinnerForGrade(rawEngSpeedCandidates, g, '영어 최고 속도');
-      });
-      if (prevMonthName) {
+        // Eng Growth
+        const rawEngGrowthCandidates: Winner[] = [];
+        if (prevMonthName) {
+          const engPrev = englishDb.filter(r => r.month === prevMonthName);
+          engThisMonth.forEach(curr => {
+            const prev = engPrev.find(p => cleanStudentId(p.studentId) === cleanStudentId(curr.studentId));
+            if (prev) {
+              const diff = curr.speed - prev.speed;
+              if (diff > 0) {
+                const { grade: rGrade, department: rDept } = resolveStudentGradeAndDept(curr.studentId, curr.grade, curr.department);
+                rawEngGrowthCandidates.push({
+                  studentId: curr.studentId,
+                  name: curr.name,
+                  grade: rGrade,
+                  department: rDept,
+                  value: diff
+                });
+              }
+            }
+          });
+        }
+        rawEngGrowthCandidates.sort((a,b) => b.value - a.value);
+
+        const trySelectWinnerForGrade = (list: Winner[], gradeVal: string, reasonTag: string) => {
+          for (let i = 0; i < list.length; i++) {
+            const s = list[i];
+            const cleanId = cleanStudentId(s.studentId);
+            const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
+            const targetGradeNum = String(gradeVal).replace(/[^0-9]/g, '');
+
+            if (sGradeNum !== targetGradeNum) continue;
+            if (isExcludedStudentName(s.name)) continue;
+
+            if (!cumulativeSnackWinners.has(cleanId) && !localSelectedSet.has(cleanId)) {
+              selectedWinners.push({
+                studentId: s.studentId,
+                name: s.name,
+                department: s.department,
+                grade: s.grade,
+                reason: `${gradeVal}학년 ${reasonTag}`,
+                value: s.value
+              });
+              localSelectedSet.add(cleanId);
+              cumulativeSnackWinners.add(cleanId);
+              break;
+            }
+          }
+        };
+
         ['1', '2', '3'].forEach(g => {
-          trySelectWinnerForGrade(rawKorGrowthCandidates, g, '한글 최고 향상도');
+          trySelectWinnerForGrade(rawKorSpeedCandidates, g, '한글 최고 속도');
         });
-      }
-      if (prevMonthName) {
         ['1', '2', '3'].forEach(g => {
-          trySelectWinnerForGrade(rawEngGrowthCandidates, g, '영어 최고 향상도');
+          trySelectWinnerForGrade(rawEngSpeedCandidates, g, '영어 최고 속도');
         });
+        if (prevMonthName) {
+          ['1', '2', '3'].forEach(g => {
+            trySelectWinnerForGrade(rawKorGrowthCandidates, g, '한글 최고 향상도');
+          });
+        }
+        if (prevMonthName) {
+          ['1', '2', '3'].forEach(g => {
+            trySelectWinnerForGrade(rawEngGrowthCandidates, g, '영어 최고 향상도');
+          });
+        }
       }
 
       historyMap[month] = {
@@ -415,7 +483,7 @@ export default function App() {
     });
 
     return historyMap;
-  }, [englishDb, koreanDb, sortedMonths]);
+  }, [englishDb, koreanDb, sortedMonths, mvpLocks, frozenMvpWinners]);
 
   // 🟢 3. Calculate Cumulative Periodic Final Awards (5월~10월)
   const cumulativeFinalAwards = React.useMemo(() => {
@@ -684,6 +752,15 @@ export default function App() {
     return cleaned.replace(/[^0-9A-Za-z]/g, '');
   };
 
+  const normalizePinValue = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    let cleaned = String(val).trim();
+    if (cleaned.endsWith('.0')) {
+      cleaned = cleaned.substring(0, cleaned.length - 2);
+    }
+    return cleaned;
+  };
+
   // Handle student credentials login match
   const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -693,8 +770,8 @@ export default function App() {
       setAuthError('학번 5자리를 정확히 입력해 주세요. (예: 10101)');
       return;
     }
-    if (!pinInput || pinInput.length < 4 || pinInput.length > 8) {
-      setAuthError('생년월일 8자리를 올바르게 입력해 주세요. (예: 20080101)');
+    if (!pinInput || pinInput.trim() === '') {
+      setAuthError('비밀번호를 입력해 주세요.');
       return;
     }
 
@@ -727,14 +804,20 @@ export default function App() {
         setLevelRulesDb(pulledData.levels);
         setPrivacyDb(pulledData.privacy || []);
 
-        currentAuth = pulledData.auth.find(
-          (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
-        );
+        currentAuth = pulledData.auth.find((a) => {
+          if (normalizeValue(a.studentId) !== normalizeValue(studentIdInput)) return false;
+          const localOverride = localStorage.getItem(`student_pin_override_${cleanStudentId(a.studentId)}`);
+          const expectedPin = localOverride || a.pin;
+          return normalizePinValue(expectedPin) === normalizePinValue(pinInput);
+        });
       } catch (fetchErr) {
         console.warn('[Login Fallback] Failed fetching fresh spreadsheet data, using cached local states:', fetchErr);
-        currentAuth = authDb.find(
-          (a) => normalizeValue(a.studentId) === normalizeValue(studentIdInput) && normalizeValue(a.pin) === normalizeValue(pinInput)
-        );
+        currentAuth = authDb.find((a) => {
+          if (normalizeValue(a.studentId) !== normalizeValue(studentIdInput)) return false;
+          const localOverride = localStorage.getItem(`student_pin_override_${cleanStudentId(a.studentId)}`);
+          const expectedPin = localOverride || a.pin;
+          return normalizePinValue(expectedPin) === normalizePinValue(pinInput);
+        });
       }
 
       if (!currentAuth) {
@@ -857,6 +940,83 @@ export default function App() {
     setPinInput('');
     setAuthError(null);
     setPendingSession(null);
+  };
+
+  // Change or Reset student PIN/password
+  const handleResetStudentPin = async (studentId: string, newPin: string): Promise<boolean> => {
+    try {
+      // 1. Save to Google spreadsheet first (using GAS URL and/or OAuth direct token)
+      const success = await saveStudentPinToSpreadsheet(spreadsheetId, studentId, newPin, googleToken, appsScriptUrl);
+      if (!success) {
+        throw new Error('스프레드시트 갱신 중 실패가 리턴되었습니다.');
+      }
+      
+      // 2. Set Local storage override to secure offline robustness
+      const normId = studentId.trim().replace(/[^0-9A-Za-z]/g, '');
+      localStorage.setItem(`student_pin_override_${normId}`, newPin);
+
+      // 3. Update authDb state in-memory so instantly matched
+      setAuthDb((prev) =>
+        prev.map((a) => {
+          if (a.studentId.trim().replace(/[^0-9A-Za-z]/g, '') === normId) {
+            return { ...a, pin: newPin };
+          }
+          return a;
+        })
+      );
+
+      return true;
+    } catch (err: any) {
+      console.error('Password reset failed:', err);
+      return false;
+    }
+  };
+
+  // Student student password edit self
+  const handleStudentSelfChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentSession) return;
+    
+    setStudentPasswordChangeError(null);
+    setStudentPasswordChangeSuccess(null);
+
+    const normCurrentInput = studentCurrentPinInput.trim();
+    // Validate current PIN matching
+    const studentAuth = authDb.find(a => cleanStudentId(a.studentId) === cleanStudentId(studentSession.id));
+    const localOverride = localStorage.getItem(`student_pin_override_${cleanStudentId(studentSession.id)}`);
+    const expectedCurrentPin = localOverride || (studentAuth ? studentAuth.pin : '');
+
+    if (normalizePinValue(normCurrentInput) !== normalizePinValue(expectedCurrentPin)) {
+      setStudentPasswordChangeError('현재 비밀번호가 정확하지 않습니다.');
+      return;
+    }
+
+    if (studentNewPinInput.trim().length < 2) {
+      setStudentPasswordChangeError('새 비밀번호는 최소 2글자 이상 입력해 주셔야 합니다.');
+      return;
+    }
+
+    if (studentNewPinInput !== studentNewPinConfirmInput) {
+      setStudentPasswordChangeError('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const success = await handleResetStudentPin(studentSession.id, studentNewPinInput);
+      if (success) {
+        setStudentPasswordChangeSuccess('비밀번호가 성공적으로 변경되었습니다! 변경된 생년월일/비밀번호로 즉시 반영되었습니다.');
+        setStudentCurrentPinInput('');
+        setStudentNewPinInput('');
+        setStudentNewPinConfirmInput('');
+      } else {
+        setStudentPasswordChangeError('스프레드시트에 데이터를 반영하는 도중 실패했습니다. 네트워크를 확인해 주세요.');
+      }
+    } catch (err: any) {
+      setStudentPasswordChangeError('오류: ' + (err.message || err));
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const handleSaveConsent = async () => {
@@ -1015,6 +1175,23 @@ export default function App() {
               <Lock className="h-5 w-5 text-indigo-550" />
               개인정보 동의 안내
             </button>
+
+            {/* 🔑 Yellow emphasized Password Change Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setStudentPasswordChangeError(null);
+                setStudentPasswordChangeSuccess(null);
+                setStudentCurrentPinInput('');
+                setStudentNewPinInput('');
+                setStudentNewPinConfirmInput('');
+                setShowStudentPasswordChangeModal(true);
+              }}
+              className="mt-2 w-full text-left px-4 py-3 rounded-xl font-black flex items-center gap-3 bg-yellow-405 hover:bg-yellow-500 text-slate-900 border border-yellow-500 shadow-xs cursor-pointer transition-all active:scale-[0.98]"
+            >
+              <span className="text-slate-850 text-base shrink-0 animate-pulse">🔑</span>
+              <span>비밀번호 변경하기</span>
+            </button>
           </nav>
 
           <div className="pt-6 border-t border-slate-100">
@@ -1134,6 +1311,9 @@ export default function App() {
                 koreanDb={koreanDb}
                 onShowSettings={() => setShowAdmin(true)}
                 spreadsheetId={spreadsheetId}
+                mvpLocks={mvpLocks}
+                onToggleMvpLock={handleToggleMvpLock}
+                frozenMvpWinners={frozenMvpWinners}
               />
             ) : (
               <div className="max-w-md w-full space-y-6 py-6">
@@ -1283,6 +1463,33 @@ export default function App() {
                     <span className="text-emerald-700">{studentSession.name}</span> 학생의 성장 기록
                   </h2>
                   <p className="text-xs text-stone-400 font-medium tracking-tight font-sans">로그인 학번 : {studentSession.id} / 데이터 동기화 완료</p>
+                  
+                  {/* 🔑 Yellow emphasized Password Change Button right in header banner for top-level visibility */}
+                  <div className="pt-2 flex flex-wrap gap-2 animate-fade-in">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStudentPasswordChangeError(null);
+                        setStudentPasswordChangeSuccess(null);
+                        setStudentCurrentPinInput('');
+                        setStudentNewPinInput('');
+                        setStudentNewPinConfirmInput('');
+                        setShowStudentPasswordChangeModal(true);
+                      }}
+                      className="px-4 py-2 bg-yellow-405 hover:bg-yellow-500 text-slate-900 border border-yellow-500 text-[11px] font-black rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-98"
+                    >
+                      <span className="text-slate-800 text-xs animate-pulse">🔑</span>
+                      <span>비밀번호 변경하기</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStudentLogout}
+                      className="md:hidden px-4 py-2 bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 text-[11px] font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <LogOut className="h-3 w-3" />
+                      <span>로그아웃</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4 md:max-w-xs flex items-start gap-3 shadow-2xs font-sans">
@@ -1888,7 +2095,136 @@ export default function App() {
           currentSpreadsheetId={spreadsheetId}
           currentAppsScriptUrl={appsScriptUrl}
           onClose={() => setShowAdmin(false)}
+          mvpLocks={mvpLocks}
+          onToggleMvpLock={handleToggleMvpLock}
+          monthlySnackWinnersHistory={monthlySnackWinnersHistory}
+          sortedMonths={sortedMonths}
+          authDb={authDb}
+          onResetStudentPin={handleResetStudentPin}
         />
+      )}
+
+      {showStudentPasswordChangeModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 font-sans">
+          <div className="relative bg-white rounded-3xl w-full max-w-md border border-gray-100 shadow-xl overflow-hidden flex flex-col my-8 animate-scale-up border-yellow-200">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-yellow-50/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-yellow-405 text-slate-900 font-bold shadow-xs">
+                  🔑
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-905 tracking-tight">개인 비밀번호 변경 (생년월일)</h2>
+                  <p className="text-[11px] text-amber-800 font-bold leading-normal">로그인 시 사용할 자신만의 비밀번호를 지정합니다.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowStudentPasswordChangeModal(false);
+                  setStudentPasswordChangeError(null);
+                  setStudentPasswordChangeSuccess(null);
+                }}
+                className="p-1 px-3 rounded-lg border border-gray-250 text-xs font-semibold text-gray-500 hover:bg-gray-100 cursor-pointer"
+              >
+                닫기
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleStudentSelfChangePassword} className="p-6 space-y-4">
+              <div className="bg-yellow-50/30 border border-yellow-200/55 rounded-xl p-3.5 text-xs text-yellow-905 leading-relaxed font-bold">
+                ⚠️ 변경 시 기존 생년월일 대신 지정된 새 비밀번호로 교사 승인 없이 즉시 교체(덮어쓰기)되며, 다음 로그인부터 변경된 비밀번호로 접속하셔야 합니다.
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">
+                  학번 및 이름
+                </label>
+                <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-xs font-bold text-gray-600">
+                  [{studentSession?.id}] {studentSession?.name}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-black text-gray-500 uppercase tracking-widest">
+                  현재 비밀번호 (생년월일 등)
+                </label>
+                <input 
+                  type="password"
+                  maxLength={50}
+                  placeholder="현재 비밀번호를 입력하십시오"
+                  value={studentCurrentPinInput}
+                  onChange={(e) => setStudentCurrentPinInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-250 text-sm font-mono tracking-wide placeholder:font-sans placeholder:text-xs focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-black text-gray-500 uppercase tracking-widest">
+                  새 비밀번호 (자유롭게 지정 가능)
+                </label>
+                <input 
+                  type="password"
+                  maxLength={50}
+                  placeholder="원하는 비밀번호를 입력하십시오 (최소 2자)"
+                  value={studentNewPinInput}
+                  onChange={(e) => setStudentNewPinInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-250 text-sm font-mono tracking-wide placeholder:font-sans placeholder:text-xs focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-black text-gray-500 uppercase tracking-widest">
+                  새 비밀번호 확인
+                </label>
+                <input 
+                  type="password"
+                  maxLength={50}
+                  placeholder="동일하게 한 번 더 입력해주십시오"
+                  value={studentNewPinConfirmInput}
+                  onChange={(e) => setStudentNewPinConfirmInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-250 text-sm font-mono tracking-wide placeholder:font-sans placeholder:text-xs focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  required
+                />
+              </div>
+
+              {studentPasswordChangeError && (
+                <div className="p-3 bg-red-50 border border-red-150 text-red-850 rounded-xl text-xs font-bold leading-normal">
+                  ⚠️ {studentPasswordChangeError}
+                </div>
+              )}
+
+              {studentPasswordChangeSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-150 text-emerald-900 rounded-xl text-xs font-semibold leading-normal">
+                  ✓ {studentPasswordChangeSuccess}
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStudentPasswordChangeModal(false);
+                    setStudentPasswordChangeError(null);
+                    setStudentPasswordChangeSuccess(null);
+                  }}
+                  className="px-4 py-3 border border-gray-200 text-gray-505 font-bold rounded-xl hover:bg-gray-50 cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="px-5 py-3 bg-yellow-405 border border-yellow-500 hover:bg-yellow-500 text-slate-900 font-extrabold rounded-xl cursor-pointer disabled:opacity-50"
+                >
+                  {isChangingPassword ? '비밀번호 저장 중...' : '비밀번호 즉시 변경'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {showGuide && (

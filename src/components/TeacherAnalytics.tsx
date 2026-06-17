@@ -5,7 +5,7 @@ import {
   Award, TrendingUp, BarChart2, CheckCircle, Users, Lightbulb, 
   Settings, HelpCircle, Flame, Calendar, Trophy, AlertCircle, 
   ChevronRight, RefreshCw, Star, Info, UserCheck, ShieldAlert,
-  Search
+  Search, Lock, Unlock
 } from 'lucide-react';
 
 interface TeacherAnalyticsProps {
@@ -14,6 +14,9 @@ interface TeacherAnalyticsProps {
   koreanDb: TypingRecord[];
   onShowSettings: () => void;
   spreadsheetId: string;
+  mvpLocks?: {[month: string]: boolean};
+  onToggleMvpLock?: (month: string, currentWinners: any[]) => void;
+  frozenMvpWinners?: {[month: string]: any[]};
 }
 
 type ActiveTab = 'achievement' | 'class_rankings' | 'monthly_snacks' | 'final_awards' | 'growth_trends' | 'integrated_stats';
@@ -77,7 +80,10 @@ export function TeacherAnalytics({
   englishDb, 
   koreanDb, 
   onShowSettings,
-  spreadsheetId
+  spreadsheetId,
+  mvpLocks = {},
+  onToggleMvpLock,
+  frozenMvpWinners = {}
 }: TeacherAnalyticsProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('integrated_stats');
   const [selectedMonth, setSelectedMonth] = useState<string>('6월');
@@ -499,59 +505,69 @@ export function TeacherAnalytics({
 
       // Selection logic prioritizing Top-1 for Speed (Kor/Eng) and Top-1 for Growth (Kor/Eng) per Grade (1, 2, 3)
       // total = up to 12 students. Avoid duplicating any student *within* this month + *across prior months*.
-      const selectedWinners: typeof historyMap[string]['winners'] = [];
+      const isLocked = !!mvpLocks[month];
+      let selectedWinners: typeof historyMap[string]['winners'] = [];
       const localSelectedSet = new Set<string>();
 
-      const trySelectWinnerForGrade = (list: Winner[], gradeVal: string, reasonTag: string) => {
-        for (let i = 0; i < list.length; i++) {
-          const s = list[i];
-          const cleanId = cleanStudentId(s.studentId);
-          const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
-          const targetGradeNum = String(gradeVal).replace(/[^0-9]/g, '');
+      if (isLocked && frozenMvpWinners && frozenMvpWinners[month]) {
+        selectedWinners = frozenMvpWinners[month];
+        selectedWinners.forEach(w => {
+          const cleanId = cleanStudentId(w.studentId);
+          localSelectedSet.add(cleanId);
+          cumulativeSnackWinners.add(cleanId);
+        });
+      } else {
+        const trySelectWinnerForGrade = (list: Winner[], gradeVal: string, reasonTag: string) => {
+          for (let i = 0; i < list.length; i++) {
+            const s = list[i];
+            const cleanId = cleanStudentId(s.studentId);
+            const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
+            const targetGradeNum = String(gradeVal).replace(/[^0-9]/g, '');
 
-          if (sGradeNum !== targetGradeNum) continue;
-          if (isExcludedStudentName(s.name)) continue;
+            if (sGradeNum !== targetGradeNum) continue;
+            if (isExcludedStudentName(s.name)) continue;
 
-          // Filter out if they won in past months or are already selected this month
-          if (!cumulativeSnackWinners.has(cleanId) && !localSelectedSet.has(cleanId)) {
-            selectedWinners.push({
-              studentId: s.studentId,
-              name: s.name,
-              department: s.department,
-              grade: s.grade,
-              reason: `${gradeVal}학년 ${reasonTag}`,
-              value: s.value
-            });
-            localSelectedSet.add(cleanId);
-            cumulativeSnackWinners.add(cleanId);
-            break; // selected 1 for this grade & category combination, we are done
+            // Filter out if they won in past months or are already selected this month
+            if (!cumulativeSnackWinners.has(cleanId) && !localSelectedSet.has(cleanId)) {
+              selectedWinners.push({
+                studentId: s.studentId,
+                name: s.name,
+                department: s.department,
+                grade: s.grade,
+                reason: `${gradeVal}학년 ${reasonTag}`,
+                value: s.value
+              });
+              localSelectedSet.add(cleanId);
+              cumulativeSnackWinners.add(cleanId);
+              break; // selected 1 for this grade & category combination, we are done
+            }
           }
+        };
+
+        // Select chronologically:
+        // A. Korean Speed (학년별 1명씩 = 총 3명)
+        ['1', '2', '3'].forEach(g => {
+          trySelectWinnerForGrade(rawKorSpeedCandidates, g, '한글 최고 속도');
+        });
+
+        // B. English Speed (학년별 1명씩 = 총 3명)
+        ['1', '2', '3'].forEach(g => {
+          trySelectWinnerForGrade(rawEngSpeedCandidates, g, '영어 최고 속도');
+        });
+
+        // C. Korean Growth (6월부터 학년별 1명씩 = 총 3명)
+        if (prevMonthName) {
+          ['1', '2', '3'].forEach(g => {
+            trySelectWinnerForGrade(rawKorGrowthCandidates, g, '한글 최고 향상도');
+          });
         }
-      };
 
-      // Select chronologically:
-      // A. Korean Speed (학년별 1명씩 = 총 3명)
-      ['1', '2', '3'].forEach(g => {
-        trySelectWinnerForGrade(rawKorSpeedCandidates, g, '한글 최고 속도');
-      });
-
-      // B. English Speed (학년별 1명씩 = 총 3명)
-      ['1', '2', '3'].forEach(g => {
-        trySelectWinnerForGrade(rawEngSpeedCandidates, g, '영어 최고 속도');
-      });
-
-      // C. Korean Growth (6월부터 학년별 1명씩 = 총 3명)
-      if (prevMonthName) {
-        ['1', '2', '3'].forEach(g => {
-          trySelectWinnerForGrade(rawKorGrowthCandidates, g, '한글 최고 향상도');
-        });
-      }
-
-      // D. English Growth (6월부터 학년별 1명씩 = 총 3명)
-      if (prevMonthName) {
-        ['1', '2', '3'].forEach(g => {
-          trySelectWinnerForGrade(rawEngGrowthCandidates, g, '영어 최고 향상도');
-        });
+        // D. English Growth (6월부터 학년별 1명씩 = 총 3명)
+        if (prevMonthName) {
+          ['1', '2', '3'].forEach(g => {
+            trySelectWinnerForGrade(rawEngGrowthCandidates, g, '영어 최고 향상도');
+          });
+        }
       }
 
       historyMap[month] = {
@@ -567,7 +583,7 @@ export function TeacherAnalytics({
     });
 
     return historyMap;
-  }, [englishDb, koreanDb, sortedMonths]);
+  }, [englishDb, koreanDb, sortedMonths, mvpLocks, frozenMvpWinners]);
 
   // 🟢 3. CUMULATIVE PERIODIC MAIN AWARDS (Double dipping ALLOWED!)
   // Calculated over the entire span 5월 - 10월
@@ -1320,19 +1336,23 @@ export function TeacherAnalytics({
 
               {/* Month Select Buttons */}
               <div className="flex flex-wrap gap-2 justify-center py-2 bg-stone-50 border border-stone-200/60 rounded-2xl max-w-xl mx-auto p-2">
-                {sortedMonths.map((m, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedMonth(m)}
-                    className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
-                      selectedMonth === m 
-                        ? 'bg-indigo-600 text-white shadow-xs' 
-                        : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 bg-white border border-stone-200/50'
-                    }`}
-                  >
-                    {m}  MVP{idx === 0 && '(선배정)'}
-                  </button>
-                ))}
+                {sortedMonths.map((m, idx) => {
+                  const isLocked = !!mvpLocks[m];
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedMonth(m)}
+                      className={`px-4 py-2 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 ${
+                        selectedMonth === m 
+                          ? 'bg-indigo-600 text-white shadow-xs' 
+                          : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 bg-white border border-stone-200/50'
+                      }`}
+                    >
+                      <span>{m}  MVP{idx === 0 && '(선배정)'}</span>
+                      {isLocked && <span className="text-[10px]" title="마감 완료">🔒</span>}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Monthly Results Display */}
@@ -1342,6 +1362,7 @@ export function TeacherAnalytics({
                 const monthlyEngSpeed = winnersList.filter(w => w.reason.includes('영어 최고 속도'));
                 const monthlyKorGrowth = winnersList.filter(w => w.reason.includes('한글 최고 향상도'));
                 const monthlyEngGrowth = winnersList.filter(w => w.reason.includes('영어 최고 향상도'));
+                const isSelectedMonthLocked = !!mvpLocks[selectedMonth];
 
                 return (
                   <div className="space-y-6">
@@ -1353,9 +1374,17 @@ export function TeacherAnalytics({
                           <Award className="h-5 w-5 text-indigo-600" />
                           🏆 {selectedMonth} MVP
                         </h4>
-                        <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-100">
-                          중복 수혜 비대상 제외 처리 완료
-                        </span>
+                        {isSelectedMonthLocked ? (
+                          <span className="text-[10px] text-amber-800 font-extrabold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
+                            <Lock className="h-3 w-3 text-amber-600" />
+                            <span>마감됨 (🔒 명단 고정 완료)</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 flex items-center gap-1.5 animate-pulse">
+                            <Unlock className="h-3 w-3 text-indigo-500" />
+                            <span>실시간 계산 분석 중 (미마감)</span>
+                          </span>
+                        )}
                       </div>
 
                       {winnersList.length === 0 ? (
@@ -1826,147 +1855,243 @@ export function TeacherAnalytics({
                   </div>
 
                   {/* 2-Column Bento Layout for Trend Graph & May baseline analysis stats */}
+                  {/* 2-Column Bento Layout for Trend Graph & May baseline analysis stats */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     
-                    {/* Left/Middle Column: Large hybrid SVG graph */}
-                    <div id="growth-hybrid-graph-container" className="lg:col-span-2 relative bg-slate-50 border border-slate-100 rounded-2xl p-6 h-76 flex flex-col justify-between select-none">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider font-sans">성장 곡선 및 월별 수련 결과 (라인 + 막대 하이브리드)</span>
-                        <div className="flex gap-3 text-[9px] font-black font-sans">
-                          <span className="flex items-center gap-1 text-purple-700">🟣 한글선</span>
-                          <span className="flex items-center gap-1 text-indigo-700">🔵 영어선</span>
-                          <span className="flex items-center gap-1 text-stone-400">📊 월실제막대 (5월 포함)</span>
+                    {/* Left/Middle Column: Beautiful SVG growth trend graph - Styled EXACTLY like the Student Typing chart */}
+                    <div id="growth-hybrid-graph-container" className="lg:col-span-2 relative bg-white border border-emerald-100 rounded-3xl p-6 shadow-sm bg-linear-to-b from-white to-emerald-50/5 flex flex-col justify-between select-none">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                        <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 font-sans">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                          인비 타자 챌린지 훈련 효과 추이 분석
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-4">
+                          <span className="text-xs font-sans font-bold flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-green-600 inline-block"></span>
+                            한글 평균
+                          </span>
+                          <span className="text-xs font-sans font-bold flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                            영어 평균
+                          </span>
+                          <span className="text-xs text-slate-500 font-mono font-bold bg-slate-50/80 border border-slate-150 px-2 py-0.5 rounded-lg shrink-0">
+                            기간: {growthTrendsTimeline.length}개월
+                          </span>
                         </div>
                       </div>
 
-                      <div className="flex-1 w-full relative">
-                        {/* Grid Lines */}
-                        <div className="absolute inset-x-0 top-0 border-t border-slate-150" />
-                        <div className="absolute inset-x-0 top-1/4 border-t border-dashed border-slate-200" />
-                        <div className="absolute inset-x-0 top-2/4 border-t border-dashed border-slate-200" />
-                        <div className="absolute inset-x-0 top-3/4 border-t border-dashed border-slate-200" />
-                        <div className="absolute inset-x-0 bottom-0 border-b border-slate-150" />
+                      <div className="relative w-full overflow-hidden flex-1 min-h-[220px] mt-2">
+                        {(() => {
+                          const chartWidth = 500;
+                          const chartHeight = 220;
+                          const paddingLeft = 45;
+                          const paddingRight = 20;
+                          const paddingTop = 25;
+                          const paddingBottom = 30;
 
-                        {/* SVG element */}
-                        <svg className="w-full h-full absolute inset-0 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                          {(() => {
-                            const allSpeeds = [
-                              ...growthTrendsTimeline.map(t => t.korAvg),
-                              ...growthTrendsTimeline.map(t => t.engAvg)
-                            ];
-                            const maxSpeed = Math.max(...allSpeeds) * 1.15;
-                            const minSpeed = Math.min(...allSpeeds) * 0.85;
-                            const range = (maxSpeed - minSpeed) || 1;
+                          const graphWidth = chartWidth - paddingLeft - paddingRight;
+                          const graphHeight = chartHeight - paddingTop - paddingBottom;
 
-                            const korPoints = growthTrendsTimeline.map((t, idx) => {
-                              const x = (idx / (growthTrendsTimeline.length - 1)) * 100;
-                              const y = 100 - (((t.korAvg - minSpeed) / range) * 100);
-                              return { x, y, val: t.korAvg };
-                            });
+                          const allSpeeds = [
+                            ...growthTrendsTimeline.map(t => t.korAvg),
+                            ...growthTrendsTimeline.map(t => t.engAvg)
+                          ];
+                          const maxSpeedValue = Math.max(...allSpeeds, 100);
+                          const minSpeedValue = 0;
 
-                            const engPoints = growthTrendsTimeline.map((t, idx) => {
-                              const x = (idx / (growthTrendsTimeline.length - 1)) * 100;
-                              const y = 100 - (((t.engAvg - minSpeed) / range) * 100);
-                              return { x, y, val: t.engAvg };
-                            });
+                          const yAxisTicksCount = 4;
+                          const rawInterval = maxSpeedValue / yAxisTicksCount;
+                          const yInterval = Math.ceil(rawInterval / 20) * 20;
+                          const yMax = yInterval * yAxisTicksCount;
 
-                            const korD = korPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-                            const engD = engPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                          const getX = (index: number) => {
+                            if (growthTrendsTimeline.length <= 1) return paddingLeft + graphWidth / 2;
+                            return paddingLeft + (index / (growthTrendsTimeline.length - 1)) * graphWidth;
+                          };
 
-                            return (
-                              <>
-                                {/* Translucent Bar Columns for exact month values (including May) in the background */}
-                                {korPoints.map((p, idx) => (
-                                  <rect
-                                    key={`kor-bar-${idx}`}
-                                    x={Math.max(0, p.x - 2.8)}
-                                    y={Math.min(100, p.y)}
-                                    width="2.2"
-                                    height={Math.max(0, 100 - p.y)}
-                                    fill="#b084f4"
-                                    opacity="0.18"
-                                    rx="0.5"
-                                  />
-                                ))}
-                                {engPoints.map((p, idx) => (
-                                  <rect
-                                    key={`eng-bar-${idx}`}
-                                    x={Math.min(98, p.x + 0.6)}
-                                    y={Math.min(100, p.y)}
-                                    width="2.2"
-                                    height={Math.max(0, 100 - p.y)}
-                                    fill="#6366f1"
-                                    opacity="0.18"
-                                    rx="0.5"
-                                  />
-                                ))}
+                          const getY = (speed: number) => {
+                            const ratio = (speed - minSpeedValue) / (yMax - minSpeedValue);
+                            return paddingTop + graphHeight - ratio * graphHeight;
+                          };
 
-                                {/* Han/Kor Area and Line - styled beautifully in purple */}
-                                <path d={`${korD} L 100 100 L 0 100 Z`} fill="url(#purpleLinearGrad2)" opacity="0.06" />
-                                <path d={korD} fill="none" stroke="#9333ea" strokeWidth="2.5" strokeLinecap="round" />
+                          const korPoints = growthTrendsTimeline.map((t, idx) => ({
+                            x: getX(idx),
+                            y: getY(t.korAvg),
+                            month: t.month,
+                            speed: t.korAvg
+                          }));
 
-                                {/* Eng Area and Line - styled in indigo */}
-                                <path d={`${engD} L 100 100 L 0 100 Z`} fill="url(#indigoLinearGrad2)" opacity="0.06" />
-                                <path d={engD} fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinecap="round" />
+                          const engPoints = growthTrendsTimeline.map((t, idx) => ({
+                            x: getX(idx),
+                            y: getY(t.engAvg),
+                            month: t.month,
+                            speed: t.engAvg
+                          }));
 
-                                {/* Interactive dots with tooltip markings for Purple (Han) */}
-                                {korPoints.map((p, idx) => (
-                                  <g key={`kp-dot-${idx}`}>
-                                    <circle cx={p.x} cy={p.y} r="3.5" fill="#9333ea" stroke="white" strokeWidth="1.5" />
-                                    {/* May Highlight Flag */}
-                                    {idx === 0 && (
+                          let korLineD = '';
+                          let korAreaD = '';
+                          let engLineD = '';
+                          let engAreaD = '';
+
+                          if (korPoints.length > 0) {
+                            korLineD = `M ${korPoints[0].x} ${korPoints[0].y} ` + korPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+                            korAreaD = `${korLineD} L ${korPoints[korPoints.length - 1].x} ${paddingTop + graphHeight} L ${korPoints[0].x} ${paddingTop + graphHeight} Z`;
+                          }
+
+                          if (engPoints.length > 0) {
+                            engLineD = `M ${engPoints[0].x} ${engPoints[0].y} ` + engPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+                            engAreaD = `${engLineD} L ${engPoints[engPoints.length - 1].x} ${paddingTop + graphHeight} L ${engPoints[0].x} ${paddingTop + graphHeight} Z`;
+                          }
+
+                          return (
+                            <svg 
+                              viewBox={`0 0 ${chartWidth} ${chartHeight}`} 
+                              className="w-full h-auto overflow-visible select-none"
+                            >
+                              <defs>
+                                <linearGradient id="kor-area-grad-teacher" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#16a34a" stopOpacity="0.12" />
+                                  <stop offset="100%" stopColor="#16a34a" stopOpacity="0.00" />
+                                </linearGradient>
+                                <linearGradient id="eng-area-grad-teacher" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.12" />
+                                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
+                                </linearGradient>
+                              </defs>
+
+                              {/* 1. Y축 보조 눈금선 및 숫자 */}
+                              {Array.from({ length: yAxisTicksCount + 1 }).map((_, idx) => {
+                                const tickValue = idx * yInterval;
+                                const yPos = getY(tickValue);
+                                return (
+                                  <g key={`y-guide-${idx}`} className="opacity-70">
+                                    <line 
+                                      x1={paddingLeft} 
+                                      y1={yPos} 
+                                      x2={chartWidth - paddingRight} 
+                                      y2={yPos} 
+                                      stroke="#f1f5f9" 
+                                      strokeWidth="1"
+                                      strokeDasharray="4 4"
+                                    />
+                                    <text 
+                                      x={paddingLeft - 8} 
+                                      y={yPos + 3.5} 
+                                      textAnchor="end" 
+                                      className="fill-gray-400 font-mono text-[9px] font-medium"
+                                    >
+                                      {tickValue}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+
+                              {/* 2. 그라데이션 면적 채우기 */}
+                              {korAreaD && (
+                                <path 
+                                  d={korAreaD} 
+                                  fill="url(#kor-area-grad-teacher)" 
+                                />
+                              )}
+                              {engAreaD && (
+                                <path 
+                                  d={engAreaD} 
+                                  fill="url(#eng-area-grad-teacher)" 
+                                />
+                              )}
+
+                              {/* 3. 트렌드 선 그리기 */}
+                              {korLineD && (
+                                <path 
+                                  d={korLineD} 
+                                  fill="none" 
+                                  stroke="#16a34a" 
+                                  strokeWidth="3" 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round"
+                                />
+                              )}
+                              {engLineD && (
+                                <path 
+                                  d={engLineD} 
+                                  fill="none" 
+                                  stroke="#10b981" 
+                                  strokeWidth="3" 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round"
+                                />
+                              )}
+
+                              {/* 4. 노드 매핑 및 X축 레이블 */}
+                              {korPoints.map((p, idx) => {
+                                const ep = engPoints[idx];
+                                return (
+                                  <g key={`month-nodes-${idx}`} className="group">
+                                    {/* X축 월 텍스트 표시 */}
+                                    <text 
+                                      x={p.x} 
+                                      y={paddingTop + graphHeight + 16} 
+                                      textAnchor="middle" 
+                                      className="fill-gray-400 font-sans text-[10px] font-bold"
+                                    >
+                                      {p.month === '5월' ? '5월 (도입)' : p.month}
+                                    </text>
+
+                                    {/* Korean Node Circles & Text (Offset upward) */}
+                                    <circle 
+                                      cx={p.x} 
+                                      cy={p.y} 
+                                      r="4" 
+                                      fill="#ffffff" 
+                                      stroke="#16a34a" 
+                                      strokeWidth="2" 
+                                    />
+                                    <text 
+                                      x={p.x} 
+                                      y={p.y - 8} 
+                                      textAnchor="middle" 
+                                      className="fill-green-700 font-mono text-[9px] font-black"
+                                    >
+                                      {p.speed}
+                                    </text>
+
+                                    {/* English Node Circles & Text (Offset downward) */}
+                                    {ep && (
                                       <g>
-                                        <rect x="0.5" y={p.y - 12} width="16" height="7.5" fill="#9333ea" rx="1.5" />
-                                        <text x="8" y={p.y - 7} fill="white" fontSize="4.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">시작점</text>
+                                        <circle 
+                                          cx={ep.x} 
+                                          cy={ep.y} 
+                                          r="4" 
+                                          fill="#ffffff" 
+                                          stroke="#10b981" 
+                                          strokeWidth="2" 
+                                        />
+                                        <text 
+                                          x={ep.x} 
+                                          y={ep.y + 11} 
+                                          textAnchor="middle" 
+                                          className="fill-emerald-700 font-mono text-[9px] font-black"
+                                        >
+                                          {ep.speed}
+                                        </text>
                                       </g>
                                     )}
                                   </g>
-                                ))}
+                                );
+                              })}
 
-                                {/* Interactive dots for Indigo (Eng) */}
-                                {engPoints.map((p, idx) => (
-                                  <g key={`ep-dot-${idx}`}>
-                                    <circle cx={p.x} cy={p.y} r="3.5" fill="#4f46e5" stroke="white" strokeWidth="1.5" />
-                                    {/* May Highlight Flag */}
-                                    {idx === 0 && (
-                                      <g>
-                                        <rect x="0.5" y={p.y + 4} width="16" height="7.5" fill="#4f46e5" rx="1.5" />
-                                        <text x="8" y={p.y + 9} fill="white" fontSize="4.5" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">5월 영어</text>
-                                      </g>
-                                    )}
-                                  </g>
-                                ))}
-
-                                {/* Grad Gradients */}
-                                <defs>
-                                  <linearGradient id="purpleLinearGrad2" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#9333ea" />
-                                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                                  </linearGradient>
-                                  <linearGradient id="indigoLinearGrad2" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#4f46e5" />
-                                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                                  </linearGradient>
-                                </defs>
-                              </>
-                            );
-                          })()}
-                        </svg>
-                      </div>
-
-                      {/* Timeline Legend label */}
-                      <div className="flex justify-between items-center pt-4 border-t border-slate-100 text-[10.5px] font-mono">
-                        {growthTrendsTimeline.map((t, idx) => (
-                          <div key={idx} className="text-center">
-                            <div className="flex flex-col gap-0.5 mb-1 items-center justify-center">
-                              <span className="text-purple-700 font-extrabold">{t.month === '5월' ? '⭐ ' : ''}한: {t.korAvg}타</span>
-                              <span className="text-indigo-700 font-extrabold">영: {t.engAvg}타</span>
-                            </div>
-                            <span className={`text-[10px] font-bold block ${t.month === '5월' ? 'text-indigo-600 font-black' : 'text-stone-400'}`}>
-                              {t.month === '5월' ? '5월 (도입)' : t.month}
-                            </span>
-                          </div>
-                        ))}
+                              {/* 바닥 축 기초선 */}
+                              <line 
+                                x1={paddingLeft} 
+                                y1={paddingTop + graphHeight} 
+                                x2={chartWidth - paddingRight} 
+                                y2={paddingTop + graphHeight} 
+                                stroke="#e2e8f0" 
+                                strokeWidth="1.5"
+                              />
+                            </svg>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -2005,13 +2130,13 @@ export function TeacherAnalytics({
                           <span className="text-[10px] font-extrabold text-stone-500 block">🏆 5월 인증 통과 우수생 비율</span>
                           <div className="space-y-1 text-[10px]">
                             {(() => {
-                              const mayAchievers = studentCertificates.filter(s => s.achievementMonth === '5월');
+                              const mayAchievers = studentCertificates.filter(s => s.levelAchievedMonth === '5월');
                               const totalCount = studentCertificates.length || 1;
                               const ratioOfTotal = Math.round((mayAchievers.length / totalCount) * 100);
                               
-                              const num1 = mayAchievers.filter(s => s.finalLevel === '1급').length;
-                              const num2 = mayAchievers.filter(s => s.finalLevel === '2급').length;
-                              const num3 = mayAchievers.filter(s => s.finalLevel === '3급').length;
+                              const num1 = mayAchievers.filter(s => s.finalPoints === 3).length;
+                              const num2 = mayAchievers.filter(s => s.finalPoints === 2).length;
+                              const num3 = mayAchievers.filter(s => s.finalPoints === 1).length;
 
                               return (
                                 <>

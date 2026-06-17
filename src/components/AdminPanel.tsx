@@ -5,10 +5,12 @@
 
 import React, { useState } from 'react';
 import { googleSignIn, logout, getAccessToken } from '../auth';
-import { fetchSpreadsheetData, DEFAULT_SPREADSHEET_ID, clearDataCache } from '../data';
+import { fetchSpreadsheetData, DEFAULT_SPREADSHEET_ID, clearDataCache, parseStudentIdInfo } from '../data';
+import { StudentAuth } from '../types';
 import { 
   Settings, Key, Link2, CheckCircle2, AlertTriangle, Copy, 
-  Terminal, ShieldCheck, HelpCircle, HardDriveDownload, UserCheck, Eye, LogIn, LogOut, ChevronDown, ChevronUp
+  Terminal, ShieldCheck, HelpCircle, HardDriveDownload, UserCheck, Eye, LogIn, LogOut, ChevronDown, ChevronUp,
+  Lock, Unlock
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 
@@ -17,14 +19,30 @@ interface AdminPanelProps {
   currentSpreadsheetId: string;
   currentAppsScriptUrl?: string | null;
   onClose: () => void;
+  mvpLocks?: {[month: string]: boolean};
+  onToggleMvpLock?: (month: string, currentWinners: any[]) => void;
+  monthlySnackWinnersHistory?: {[month: string]: { winners: any[] }};
+  sortedMonths?: string[];
+  authDb?: StudentAuth[];
+  onResetStudentPin?: (studentId: string, newPin: string) => Promise<boolean>;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ 
   onSpreadsheetConfigured, 
   currentSpreadsheetId, 
   currentAppsScriptUrl,
-  onClose 
+  onClose,
+  mvpLocks = {},
+  onToggleMvpLock,
+  monthlySnackWinnersHistory = {},
+  sortedMonths = [],
+  authDb = [],
+  onResetStudentPin
 }) => {
+  const [selectedStudentIdForReset, setSelectedStudentIdForReset] = useState<string>('');
+  const [isResettingPin, setIsResettingPin] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+
   const [spreadsheetIdIn, setSpreadsheetIdIn] = useState(
     currentSpreadsheetId === DEFAULT_SPREADSHEET_ID ? '' : currentSpreadsheetId
   );
@@ -182,6 +200,20 @@ function doGet(e) {
         var stdNm = e.parameter.name;
         var agreement = e.parameter.agreement || 'Y';
         var res = saveConsentGas(stdId, stdNm, agreement);
+        return ContentService.createTextOutput(JSON.stringify(res))
+            .setMimeType(ContentService.MimeType.JSON);
+      } catch (err) {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, message: err.toString() }))
+            .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
+    // 1c. 학생 비밀번호 변경 처리
+    if (e.parameter.action === 'saveStudentPin') {
+      try {
+        var stdId = e.parameter.studentId;
+        var pin = e.parameter.pin;
+        var res = saveStudentPinGas(stdId, pin);
         return ContentService.createTextOutput(JSON.stringify(res))
             .setMimeType(ContentService.MimeType.JSON);
       } catch (err) {
@@ -697,6 +729,69 @@ function saveConsentGas(studentId, name, agreement) {
   }
   
   return { success: true, message: "동의 정보가 성공적으로 기록되었습니다." };
+}
+
+/**
+ * 학생 비밀번호 변경/재설정
+ */
+function saveStudentPinGas(studentId, pin) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var candidates = ['students_auth', 'student_auth', 'students', 'auth', '인증', '학생명부', '학생_auth'];
+  var sheet = null;
+  
+  if (ss) {
+    var allSheets = ss.getSheets();
+    for (var i = 0; i < candidates.length; i++) {
+      var cand = String(candidates[i]).trim().toLowerCase().replace(/[\s_/-]/g, '');
+      for (var j = 0; j < allSheets.length; j++) {
+        var sClean = String(allSheets[j].getName()).trim().toLowerCase().replace(/[\s_/-]/g, '');
+        if (sClean === cand) {
+          sheet = allSheets[j];
+          break;
+        }
+      }
+      if (sheet) break;
+    }
+  }
+  
+  if (!sheet) {
+    return { success: false, message: "학생 인증 명부 시트를 찾을 수 없습니다." };
+  }
+  
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var idxId = findHeaderIndex(headers, ['학번', 'ID', 'studentId', '학생ID', '학급번호', '번호', '학급']);
+  var idxPin = findHeaderIndex(headers, ['인증번호', '비밀번호', '비번', '핀', '인증', 'pin']);
+  
+  if (idxId === -1) idxId = 0;
+  if (idxPin === -1) idxPin = 2; // Default to C column
+  
+  var foundRowIndex = -1;
+  
+  function normalizeIdGasTemp(val) {
+    if (val === null || val === undefined) return '';
+    var s = String(val).trim().replace(/['"“”\s]/g, '');
+    if (s.indexOf('.0') !== -1 && s.endsWith('.0')) {
+      s = s.substring(0, s.length - 2);
+    }
+    return s;
+  }
+  
+  var searchId = normalizeIdGasTemp(studentId);
+  for (var i = 1; i < values.length; i++) {
+    var curId = normalizeIdGasTemp(values[i][idxId]);
+    if (curId && curId === searchId) {
+      foundRowIndex = i + 1;
+      break;
+    }
+  }
+  
+  if (foundRowIndex !== -1) {
+    sheet.getRange(foundRowIndex, idxPin + 1).setValue(pin);
+    return { success: true, message: "학생 비밀번호가 성공적으로 변경되었습니다." };
+  } else {
+    return { success: false, message: "학생 인증 명부에서 해당 학번(" + studentId + ")을 찾을 수 없습니다." };
+  }
 }`;
 
   const appsScriptCode_HTML = `<!DOCTYPE html>
@@ -1098,6 +1193,155 @@ function saveConsentGas(studentId, name, agreement) {
                 )}
               </div>
             )}
+          </div>
+
+          {/* 🏆 월간 MVP 마감 관리 (Lock Manager) */}
+          <div className="p-5 rounded-2xl bg-amber-50/20 border border-amber-200/50 space-y-4">
+            <div className="flex gap-3">
+              <div className="p-2 rounded-xl bg-amber-100 text-amber-700 h-10 w-10 shrink-0 flex items-center justify-center">
+                <Lock className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-amber-900">🏆 월간 MVP 마감 관리 (Lock Manager)</h3>
+                <p className="text-xs text-amber-850 leading-relaxed font-medium">
+                  매월 타자 수련 마감 시점에 마감 버튼을 클릭하면, 이후 구글 스프레드시트에 더 높은 점수의 데이터가 추가되더라도 그 달의 MVP 수상 내역(명예의 전당)이 변동되지 않도록 고정됩니다.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              {sortedMonths.length === 0 ? (
+                <div className="p-4 text-center rounded-xl bg-white border border-amber-100/50 text-xs text-amber-600 font-semibold">
+                  데이터베이스가 연동되어 있지 않거나 월 기록이 존재하지 않습니다.
+                </div>
+              ) : (
+                sortedMonths.map(month => {
+                  const isLocked = !!mvpLocks[month];
+                  const monthData = monthlySnackWinnersHistory[month];
+                  const winners = monthData?.winners || [];
+                  const winnerNames = winners.map(w => w.name).join(', ') || '없음';
+
+                  return (
+                    <div 
+                      key={month} 
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border transition-all gap-3 ${
+                        isLocked 
+                          ? 'bg-amber-100/20 border-amber-200 shadow-xs' 
+                          : 'bg-white border-gray-150 hover:bg-gray-50/50'
+                      }`}
+                    >
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-xs sm:text-sm text-stone-800">{month} MVP 선정</span>
+                          {isLocked ? (
+                            <span className="inline-flex items-center gap-1 bg-amber-100 border border-amber-200/55 text-amber-850 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                              <Lock className="h-2.5 w-2.5" />
+                              마감됨 (🔒 고정 완료)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 bg-gray-150 text-gray-600 border border-gray-200 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                              <Unlock className="h-2.5 w-2.5" />
+                              분석 중 (🔓 실시간 계산)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-stone-500 font-medium">
+                          • 현재 수상자: <strong className="text-stone-700 font-bold">{winnerNames}</strong> (총 {winners.length}명)
+                        </div>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => onToggleMvpLock && onToggleMvpLock(month, winners)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer text-center shrink-0 border shadow-xs h-9 ${
+                          isLocked 
+                            ? 'bg-white border-amber-300 text-amber-700 hover:bg-amber-50' 
+                            : 'bg-amber-500 border-amber-600 text-white hover:bg-amber-600 active:scale-95'
+                        }`}
+                      >
+                        {isLocked ? '마감 취소 (실시간 전환)' : '월간 MVP 마감하기'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="h-px bg-gray-100" />
+
+          {/* 🔑 학생 전용 비밀번호 분실 초기화 (Password Reset Section) */}
+          <div className="p-5 rounded-2xl bg-yellow-50/20 border border-yellow-250 space-y-4">
+            <div className="flex gap-3">
+              <div className="p-2 rounded-xl bg-yellow-150 text-amber-700 h-10 w-10 shrink-0 flex items-center justify-center font-black text-base">
+                🔑
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-black text-amber-900">🔐 학생 비밀번호 현황 조회 및 초기화</h3>
+                <p className="text-xs text-amber-800 leading-relaxed font-bold">
+                  학생들이 비밀번호(생년월일)를 분실했거나 잘못 변경한 경우, 아래에서 해당 학생을 조회하여 초기 비밀번호인 <strong className="text-amber-950 bg-yellow-200 border border-yellow-300 px-1.5 py-0.5 rounded font-mono">12345678</strong>로 즉시 초기화/변경 처리가 가능합니다. (노란색 강조 관리 기능)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <div className="relative flex-1">
+                  <select
+                    value={selectedStudentIdForReset}
+                    onChange={(e) => {
+                      setSelectedStudentIdForReset(e.target.value);
+                      setResetSuccessMessage(null);
+                    }}
+                    className="w-full px-4 py-3 rounded-2xl border border-gray-250 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-gray-700 bg-white font-semibold"
+                  >
+                    <option value="">-- 초기화할 학생을 선택하십시오 --</option>
+                    {(authDb || []).map((student) => {
+                      const info = parseStudentIdInfo(student.studentId);
+                      return (
+                        <option key={student.studentId} value={student.studentId}>
+                          [{student.studentId}] {student.name} ({info.grade}학년 {info.department}) [현재비번: {student.pin}]
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                
+                <button
+                  type="button"
+                  disabled={!selectedStudentIdForReset || isResettingPin}
+                  onClick={async () => {
+                    const student = (authDb || []).find(s => s.studentId === selectedStudentIdForReset);
+                    if (!student) return;
+                    if (window.confirm(`정말 [${student.name}] 학생의 개인 비밀번호를 초기 비밀번호인 '12345678'로 강제 변경/초기화하시겠습니까?`)) {
+                      setIsResettingPin(true);
+                      setResetSuccessMessage(null);
+                      const success = onResetStudentPin ? await onResetStudentPin(student.studentId, '12345678') : false;
+                      setIsResettingPin(false);
+                      if (success) {
+                        setResetSuccessMessage(`[${student.name}] 학생의 비밀번호가 '12345678'로 정상 초기화되었습니다! 학생이 즉시 새 비밀번호나 '12345678'로 로그인할 수 있습니다.`);
+                      } else {
+                        alert('비밀번호 초기화 저장 도중 오류가 발생했습니다. 구글 시트 쓰기 권한 또는 Apps Script 상태를 점검하십시오.');
+                      }
+                    }
+                  }}
+                  className={`px-5 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer text-center shrink-0 border h-11 flex items-center justify-center gap-1.5 ${
+                    !selectedStudentIdForReset 
+                      ? 'bg-yellow-200/50 border-yellow-300 text-slate-400 cursor-not-allowed'
+                      : 'bg-yellow-400 hover:bg-yellow-500 border-yellow-500 text-slate-900 active:scale-98 shadow-sm'
+                  }`}
+                >
+                  {isResettingPin ? '초기화 처리 중...' : '초기 비밀번호(12345678)로 재설정'}
+                </button>
+              </div>
+
+              {resetSuccessMessage && (
+                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-900 text-xs font-bold leading-normal animate-fade-in flex items-center gap-1.5">
+                  <span className="text-emerald-605 text-sm font-black">✓</span>
+                  {resetSuccessMessage}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="h-px bg-gray-100" />
