@@ -38,6 +38,14 @@ const isExcludedStudentName = (name: string): boolean => {
 
 const cleanStudentId = (id: string) => String(id || '').trim().replace(/[^0-9A-Za-z]/g, '');
 
+const getFormattedDate = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}.${month}.${day}`;
+};
+
 const maskName = (name: string): string => {
   if (!name) return '';
   const trimmed = name.trim();
@@ -502,9 +510,9 @@ export default function App() {
         });
 
         if (sKor.length >= 2) {
-          const firstSpeed = sKor[0].speed;
-          const lastSpeed = sKor[sKor.length - 1].speed;
-          const improvement = lastSpeed - firstSpeed;
+          const minSpeed = Math.min(...sKor.map(r => r.speed));
+          const maxSpeed = Math.max(...sKor.map(r => r.speed));
+          const improvement = maxSpeed - minSpeed;
           if (improvement > 0) {
             korGrowths.push({
               studentId: sid,
@@ -530,9 +538,9 @@ export default function App() {
         });
 
         if (sEng.length >= 2) {
-          const firstSpeed = sEng[0].speed;
-          const lastSpeed = sEng[sEng.length - 1].speed;
-          const improvement = lastSpeed - firstSpeed;
+          const minSpeed = Math.min(...sEng.map(r => r.speed));
+          const maxSpeed = Math.max(...sEng.map(r => r.speed));
+          const improvement = maxSpeed - minSpeed;
           if (improvement > 0) {
             engGrowths.push({
               studentId: sid,
@@ -1270,8 +1278,6 @@ export default function App() {
                 <div className="text-right shrink-0 hidden sm:block mr-2">
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-none">Today is</p>
                   <p className="text-xs font-bold text-slate-700 mt-1">{getFormattedDate()}</p>
-  
-</p>
                 </div>
                 <button 
                   onClick={handleStudentLogout}

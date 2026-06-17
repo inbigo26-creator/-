@@ -715,9 +715,9 @@ export function TeacherAnalytics({
         });
 
         if (sKor.length >= 2) {
-          const firstSpeed = sKor[0].speed;
-          const lastSpeed = sKor[sKor.length - 1].speed;
-          const improvement = lastSpeed - firstSpeed;
+          const minSpeed = Math.min(...sKor.map(r => r.speed));
+          const maxSpeed = Math.max(...sKor.map(r => r.speed));
+          const improvement = maxSpeed - minSpeed;
           if (improvement > 0) {
             korGrowths.push({
               studentId: sid,
@@ -743,9 +743,9 @@ export function TeacherAnalytics({
         });
 
         if (sEng.length >= 2) {
-          const firstSpeed = sEng[0].speed;
-          const lastSpeed = sEng[sEng.length - 1].speed;
-          const improvement = lastSpeed - firstSpeed;
+          const minSpeed = Math.min(...sEng.map(r => r.speed));
+          const maxSpeed = Math.max(...sEng.map(r => r.speed));
+          const improvement = maxSpeed - minSpeed;
           if (improvement > 0) {
             engGrowths.push({
               studentId: sid,
