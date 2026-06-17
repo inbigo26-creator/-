@@ -1268,8 +1268,10 @@ export default function App() {
             {studentSession && (
               <>
                 <div className="text-right shrink-0 hidden sm:block mr-2">
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-none">최종 업데이트</p>
-                  <p className="text-xs font-bold text-slate-700 mt-1">2026.05.29</p>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-none">Today is</p>
+                  <p className="text-xs font-bold text-slate-700 mt-1">{getFormattedDate()}</p>
+  
+</p>
                 </div>
                 <button 
                   onClick={handleStudentLogout}
