@@ -1066,7 +1066,7 @@ export function TeacherAnalytics({
                       <AlertCircle className="h-4 w-4 text-rose-500 animate-pulse" />
                       급수 미달 요인 분석 
                     </h4>
-                    <span className="text-[10px] font-bold text-rose-650 bg-rose-50 px-2 py-0.5 rounded-lg">미달성자 {aggregateStats.bottleneck.totalFails}명 분석</span>
+                    <span className="text-[10px] font-bold text-rose-650 bg-rose-50 px-2 py-0.5 rounded-lg">타자 꿈나무 {aggregateStats.bottleneck.totalFails}명 분석</span>
                   </div>
 
                   {aggregateStats.bottleneck.totalFails === 0 ? (
@@ -1090,11 +1090,11 @@ export function TeacherAnalytics({
                           {(() => {
                             const b = aggregateStats.bottleneck;
                             if (b.engRate > b.korRate && b.engRate > b.bothRate) {
-                              return `인비고 미달성 학생의 ${b.engRate}%가 '영어 타자 실력 부족'으로 인해 급수를 취득하지 못하고 있습니다. 영어 타자 연습에 조금 더 힘써주세요!`;
+                              return `인비고 타자 꿈나무의 ${b.engRate}%가 '영어 타자 실력 부족'으로 인해 급수를 취득하지 못하고 있습니다. 영어 타자 연습에 조금 더 힘써주세요!`;
                             } else if (b.korRate > b.engRate && b.korRate > b.bothRate) {
-                              return `인비고 미달성 학생의 ${b.korRate}%가 '한글 타자 실력 부족'으로 인해 급수를 취득하지 못하고 있습니다. 영어 타자 연습에 조금 더 힘써주세요!`;
+                              return `인비고 타자 꿈나무의 ${b.korRate}%가 '한글 타자 실력 부족'으로 인해 급수를 취득하지 못하고 있습니다. 영어 타자 연습에 조금 더 힘써주세요!`;
                             } else {
-                              return `다수의 학생(${b.bothRate}%)이 한글과 영어 타자 모두에서 최저 등급(100/150타)을 도달하지 못해, 한글/영어 모두 집중 훈련이 필요합니다.`;
+                              return `다수의 타자 꿈나무 학생(${b.bothRate}%)이 한글과 영어 타자 모두에서 최저 등급(100/150타)을 도달하지 못해, 한글/영어 모두 집중 훈련이 필요합니다.`;
                             }
                           })()}
                         </p>
@@ -1153,19 +1153,19 @@ export function TeacherAnalytics({
                     </h4>
                     <div className="grid grid-cols-2 gap-3 text-center">
                       <div className="p-4 bg-rose-50 border border-slate-100 rounded-2xl animate-fade-in">
-                        <span className="text-[11px] font-bold text-rose-600 block">1급 인증 🥇</span>
+                        <span className="text-[11px] font-bold text-rose-600 block">타자 1급 인증 🥇</span>
                         <span className="text-2xl font-black text-rose-800 font-mono mt-0.5 inline-block">{aggregateStats.level1Count}명</span>
                       </div>
                       <div className="p-4 bg-amber-50 border border-slate-100 rounded-2xl animate-fade-in">
-                        <span className="text-[11px] font-bold text-amber-600 block">2급 인증 🥈</span>
+                        <span className="text-[11px] font-bold text-amber-600 block">타자 2급 인증 🥈</span>
                         <span className="text-2xl font-black text-amber-800 font-mono mt-0.5 inline-block">{aggregateStats.level2Count}명</span>
                       </div>
                       <div className="p-4 bg-emerald-50 border border-slate-100 rounded-2xl animate-fade-in">
-                        <span className="text-[11px] font-bold text-emerald-600 block">3급 인증 🥉</span>
+                        <span className="text-[11px] font-bold text-emerald-600 block">타자 3급 인증 🥉</span>
                         <span className="text-2xl font-black text-emerald-800 font-mono mt-0.5 inline-block">{aggregateStats.level3Count}명</span>
                       </div>
                       <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl animate-fade-in">
-                        <span className="text-[11px] font-bold text-slate-550 block">급수 없음 🚫</span>
+                        <span className="text-[11px] font-bold text-slate-550 block">타자 꿈나무 🌱</span>
                         <span className="text-2xl font-black text-slate-700 font-mono mt-0.5 inline-block">{aggregateStats.failCount}명</span>
                       </div>
                     </div>
@@ -1889,7 +1889,7 @@ export function TeacherAnalytics({
                   <h4 className="text-xs font-black text-stone-900 tracking-wider uppercase font-sans">
                     인비 타자 챌린지 전교생 효과 분석
                   </h4>
-                  <p className="text-[10px] text-stone-400 font-medium font-sans">학생들의 성장을 그래프 흐름으로 활인할 수 있십니다.</p>
+                  <p className="text-[10px] text-stone-400 font-medium font-sans">학생들의 성장을 그래프 흐름으로 확인할 수 있십니다.</p>
                 </div>
                 <span className="inline-flex items-center gap-1 bg-emerald-55 text-emerald-700 text-[9px] border px-2.5 py-1 rounded-lg font-black font-sans">
                   인비 챌린지 검정 효과 분석 입증용 🚀
@@ -1922,12 +1922,12 @@ export function TeacherAnalytics({
                             {growthTrendsTimeline[0].korAvg}타 ➡️ {growthTrendsTimeline[growthTrendsTimeline.length - 1].korAvg}타
                           </strong> 
                           ({growthTrendsTimeline[growthTrendsTimeline.length - 1].korAvg - growthTrendsTimeline[0].korAvg}타 우상향), 
-                          영문 타수는 
+                          영어 타수는 
                           <strong className="text-indigo-650 mx-1 font-mono font-bold">
                             {growthTrendsTimeline[0].engAvg}타 ➡️ {growthTrendsTimeline[growthTrendsTimeline.length - 1].engAvg}타
                           </strong> 
                           ({growthTrendsTimeline[growthTrendsTimeline.length - 1].engAvg - growthTrendsTimeline[0].engAvg}타 우상향)으로 집계되었습니다. 
-                          타자 훈련 검정 체계 연동 효과가 완벽히 입증되고 있습니다.
+                          학생들이 성장한 결과를 확인할 수 있습니다.
                         </>
                       )}
                     </p>
