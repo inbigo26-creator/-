@@ -65,6 +65,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [copiedText, setCopiedText] = useState(false);
   const [showScriptExporter, setShowScriptExporter] = useState(false);
 
+  // Privacy Policy File Upload and Edit
+  const [privacyText, setPrivacyText] = useState<string>(() => localStorage.getItem('privacy_policy_text') || '');
+  const [privacySaveSuccess, setPrivacySaveSuccess] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
   // Handle Google OAuth Sign In
   const handleGoogleSignIn = async () => {
     setIsAuthenticating(true);
@@ -94,6 +99,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       clearDataCache();
     } catch (err) {
       console.error('Signout failed:', err);
+    }
+  };
+
+  // 🛡️ Privacy Policy File Handlers
+  const handleFileRead = (file: File) => {
+    if (!file) return;
+    if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) {
+      alert('텍스트(.txt) 또는 마크다운(.md) 파일만 업로드할 수 있습니다.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (text) {
+        setPrivacyText(text);
+        setPrivacySaveSuccess(false);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileRead(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileRead(e.target.files[0]);
+    }
+  };
+
+  const handleSavePrivacy = () => {
+    localStorage.setItem('privacy_policy_text', privacyText);
+    setPrivacySaveSuccess(true);
+    setTimeout(() => setPrivacySaveSuccess(false), 3000);
+  };
+
+  const handleResetPrivacy = () => {
+    if (confirm('개인정보처리방침을 기본 제공안으로 초기화하시겠습니까?')) {
+      localStorage.removeItem('privacy_policy_text');
+      setPrivacyText('');
+      setPrivacySaveSuccess(true);
+      setTimeout(() => setPrivacySaveSuccess(false), 3000);
     }
   };
 
@@ -1296,6 +1359,92 @@ function saveStudentPinGas(studentId, pin) {
                 })
               )}
             </div>
+          </div>
+
+          <div className="h-px bg-gray-100" />
+
+          {/* 🛡️ 개인정보처리방침 파일 등록 및 설정 관리 */}
+          <div className="p-5 rounded-2xl bg-emerald-50/25 border border-emerald-200/80 space-y-4">
+            <div className="flex gap-3">
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 h-10 w-10 shrink-0 flex items-center justify-center font-black text-base border border-emerald-100 shadow-3xs">
+                🛡️
+              </div>
+              <div className="space-y-1 flex-1">
+                <h3 className="text-sm font-black text-slate-800">🛡️ 개인정보처리방침 파일 등록 및 상세 설정</h3>
+                <p className="text-xs text-stone-500 leading-relaxed font-bold">
+                  학생 회원 및 사용자가 조회할 수 있는 <strong className="text-emerald-805">개인정보처리방침</strong> 파일(.txt, .md)을 등록하거나 내용을 직접 편집할 수 있습니다. 등록된 방침은 대시보드 화면 맨 아래의 링크를 통해 학생들이 투명하게 확인할 수 있습니다.
+                </p>
+              </div>
+            </div>
+
+            {/* Drag & Drop File Upload Area */}
+            <div 
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-xl p-5 text-center transition-all cursor-pointer ${
+                dragActive 
+                  ? 'border-emerald-500 bg-emerald-50/60' 
+                  : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+              }`}
+            >
+              <input 
+                type="file" 
+                id="privacy-file-upload" 
+                accept=".txt,.md" 
+                onChange={handleFileChange} 
+                className="hidden" 
+              />
+              <label htmlFor="privacy-file-upload" className="cursor-pointer space-y-1.5 block">
+                <div className="text-slate-400 font-bold text-xs">
+                  📁 마크다운(.md) 또는 텍스트(.txt) 파일을 여기에 드래그해 놓거나 <span className="text-emerald-600 underline font-black">컴퓨터에서 선택</span> 하세요
+                </div>
+                <p className="text-[10px] text-stone-400">
+                  파일 업로드 시 아래 창에 내용이 자동으로 인식되어 불러와집니다.
+                </p>
+              </label>
+            </div>
+
+            {/* Direct Edit Textarea */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black text-slate-700 block">
+                ✍️ 방침 내용 수동 편집 시 적용 창
+              </label>
+              <textarea
+                value={privacyText}
+                onChange={(e) => {
+                  setPrivacyText(e.target.value);
+                  setPrivacySaveSuccess(false);
+                }}
+                placeholder="여기에 직접 처리방침 내용을 입력하거나 위의 파일 업로드를 이용하십시오. 빈 상태로 저장 시 기본 탑재된 방침안이 적용됩니다."
+                className="w-full min-h-[140px] text-[11px] font-medium font-sans p-3 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white leading-relaxed"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2 justify-between items-center">
+              <button
+                type="button"
+                onClick={handleResetPrivacy}
+                className="px-4 py-2 hover:bg-rose-50 border border-stone-200 hover:border-rose-200 text-stone-500 hover:text-rose-600 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                기본방침 초기화
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePrivacy}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs active:scale-98 flex items-center gap-1.5"
+              >
+                💾 설정 저장하기
+              </button>
+            </div>
+
+            {privacySaveSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-900 text-xs font-bold animate-fade-in flex items-center gap-1.5">
+                <span className="text-emerald-605">✓</span>
+                새로운 개인정보처리방침 설정이 브라우저와 시스템에 안전하게 저장 및 적용되었습니다!
+              </div>
+            )}
           </div>
 
           <div className="h-px bg-gray-100" />

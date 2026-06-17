@@ -78,7 +78,7 @@ export const TypingChart: React.FC<TypingChartProps> = ({
   let linePathD = '';
   let areaPathD = '';
 
-  if (points.length > 0) {
+  if (points.length >= 2) {
     // 단순 직선 연결 루트 생성
     linePathD = `M ${points[0].x} ${points[0].y} ` + 
       points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
@@ -157,7 +157,7 @@ export const TypingChart: React.FC<TypingChartProps> = ({
           })}
 
           {/* 학년별 평균 기준선 */}
-          {gradeAverage !== undefined && gradeAverage > 0 && (
+          {gradeAverage !== undefined && gradeAverage > 0 && history.length >= 2 && (
             <line 
               x1={paddingLeft} 
               y1={getY(gradeAverage)} 
@@ -171,7 +171,7 @@ export const TypingChart: React.FC<TypingChartProps> = ({
           )}
 
           {/* 전체 평균 기준선 */}
-          {schoolAverage !== undefined && schoolAverage > 0 && (
+          {schoolAverage !== undefined && schoolAverage > 0 && history.length >= 2 && (
             <line 
               x1={paddingLeft} 
               y1={getY(schoolAverage)} 

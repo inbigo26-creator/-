@@ -25,7 +25,7 @@ import { TeacherAnalytics } from './components/TeacherAnalytics';
 import { 
   Keyboard, LogIn, GraduationCap, Lock, HelpCircle, 
   Settings, AlertCircle, BookOpen, LogOut, Medal, Sparkles,
-  Sprout, Star, TrendingUp
+  Sprout, Star, TrendingUp, ShieldCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { SCHOOL_SPREADSHEET_ID, SCHOOL_APPS_SCRIPT_URL } from './config';
@@ -122,6 +122,7 @@ export default function App() {
   const [studentTab, setStudentTab] = useState<'my_stats' | 'hall_of_fame' | 'privacy_consent'>('my_stats');
   const [selectedHallMonth, setSelectedHallMonth] = useState<string>('');
   const [showPrivacyOnlyModal, setShowPrivacyOnlyModal] = useState(false);
+  const [showPrivacyPolicyModal, setShowPrivacyPolicyModal] = useState(false);
 
   // Student own Password change states
   const [showStudentPasswordChangeModal, setShowStudentPasswordChangeModal] = useState(false);
@@ -1121,7 +1122,7 @@ export default function App() {
             <div className="w-18 h-18 bg-emerald-50 rounded-full mx-auto mb-4 flex items-center justify-center text-emerald-600 font-extrabold text-2xl border border-emerald-100 shadow-xs">
               {studentSession.grade || '1'}
             </div>
-            <h2 className="font-bold text-[17px] leading-tight text-slate-950 tracking-tight">{studentSession.id}</h2>
+            <h2 className="font-bold text-[17px] leading-tight text-slate-950 tracking-tight">{studentSession.id} {studentSession.name}</h2>
             <p className="text-xs text-emerald-600 mt-2 uppercase tracking-widest font-extrabold flex items-center justify-center gap-1.5 bg-emerald-50/60 py-1.5 px-3 rounded-full border border-emerald-100">
               <Sprout className="h-3.5 w-3.5 text-emerald-500 animate-pulse shrink-0" />
               {studentSession.grade}학년 {studentSession.department}과
@@ -1205,7 +1206,10 @@ export default function App() {
                 </div>
                 <div>
                   <h1 className="text-base sm:text-lg font-black text-stone-900 tracking-tight leading-none flex items-center gap-1.5">
-                    2026 Speed-Up 인비 타자 챌린지
+                    <span className="hidden sm:inline">2026 Speed-Up 인비 타자 챌린지</span>
+                    <span className="sm:hidden block leading-tight text-sm">
+                      2026 Speed-Up<br />인비 타자 챌린지
+                    </span>
                     <Sprout className="h-4 sm:h-4.5 w-4 sm:w-4.5 text-emerald-500 animate-bounce shrink-0" />
                   </h1>
                   <p className="text-[10px] sm:text-xs text-emerald-650 font-bold mt-1">
@@ -1217,7 +1221,11 @@ export default function App() {
               <>
                 <div>
                   <h1 className="text-base sm:text-lg font-black text-stone-900 tracking-tight flex items-center gap-1.5 leading-none">
-                    2026 Speed-Up 인비 타자 챌린지 <span className="text-[9px] font-bold tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-lg uppercase select-none">Live</span>
+                    <span className="hidden sm:inline">2026 Speed-Up 인비 타자 챌린지</span>
+                    <span className="sm:hidden block max-w-[190px] leading-tight text-xs">
+                      2026 Speed-Up<br />인비 타자 챌린지
+                    </span>
+                    <span className="text-[9px] font-bold tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-lg uppercase select-none shrink-0">Live</span>
                     <Sprout className="h-4 sm:h-4.5 w-4 sm:w-4.5 text-emerald-500 animate-pulse shrink-0" />
                   </h1>
                   <p className="text-[10.5px] text-emerald-650 font-bold mt-1">
@@ -1247,10 +1255,11 @@ export default function App() {
                       setTeacherPasswordInput('');
                       setShowTeacherLogin(true);
                     }}
-                    className="p-2.5 px-4 rounded-xl text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-all flex items-center gap-2 text-xs font-extrabold cursor-pointer h-10 shadow-sm"
+                    className="p-2 sm:p-2.5 px-2.5 sm:px-4 rounded-xl text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-all flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-extrabold cursor-pointer min-h-10 sm:h-10 shadow-sm shrink-0"
                   >
-                    <Lock className="h-4 w-4 text-slate-500" />
-                    <span>선생님 로그인</span>
+                    <Lock className="h-4 w-4 text-slate-500 shrink-0" />
+                    <span className="hidden sm:inline">선생님 로그인</span>
+                    <span className="sm:hidden block leading-tight text-center">선생님<br />로그인</span>
                   </button>
                 )}
               </>
@@ -1315,8 +1324,13 @@ export default function App() {
                         <Sprout className="h-6 w-6" />
                       </div>
                     </div>
-                    <h2 className="text-2xl font-black tracking-tight text-stone-900 leading-tight">2026 Speed-Up 인비 타자 챌린지</h2>
-                    <p className="text-2xl sm:text-[27px] text-emerald-700 font-extrabold mt-2 tracking-tight leading-snug">
+                    <h2 className="text-2xl font-black tracking-tight text-stone-900 leading-tight">
+                      <span className="hidden sm:inline">2026 Speed-Up 인비 타자 챌린지</span>
+                      <span className="sm:hidden block">
+                        2026 Speed-Up<br />인비 타자 챌린지
+                      </span>
+                    </h2>
+                    <p className="text-xl sm:text-[27px] text-emerald-700 font-extrabold mt-2 tracking-tight leading-snug">
                       디지털 읽걷쓰 성장 프로젝트 🌱
                     </p>
                   </div>
@@ -1447,9 +1461,9 @@ export default function App() {
                     </span>
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight font-sans">
-                    <span className="text-emerald-700">{studentSession.id}</span> 학생의 성장 기록
+                    <span className="text-emerald-700">{studentSession.id} {studentSession.name}</span> 학생의 성장 기록
                   </h2>
-                  <p className="text-xs text-stone-400 font-medium tracking-tight font-sans">로그인 학번 : {studentSession.id} / 데이터 동기화 완료</p>
+                  <p className="text-xs text-stone-400 font-medium tracking-tight font-sans">로그인 학번 : {studentSession.id} ({studentSession.name}) / 데이터 동기화 완료</p>
                   
                   {/* 🔑 Yellow emphasized Password Change Button right in header banner for top-level visibility */}
                   <div className="pt-2 flex flex-wrap gap-2 animate-fade-in">
@@ -1476,18 +1490,6 @@ export default function App() {
                       <LogOut className="h-3 w-3" />
                       <span>로그아웃</span>
                     </button>
-                  </div>
-                </div>
-
-                <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4 md:max-w-xs flex items-start gap-3 shadow-2xs font-sans">
-                  <div className="p-2 bg-emerald-50 text-emerald-500 rounded-xl shrink-0">
-                    <Medal className="h-5 w-5" />
-                  </div>
-                  <div className="text-xs space-y-0.5">
-                    <p className="font-bold text-stone-850">기적의 타수 성장 러너</p>
-                    <p className="text-stone-550 leading-relaxed font-semibold">
-                      속도가 월별로 증가하고 있습니다. 포기 지점을 넘어 지속 수련해 최고 급수인 1급(Gold)을 겨냥하세요!
-                    </p>
                   </div>
                 </div>
               </div>
@@ -1600,8 +1602,14 @@ export default function App() {
                                           {w.grade}학년 대표
                                         </span>
                                         <div>
-                                          <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
-                                          <p className="text-[10px] text-stone-400">{w.grade}학년 {w.department}</p>
+                                          {isTeacher ? (
+                                            <>
+                                              <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
+                                              <p className="text-[10px] text-stone-400">{w.grade}학년 {w.department}</p>
+                                            </>
+                                          ) : (
+                                            <p className="font-extrabold text-stone-900">{w.grade}학년 {w.department}</p>
+                                          )}
                                         </div>
                                       </div>
                                       <span className="font-mono text-sm text-rose-700 font-extrabold">{w.value}타 최고</span>
@@ -1629,8 +1637,14 @@ export default function App() {
                                           {w.grade}학년 대표
                                         </span>
                                         <div>
-                                          <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
-                                          <p className="text-[10px] text-stone-400">{w.grade}학년 {w.department}</p>
+                                          {isTeacher ? (
+                                            <>
+                                              <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
+                                              <p className="text-[10px] text-stone-400">{w.grade}학년 {w.department}</p>
+                                            </>
+                                          ) : (
+                                            <p className="font-extrabold text-stone-900">{w.grade}학년 {w.department}</p>
+                                          )}
                                         </div>
                                       </div>
                                       <span className="font-mono text-sm text-indigo-700 font-extrabold">{w.value}타 최고</span>
@@ -1663,8 +1677,14 @@ export default function App() {
                                           {w.grade}학년 대표
                                         </span>
                                         <div>
-                                          <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
-                                          <p className="text-[10px] text-stone-450">{w.grade}학년 {w.department}</p>
+                                          {isTeacher ? (
+                                            <>
+                                              <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
+                                              <p className="text-[10px] text-stone-450">{w.grade}학년 {w.department}</p>
+                                            </>
+                                          ) : (
+                                            <p className="font-extrabold text-stone-900">{w.grade}학년 {w.department}</p>
+                                          )}
                                         </div>
                                       </div>
                                       <span className="text-right">
@@ -1695,8 +1715,14 @@ export default function App() {
                                           {w.grade}학년 대표
                                         </span>
                                         <div>
-                                          <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
-                                          <p className="text-[10px] text-stone-450">{w.grade}학년 {w.department}</p>
+                                          {isTeacher ? (
+                                            <>
+                                              <p className="font-extrabold text-stone-900">{maskName(w.name)}</p>
+                                              <p className="text-[10px] text-stone-450">{w.grade}학년 {w.department}</p>
+                                            </>
+                                          ) : (
+                                            <p className="font-extrabold text-stone-900">{w.grade}학년 {w.department}</p>
+                                          )}
                                         </div>
                                       </div>
                                       <span className="text-right">
@@ -1754,8 +1780,14 @@ export default function App() {
                                       {s.grade}학년 1위
                                     </span>
                                     <div>
-                                      <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
-                                      <p className="text-[10px] text-stone-400">{s.grade}학년 {s.department}</p>
+                                      {isTeacher ? (
+                                        <>
+                                          <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
+                                          <p className="text-[10px] text-stone-400">{s.grade}학년 {s.department}</p>
+                                        </>
+                                      ) : (
+                                        <p className="font-extrabold text-stone-900">{s.grade}학년 {s.department}</p>
+                                      )}
                                     </div>
                                   </div>
                                   <span className="font-mono text-sm text-rose-700 font-extrabold">{s.value}타 최고</span>
@@ -1783,8 +1815,14 @@ export default function App() {
                                       {s.grade}학년 1위
                                     </span>
                                     <div>
-                                      <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
-                                      <p className="text-[10px] text-stone-404">{s.grade}학년 {s.department}</p>
+                                      {isTeacher ? (
+                                        <>
+                                          <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
+                                          <p className="text-[10px] text-stone-404">{s.grade}학년 {s.department}</p>
+                                        </>
+                                      ) : (
+                                        <p className="font-extrabold text-stone-900">{s.grade}학년 {s.department}</p>
+                                      )}
                                     </div>
                                   </div>
                                   <span className="font-mono text-sm text-indigo-700 font-extrabold">{s.value}타 최고</span>
@@ -1817,8 +1855,14 @@ export default function App() {
                                       {s.grade}학년 1위
                                     </span>
                                     <div>
-                                      <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
-                                      <p className="text-[10px] text-stone-450">{s.grade}학년 {s.department}</p>
+                                      {isTeacher ? (
+                                        <>
+                                          <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
+                                          <p className="text-[10px] text-stone-450">{s.grade}학년 {s.department}</p>
+                                        </>
+                                      ) : (
+                                        <p className="font-extrabold text-stone-900">{s.grade}학년 {s.department}</p>
+                                      )}
                                     </div>
                                   </div>
                                   <span className="text-right">
@@ -1849,8 +1893,14 @@ export default function App() {
                                       {s.grade}학년 1위
                                     </span>
                                     <div>
-                                      <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
-                                      <p className="text-[10px] text-stone-450">{s.grade}학년 {s.department}</p>
+                                      {isTeacher ? (
+                                        <>
+                                          <p className="font-extrabold text-stone-900">{maskName(s.name)}</p>
+                                          <p className="text-[10px] text-stone-450">{s.grade}학년 {s.department}</p>
+                                        </>
+                                      ) : (
+                                        <p className="font-extrabold text-stone-900">{s.grade}학년 {s.department}</p>
+                                      )}
                                     </div>
                                   </div>
                                   <span className="text-right">
@@ -1872,41 +1922,108 @@ export default function App() {
             })()}
 
               {studentTab === 'my_stats' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in font-sans">
-                  {/* Korean */}
-                  <div className="space-y-6">
-                    <StudentStatsCard 
-                      stats={studentSession.koreanStats} 
-                      title="한글 타자 성장 기록" 
-                      type="korean" 
-                      gradeAverage={statsAverages.korean.gradeAverage[studentSession.grade || '1']}
-                      schoolAverage={statsAverages.korean.schoolAverage}
-                    />
+                <div className="space-y-8 animate-fade-in font-sans">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in font-sans">
+                    {/* Korean */}
+                    <div className="space-y-6">
+                      <StudentStatsCard 
+                        stats={studentSession.koreanStats} 
+                        title="한글 타자 성장 기록" 
+                        type="korean" 
+                        gradeAverage={statsAverages.korean.gradeAverage[studentSession.grade || '1']}
+                        schoolAverage={statsAverages.korean.schoolAverage}
+                      />
 
-                    <TypingChart 
-                      history={studentSession.koreanStats.history} 
-                      type="korean" 
-                      gradeAverage={statsAverages.korean.gradeAverage[studentSession.grade || '1']}
-                      schoolAverage={statsAverages.korean.schoolAverage}
-                    />
+                      <TypingChart 
+                        history={studentSession.koreanStats.history} 
+                        type="korean" 
+                        gradeAverage={statsAverages.korean.gradeAverage[studentSession.grade || '1']}
+                        schoolAverage={statsAverages.korean.schoolAverage}
+                      />
+                    </div>
+
+                    {/* English */}
+                    <div className="space-y-6">
+                      <StudentStatsCard 
+                        stats={studentSession.englishStats} 
+                        title="영어 타자 성장 기록" 
+                        type="english" 
+                        gradeAverage={statsAverages.english.gradeAverage[studentSession.grade || '1']}
+                        schoolAverage={statsAverages.english.schoolAverage}
+                      />
+                      
+                      <TypingChart 
+                        history={studentSession.englishStats.history} 
+                        type="english" 
+                        gradeAverage={statsAverages.english.gradeAverage[studentSession.grade || '1']}
+                        schoolAverage={statsAverages.english.schoolAverage}
+                      />
+                    </div>
                   </div>
 
-                  {/* English */}
-                  <div className="space-y-6">
-                    <StudentStatsCard 
-                      stats={studentSession.englishStats} 
-                      title="영어 타자 성장 기록" 
-                      type="english" 
-                      gradeAverage={statsAverages.english.gradeAverage[studentSession.grade || '1']}
-                      schoolAverage={statsAverages.english.schoolAverage}
-                    />
-                    
-                    <TypingChart 
-                      history={studentSession.englishStats.history} 
-                      type="english" 
-                      gradeAverage={statsAverages.english.gradeAverage[studentSession.grade || '1']}
-                      schoolAverage={statsAverages.english.schoolAverage}
-                    />
+                  {/* 🏆 공식 타자 인증 등급(급수) 기준표 (페이지 하단 배치 및 2급 라이트 그레이 연한 파스텔톤 적용) */}
+                  <div className="bg-white rounded-3xl border border-stone-200 shadow-3xs p-5 sm:p-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3.5 border-b border-stone-150">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">🏆</span>
+                          <h3 className="text-sm font-black text-slate-900 tracking-tight">공식 타자 인증 등급(급수) 기준표</h3>
+                        </div>
+                        <p className="text-[10.5px] text-stone-400 font-bold">목표 최고 속도에 도달하여 공식 등급을 올리고 실력을 키워보세요!</p>
+                      </div>
+                      <span className="self-start sm:self-center px-2 py-0.5 bg-emerald-50 text-emerald-750 text-[9.5px] font-black rounded-lg border border-emerald-100 shadow-3xs select-none">
+                        실시간 자동 반영
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 한글과 영어 등급표를 모던하고 깔끔한 카드로 배치 */}
+                      <div className="bg-emerald-50/15 border border-emerald-100/60 p-4 rounded-2xl space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-emerald-850 flex items-center gap-1.5">
+                            <span>🇰🇷</span> 한글 타자 기준
+                          </span>
+                          <span className="text-[9px] text-emerald-600 bg-white font-extrabold px-1.5 py-0.5 rounded-md border border-emerald-100/50">KOREAN</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-white px-2 py-2 rounded-xl border border-emerald-100 text-center shadow-3xs">
+                            <span className="text-[9.5px] font-black text-amber-600 block mb-0.5">🥇 1급</span>
+                            <span className="text-[11px] font-mono font-black text-stone-800">350타 이상</span>
+                          </div>
+                          <div className="bg-white px-2 py-2 rounded-xl border border-slate-200 text-center shadow-3xs">
+                            <span className="text-[9.5px] font-black text-slate-500 block mb-0.5">🥈 2급</span>
+                            <span className="text-[11px] font-mono font-black text-stone-800">250타 이상</span>
+                          </div>
+                          <div className="bg-white px-2 py-2 rounded-xl border border-orange-100 text-center shadow-3xs">
+                            <span className="text-[9.5px] font-black text-orange-655 block mb-0.5">🥉 3급</span>
+                            <span className="text-[11px] font-mono font-black text-stone-800">150타 이상</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-indigo-50/15 border border-indigo-100/50 p-4 rounded-2xl space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-indigo-850 flex items-center gap-1.5">
+                            <span>🇺🇸</span> 영어 타자 기준
+                          </span>
+                          <span className="text-[9px] text-indigo-600 bg-white font-extrabold px-1.5 py-0.5 rounded-md border border-indigo-100/55">ENGLISH</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-white px-2 py-2 rounded-xl border border-indigo-100 text-center shadow-3xs">
+                            <span className="text-[9.5px] font-black text-amber-600 block mb-0.5">🥇 1급</span>
+                            <span className="text-[11px] font-mono font-black text-stone-800">200타 이상</span>
+                          </div>
+                          <div className="bg-white px-2 py-2 rounded-xl border border-slate-200 text-center shadow-3xs">
+                            <span className="text-[9.5px] font-black text-slate-500 block mb-0.5">🥈 2급</span>
+                            <span className="text-[11px] font-mono font-black text-stone-800">150타 이상</span>
+                          </div>
+                          <div className="bg-white px-2 py-2 rounded-xl border border-orange-100 text-center shadow-3xs">
+                            <span className="text-[9.5px] font-black text-orange-655 block mb-0.5">🥉 3급</span>
+                            <span className="text-[11px] font-mono font-black text-stone-800">100타 이상</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2062,9 +2179,16 @@ export default function App() {
 
         {/* FOOTER */}
         <footer className="w-full bg-white border-t border-slate-205 py-6 text-center text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center px-4 sm:px-8 gap-3">
-          <p className="font-medium tracking-wide">
-            Copyright © 2026 INBIGO. All rights reserved. | Version 1.0.0
-          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-medium tracking-wide">
+            <span>Copyright © 2026 INBIGO. All rights reserved. | Version 1.0.0</span>
+            <span className="hidden sm:inline text-slate-250">|</span>
+            <button 
+              onClick={() => setShowPrivacyPolicyModal(true)} 
+              className="text-stone-500 hover:text-stone-900 font-bold underline decoration-dotted decoration-1 underline-offset-3 transition-colors cursor-pointer"
+            >
+              개인정보처리방침
+            </button>
+          </div>
           <div className="flex gap-6">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2401,7 +2525,7 @@ export default function App() {
                 </div>
                 <div>
                   <span className="font-black text-stone-900 font-sans">3. 보유 및 이용 기간: </span>
-                  <span className="font-black text-indigo-805 font-sans">수집 일로부터 해당 학년도 종료 시까지 (학기가 종료된 후 데이터는 복구 불가능하도록 자동 파기됩니다.)</span>
+                  <span className="font-black text-indigo-850 font-sans">수집 일로부터 해당 학년도 종료 시까지 (학기가 종료된 후 데이터는 복구 불가능하도록 자동 파기됩니다.)</span>
                 </div>
               </div>
 
@@ -2417,6 +2541,67 @@ export default function App() {
                 className="w-full py-3 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all cursor-pointer shadow-xs active:scale-98 text-center"
               >
                 닫기 및 확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🛡️ Custom/Stored Privacy Policy Display Modal */}
+      {showPrivacyPolicyModal && (
+        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in animate-duration-150">
+          <div className="bg-white rounded-3xl border border-stone-150 shadow-xl max-w-xl w-full p-6 sm:p-8 space-y-6 relative overflow-hidden animate-scale-up font-sans flex flex-col max-h-[85vh]">
+            <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600" />
+            
+            <div className="flex items-center justify-between pb-3 border-b border-stone-105">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-50 text-emerald-650 rounded-xl border border-emerald-100">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-slate-950 font-sans tracking-tight">
+                    개인정보처리방침
+                  </h3>
+                  <p className="text-[10px] text-stone-400 font-bold">인비 타자 챌린지 개인정보 보호 및 규정 안내</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowPrivacyPolicyModal(false)}
+                className="p-1.5 px-3 rounded-lg border border-stone-200 text-xs font-bold text-stone-500 hover:bg-stone-50 cursor-pointer"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs tracking-tight text-stone-605 leading-relaxed font-sans overflow-y-auto flex-1 pr-2">
+              <div className="whitespace-pre-wrap font-medium p-4.5 bg-stone-50 border border-stone-150 rounded-2xl leading-relaxed font-sans text-stone-750">
+                {localStorage.getItem('privacy_policy_text') || `[인비 챌린지 개인정보처리방침 (기본값)]
+
+본 프로그램(이하 '인비 챌린지')은 학생들의 타자 수련 능력 향상도 관리를 위해 양질의 교육용 정보서비스로 기획 및 구성 되었습니다. 정보 보호 책임하에 최소한의 안전 조치 및 정보보호 법령상의 규정을 철저히 준수하고 아래와 같이 개인정보처리방침을 공개합니다.
+
+1. 수집 및 이용 목적
+- 본인 대시보드 로그인 인증 및 식별
+- 학년별/학급별 통계 및 전교생 수준 분포 분석
+- 명예의 전당 및 MVP 수상 기록 매칭 및 관리
+
+2. 수집하는 개인정보 항목
+- 학번, 이름, 생년월일, 월별 타자 속도, 정확도, 평가 기준, 급수 취득 정보
+
+3. 개인정보의 보유 및 이용 기간
+- 학생 수집 데이터는 학년도 말(또는 운영 만기 시점)까지 보관 후, 복구 불가능한 영구 삭제 기법을 준수하여 자동 파기 처리됩니다.
+
+4. 동의권 및 불이익 고지
+- 학생 가입자 및 이용자는 개인정보 수집 및 처리 동의를 거부하실 권리가 있습니다. 단, 동의를 거부하는 경우 개인 타자 분석 시스템 내 실시간 순위 산정, 공로 인증서 발급 등의 대시보드의 사용 권한이 일부 제한될 수 있습니다.`}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-stone-105 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowPrivacyPolicyModal(false)}
+                className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all cursor-pointer shadow-2xs active:scale-98 text-center"
+              >
+                확인 및 닫기
               </button>
             </div>
           </div>
