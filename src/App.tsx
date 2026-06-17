@@ -2058,17 +2058,17 @@ export default function App() {
 
                     if (isAgreed) {
                       return (
-                        <div className="p-4.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center justify-between gap-4">
+                        <div className="p-4.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 break-words break-keep">
                           <div className="space-y-1">
                             <div className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                               <span className="text-xs font-black text-emerald-800">개인정보 동의 상태 : 동의 완료(Active)</span>
                             </div>
-                            <p className="text-[11px] text-emerald-705/80 font-semibold leading-relaxed">
+                            <p className="text-[11px] text-emerald-705/80 font-semibold leading-relaxed break-words break-keep">
                               귀하는 원활한 타자 성적 조회 및 성취도 추적 관리를 지지하며 동의하였습니다.
                             </p>
                           </div>
-                          <div className="flex flex-col gap-2 shrink-0 items-end">
+                          <div className="flex flex-col gap-2 shrink-0 items-start sm:items-end w-full sm:w-auto">
                             <span className="text-[10px] font-black bg-emerald-600 text-white px-3 py-1.5 rounded-lg uppercase tracking-widest text-center">
                               ACTIVE
                             </span>
@@ -2109,17 +2109,17 @@ export default function App() {
                       );
                     } else {
                       return (
-                        <div className="p-4.5 bg-rose-50/50 border border-rose-100 rounded-2xl flex items-center justify-between gap-4">
+                        <div className="p-4.5 bg-rose-50/50 border border-rose-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 break-words break-keep">
                           <div className="space-y-1">
                             <div className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
                               <span className="text-xs font-black text-rose-800">개인정보 동의 상태 : 동의 미완료 (N)</span>
                             </div>
-                            <p className="text-[11px] text-rose-750/80 font-semibold leading-relaxed font-sans">
+                            <p className="text-[11px] text-rose-750/80 font-semibold leading-relaxed font-sans break-words break-keep">
                               현재 구글 스프레드시트 상의 개인정보 동의 상태가 'N'으로 비활성화되어 있습니다. 다음 로그인 시에 동의 수집 팝업이 다시 나타납니다.
                             </p>
                           </div>
-                          <div className="flex flex-col gap-2 shrink-0 items-end">
+                          <div className="flex flex-col gap-2 shrink-0 items-start sm:items-end w-full sm:w-auto">
                             <span className="text-[10px] font-black bg-rose-600 text-white px-3 py-1.5 rounded-lg uppercase tracking-widest text-center">
                               PENDING (N)
                             </span>
@@ -2142,22 +2142,22 @@ export default function App() {
                       개인정보 보호법 제15조에 따른 주요 동의 내용 요약
                     </h4>
 
-                    <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4.5 space-y-3.5 text-xs text-stone-605">
+                    <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4.5 space-y-3.5 text-xs text-stone-605 break-words break-keep">
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-1.5 sm:gap-4 pb-3 border-b border-stone-200/50 font-sans">
                         <span className="font-black text-stone-900">1. 수집 항목</span>
-                        <span className="sm:col-span-3 text-stone-750 font-bold font-sans">
+                        <span className="sm:col-span-3 text-stone-750 font-bold font-sans break-words break-keep">
                           학번, 이름, 생년월일, 매월 타자검정 결과 (타수, 성장도, 급수)
                         </span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-1.5 sm:gap-4 pb-3 border-b border-stone-200/50 font-sans">
                         <span className="font-black text-stone-900">2. 수집 및 이용 목적</span>
-                        <span className="sm:col-span-3 text-stone-750 font-bold font-sans">
+                        <span className="sm:col-span-3 text-stone-750 font-bold font-sans break-words break-keep">
                           인비 타자 챌린지 내 사용자 본인 확인/식별, 개인별 성장도 계산 및 조회, 학교별/학년별 통계 관리
                         </span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-1.5 sm:gap-4 font-sans">
                         <span className="font-black text-stone-900">3. 보유 및 이용 기간</span>
-                        <span className="sm:col-span-3 text-emerald-800 font-extrabold font-sans">
+                        <span className="sm:col-span-3 text-emerald-800 font-extrabold font-sans break-words break-keep">
                           해당 학년도 종료 시까지 (종료 후 안전하게 파기됩니다.)
                         </span>
                       </div>
@@ -2168,7 +2168,7 @@ export default function App() {
                     <p className="text-[11px] font-black text-stone-700">
                       동의 주체: {studentSession.id}
                     </p>
-                    <p className="text-[10px] text-stone-400 leading-normal">
+                    <p className="text-[10px] text-stone-400 leading-normal break-words break-keep">
                       ※ 귀하는 동의를 거부할 권리가 있으나, 동의 거부 시 본 성장 관리 프로그램을 이용할 수 없습니다. <br />
                       동의 철회나 정보 정정을 원하실 경우, 담당 교사에게 문의해 주시기 바랍니다.
                     </p>
@@ -2517,12 +2517,12 @@ export default function App() {
               </h3>
             </div>
 
-            <div className="space-y-4 text-xs tracking-tight text-stone-605 leading-relaxed font-sans">
+            <div className="space-y-4 text-xs tracking-tight text-stone-605 leading-relaxed font-sans break-words break-keep">
               <p className="font-bold">
                 본 인비 타자 챌린지 프로그램은 학생들의 타자 수련 능력 향상도 관리를 위해 아래와 같이 최소한의 개인정보를 안전하게 수집합니다.
               </p>
               
-              <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4.5 space-y-2 text-[11px] font-sans shadow-3xs">
+              <div className="bg-stone-50 border border-stone-150 rounded-2xl p-4.5 space-y-2 text-[11px] font-sans shadow-3xs break-words break-keep">
                 <div>
                   <span className="font-black text-stone-900 font-sans">1. 수집 항목: </span>
                   <span className="font-black text-indigo-805 font-sans">학번, 이름, 생년월일, 매월 타자검정 결과 (속도/정확도/성장율/급수)</span>
@@ -2537,7 +2537,7 @@ export default function App() {
                 </div>
               </div>
 
-              <p className="text-[10.5px] font-black text-stone-500 font-sans leading-relaxed">
+              <p className="text-[10.5px] font-black text-stone-500 font-sans leading-relaxed break-words break-keep">
                 ※ 귀하는 상기 개인정보 수집 및 이용의 동의를 거부할 권리가 있습니다. 단, 동의를 거부하는 경우 본 프로그램 내 대시보드 조회 및 성장도 기록 매칭에 일부 제한이 따를 수 있음을 안내해 드립니다.
               </p>
             </div>
@@ -2581,8 +2581,8 @@ export default function App() {
               </button>
             </div>
 
-            <div className="space-y-4 text-xs tracking-tight text-stone-605 leading-relaxed font-sans overflow-y-auto flex-1 pr-2">
-              <div className="whitespace-pre-wrap font-medium p-4.5 bg-stone-50 border border-stone-150 rounded-2xl leading-relaxed font-sans text-stone-750">
+            <div className="space-y-4 text-xs tracking-tight text-stone-605 leading-relaxed font-sans overflow-y-auto flex-1 pr-2 break-words break-keep">
+              <div className="whitespace-pre-wrap font-medium p-4.5 bg-stone-50 border border-stone-150 rounded-2xl leading-relaxed font-sans text-stone-750 break-words break-keep">
                 {localStorage.getItem('privacy_policy_text') || `[인비 챌린지 개인정보처리방침 (기본값)]
 
 본 프로그램(이하 '인비 챌린지')은 학생들의 타자 수련 능력 향상도 관리를 위해 양질의 교육용 정보서비스로 기획 및 구성 되었습니다. 정보 보호 책임하에 최소한의 안전 조치 및 정보보호 법령상의 규정을 철저히 준수하고 아래와 같이 개인정보처리방침을 공개합니다.
