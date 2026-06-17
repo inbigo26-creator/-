@@ -787,7 +787,7 @@ function saveStudentPinGas(studentId, pin) {
   }
   
   if (foundRowIndex !== -1) {
-    sheet.getRange(foundRowIndex, idxPin + 1).setValue(pin);
+    sheet.getRange(foundRowIndex, idxPin + 1).setValue("'" + pin);
     return { success: true, message: "학생 비밀번호가 성공적으로 변경되었습니다." };
   } else {
     return { success: false, message: "학생 인증 명부에서 해당 학번(" + studentId + ")을 찾을 수 없습니다." };
@@ -926,7 +926,7 @@ function saveStudentPinGas(studentId, pin) {
       const filteredLevels = levels.filter(function(l) { return l.type === type; });
       filteredLevels.sort(function(a, b) { return a.minVal - b.minVal; });
 
-      let currentLevel = "무급 (훈련 필요)";
+      let currentLevel = "꿈나무 (훈련 필요)";
       let currentMinVal = 0;
       let nextLevel = null;
       let nextLevelNeeded = null;
@@ -1193,6 +1193,36 @@ function saveStudentPinGas(studentId, pin) {
                 )}
               </div>
             )}
+          </div>
+
+          {/* 🔗 원클릭 학생용 접속/공유 링크 생성기 */}
+          <div className="p-5 rounded-2xl bg-teal-50/30 border border-teal-200/50 space-y-3">
+            <div className="flex gap-3">
+              <div className="p-2 rounded-xl bg-teal-50 text-teal-700 h-10 w-10 shrink-0 flex items-center justify-center">
+                <Link2 className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-teal-900">🔗 학생용 최적화 실시간 연동 공유 링크 생성</h3>
+                <p className="text-xs text-teal-850 leading-relaxed font-sans font-medium">
+                  스마트폰이나 다른 PC로 접속하는 학생들이 별도의 연동 설정 없이 즉시 로그인하고 실시간 조회 및 비밀번호 변경을 진행할 수 있도록 설계된 '원클릭 연동 접속 링크'입니다.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const targetSid = spreadsheetIdIn || currentSpreadsheetId;
+                const targetGas = appsScriptUrlIn || currentAppsScriptUrl || '';
+                const shareUrl = `${window.location.origin}${window.location.pathname}?sid=${encodeURIComponent(targetSid)}&gas=${encodeURIComponent(targetGas)}`;
+                navigator.clipboard.writeText(shareUrl);
+                alert("🎉 학생용 실시간 연동용 접속 주소가 복사되었습니다!\n학생들에게 전달(단톡방, QR, 알림장 등)하시면 바로 스프레드시트와 동기화되어 정상 작동합니다.\n\n[복사된 주소]:\n" + shareUrl);
+              }}
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-extrabold py-3 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
+            >
+              <Copy className="h-4 w-4" />
+              학생들에게 전송할 실시간 연동 주소 복사하기
+            </button>
           </div>
 
           {/* 🏆 월간 MVP 마감 관리 (Lock Manager) */}

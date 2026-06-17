@@ -679,7 +679,7 @@ export function calculateStudentStats(
     .filter((l) => l.type === subjectLabel)
     .sort((a, b) => a.minVal - b.minVal);
 
-  let currentLevel = '무급';
+  let currentLevel = '꿈나무';
   let nextLevel = '최종 수료';
   let nextLevelNeeded = 0;
   let percentToNext = 100;
@@ -1059,7 +1059,7 @@ export async function saveStudentPinToSpreadsheet(
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  values: [[newPin]]
+                  values: [["'" + newPin]]
                 })
               });
               if (updateRes.ok) {

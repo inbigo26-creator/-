@@ -306,6 +306,51 @@ export function TeacherAnalytics({
     };
   }, [studentCertificates, englishDb, koreanDb]);
 
+  // Calculation of certificate status for EACH month in sortedMonths up to that month (cumulative)
+  const allMonthsStats = useMemo(() => {
+    const validStudents = studentCertificates.filter(s => !s.isExcluded);
+    const stats: {[month: string]: { num1: number; num2: number; num3: number; certifiedCount: number; totalCount: number }} = {};
+
+    sortedMonths.forEach(m => {
+      let num1 = 0; // 1급 (points = 3)
+      let num2 = 0; // 2급 (points = 2)
+      let num3 = 0; // 3급 (points = 1)
+      let certifiedCount = 0;
+
+      validStudents.forEach(s => {
+        // Find English speed up to month m specifically
+        const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId) && getMonthNumber(r.month) <= getMonthNumber(m));
+        const engSpeedVal = sEng.length > 0 ? Math.max(...sEng.map(r => r.speed), 0) : 0;
+
+        // Find Korean speed up to month m specifically
+        const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId) && getMonthNumber(r.month) <= getMonthNumber(m));
+        const korSpeedVal = sKor.length > 0 ? Math.max(...sKor.map(r => r.speed), 0) : 0;
+
+        const ep = getEnglishLevelPoints(engSpeedVal);
+        const kp = getKoreanLevelPoints(korSpeedVal);
+        const pts = Math.min(ep, kp);
+
+        if (pts === 3) num1++;
+        else if (pts === 2) num2++;
+        else if (pts === 1) num3++;
+        
+        if (pts > 0) {
+          certifiedCount++;
+        }
+      });
+
+      stats[m] = {
+        num1,
+        num2,
+        num3,
+        certifiedCount,
+        totalCount: validStudents.length
+      };
+    });
+
+    return stats;
+  }, [studentCertificates, englishDb, koreanDb, sortedMonths]);
+
   // 🟠 AGGREGATES: SCHOOL, GRADE AND DEPARTMENT STATISTICS
   const aggregateStats = useMemo(() => {
     const validStudents = studentCertificates.filter(s => !s.isExcluded);
@@ -2174,79 +2219,80 @@ export function TeacherAnalytics({
                       </div>
                     </div>
 
-                    {/* Right Column: Prominent May Baseline Result Card */}
-                    <div id="may-baseline-results-widget" className="bg-gradient-to-br from-indigo-50/40 to-stone-50 border border-stone-200/85 rounded-2xl p-4 space-y-4 flex flex-col justify-between">
-                      <div className="space-y-2.5">
-                        <div className="flex items-center gap-1.5 pb-1 border-b border-indigo-100/60">
-                          <span className="text-xs">📅</span>
-                          <h5 className="text-[11.5px] font-black text-slate-800 uppercase tracking-wider font-sans">
-                            도입월(현재 5월) 실적 결과 심층 분석
-                          </h5>
-                        </div>
+                    {/* Right Column: Monthly Analysis Widgets */}
+                    <div id="monthly-analysis-widgets-sidebar" className="space-y-4">
+                      {growthTrendsTimeline.map((t) => {
+                        const isMay = t.month === '5월';
+                        const mStats = allMonthsStats[t.month] || { num1: 0, num2: 0, num3: 0, certifiedCount: 0, totalCount: 1 };
+                        const totalCount = mStats.totalCount || 1;
+                        const ratioOfTotalValue = Math.round((mStats.certifiedCount / totalCount) * 100);
+                        const num1 = mStats.num1;
+                        const num2 = mStats.num2;
+                        const num3 = mStats.num3;
 
-                        <p className="text-[11px] text-stone-500 leading-relaxed font-sans">
-                          프로그램 도입 시점인 <strong>5월 검정 결과</strong>는 타자 실력의 기준 역할을 하며, 성장 곡선의 시작 좌표가 됩니다.
-                        </p>
+                        return (
+                          <div 
+                            key={t.month} 
+                            className="bg-gradient-to-br from-indigo-50/40 to-stone-50 border border-stone-200/85 rounded-2xl p-4 space-y-4 flex flex-col justify-between shadow-2xs"
+                          >
+                            <div className="space-y-2.5">
+                              <div className="flex items-center gap-1.5 pb-1 border-b border-indigo-100/60">
+                                <span className="text-xs">📅</span>
+                                <h5 className="text-[11.5px] font-black text-slate-800 uppercase tracking-wider font-sans">
+                                  {isMay ? '도입월(현재 5월) 실적 결과 심층 분석' : `${t.month} 실적 결과 심층 분석`}
+                                </h5>
+                              </div>
 
-                        {/* May Key Metrics Indicators */}
-                        <div className="grid grid-cols-2 gap-2 font-sans">
-                          <div className="p-2.5 bg-white border border-stone-150 rounded-xl">
-                            <span className="text-[9.5px] font-bold text-purple-600 block">5월 한글 평균</span>
-                            <span className="text-sm font-black font-mono text-purple-950">
-                              {(() => {
-                                const korRecords = koreanDb.filter(r => r.month === '5월');
-                                const activeKor = korRecords.filter(r => r.speed > 0);
-                                return activeKor.length > 0 ? Math.round(activeKor.reduce((sum, r) => sum + r.speed, 0) / activeKor.length) : 0;
-                              })()}타
-                            </span>
-                          </div>
-                          <div className="p-2.5 bg-white border border-stone-150 rounded-xl">
-                            <span className="text-[9.5px] font-bold text-indigo-600 block">5월 영어 평균</span>
-                            <span className="text-sm font-black font-mono text-indigo-950">
-                              {(() => {
-                                const engRecords = englishDb.filter(r => r.month === '5월');
-                                const activeEng = engRecords.filter(r => r.speed > 0);
-                                return activeEng.length > 0 ? Math.round(activeEng.reduce((sum, r) => sum + r.speed, 0) / activeEng.length) : 0;
-                              })()}타
-                            </span>
-                          </div>
-                        </div>
+                              <p className="text-[11px] text-stone-500 leading-relaxed font-sans">
+                                {isMay ? (
+                                  <>프로그램 도입 시점인 <strong>5월 검정 결과</strong>는 타자 실력의 기준 역할을 하며, 성장 곡선의 시작 좌표가 됩니다.</>
+                                ) : (
+                                  <><strong>{t.month} 마감 결과</strong> 기준, 학생들의 전반적인 타수 향상과 누적 급수 인증 획득률 현황입니다.</>
+                                )}
+                              </p>
 
-                        {/* 5월 급수 취득 비중 */}
-                        <div className="p-3 bg-white border border-stone-150 rounded-xl space-y-1.5 font-sans">
-                          <span className="text-[10px] font-extrabold text-stone-500 block">🏆 5월 인증 통과 비율</span>
-                          <div className="space-y-1 text-[10px]">
-                            {(() => {
-                              const totalCount = mayStats.totalCount || 1;
-                              const ratioOfTotalValue = Math.round((mayStats.certifiedCount / totalCount) * 100);
-                              const num1 = mayStats.num1;
-                              const num2 = mayStats.num2;
-                              const num3 = mayStats.num3;
+                              {/* Key Metrics Indicators */}
+                              <div className="grid grid-cols-2 gap-2 font-sans">
+                                <div className="p-2.5 bg-white border border-stone-150 rounded-xl">
+                                  <span className={`text-[9.5px] font-bold block ${isMay ? 'text-purple-600' : 'text-emerald-600'}`}>{t.month} 한글 평균</span>
+                                  <span className="text-sm font-black font-mono text-slate-900">
+                                    {t.korAvg}타
+                                  </span>
+                                </div>
+                                <div className="p-2.5 bg-white border border-stone-150 rounded-xl">
+                                  <span className={`text-[9.5px] font-bold block ${isMay ? 'text-indigo-600' : 'text-teal-600'}`}>{t.month} 영어 평균</span>
+                                  <span className="text-sm font-black font-mono text-slate-900">
+                                    {t.engAvg}타
+                                  </span>
+                                </div>
+                              </div>
 
-                              return (
-                                <>
+                              {/* 급수 취득 비중 */}
+                              <div className="p-3 bg-white border border-stone-150 rounded-xl space-y-1.5 font-sans">
+                                <span className="text-[10px] font-extrabold text-stone-500 block">🏆 {t.month} 누적 인증 통과 비율</span>
+                                <div className="space-y-1 text-[10px]">
                                   <div className="flex justify-between items-center text-stone-700">
-                                    <span>5월 인증서 취득</span>
-                                    <span className="font-extrabold font-mono text-stone-900">{mayStats.certifiedCount}명 ({ratioOfTotalValue}%)</span>
+                                    <span>{t.month} 누적 인증서 취득</span>
+                                    <span className="font-extrabold font-mono text-stone-900">{mStats.certifiedCount}명 ({ratioOfTotalValue}%)</span>
                                   </div>
                                   <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden mt-0.5">
-                                    <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${ratioOfTotalValue}%` }} />
+                                    <div className={`${isMay ? 'bg-indigo-600' : 'bg-emerald-600'} h-full rounded-full`} style={{ width: `${ratioOfTotalValue}%` }} />
                                   </div>
                                   <div className="flex justify-between text-[8.5px] text-stone-400 font-bold pt-1">
                                     <span>1급: {num1}명</span>
                                     <span>2급: {num2}명</span>
                                     <span>3급: {num3}명</span>
                                   </div>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      </div>
+                                </div>
+                              </div>
+                            </div>
 
-                      <div className="text-[9.5px] font-bold text-stone-400 bg-stone-100/50 p-2 rounded-lg font-sans border border-dashed text-center">
-                        ✔️ 5월 기준 결과는 매칭 필터의 기준축입니다.
-                      </div>
+                            <div className="text-[9.5px] font-bold text-stone-400 bg-stone-100/50 p-2 rounded-lg font-sans border border-dashed text-center">
+                              {isMay ? '✔️ 5월 기준 결과는 매칭 필터의 기준축입니다.' : `✔️ ${t.month} 마감 데이터 분석 완료`}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                   </div>

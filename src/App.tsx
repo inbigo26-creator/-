@@ -53,6 +53,16 @@ export default function App() {
 
   // Active configurations
   const [spreadsheetId, setSpreadsheetId] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlSid = params.get('sid');
+      if (urlSid && urlSid.trim() && urlSid !== '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') {
+        localStorage.setItem('school_spreadsheet_id', urlSid.trim());
+        return urlSid.trim();
+      }
+    } catch (e) {
+      console.warn('Failed parsing URL sid parameter:', e);
+    }
     const localVal = localStorage.getItem('school_spreadsheet_id');
     if (localVal && localVal.trim() && localVal !== '1Q8v8_1_S_T-E_ST_S_h_e_e_t_I_D_D_e_m_o') {
       return localVal;
@@ -63,6 +73,16 @@ export default function App() {
     return localStorage.getItem('school_google_token') || null;
   });
   const [appsScriptUrl, setAppsScriptUrl] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlGas = params.get('gas');
+      if (urlGas && urlGas.trim()) {
+        localStorage.setItem('school_apps_script_url', urlGas.trim());
+        return urlGas.trim();
+      }
+    } catch (e) {
+      console.warn('Failed parsing URL gas parameter:', e);
+    }
     const localVal = localStorage.getItem('school_apps_script_url');
     if (localVal && localVal.trim()) {
       return localVal;
@@ -959,7 +979,7 @@ export default function App() {
     }
 
     if (studentNewPinInput.trim().length < 2) {
-      setStudentPasswordChangeError('새 비밀번호는 최소 2글자 이상 입력해 주셔야 합니다.');
+      setStudentPasswordChangeError('새 비밀번호를 입력해 주세요.');
       return;
     }
 
@@ -1101,7 +1121,7 @@ export default function App() {
             <div className="w-18 h-18 bg-emerald-50 rounded-full mx-auto mb-4 flex items-center justify-center text-emerald-600 font-extrabold text-2xl border border-emerald-100 shadow-xs">
               {studentSession.grade || '1'}
             </div>
-            <h2 className="font-bold text-[17px] leading-tight text-slate-950 tracking-tight">{studentSession.id} {studentSession.name}</h2>
+            <h2 className="font-bold text-[17px] leading-tight text-slate-950 tracking-tight">{studentSession.id}</h2>
             <p className="text-xs text-emerald-600 mt-2 uppercase tracking-widest font-extrabold flex items-center justify-center gap-1.5 bg-emerald-50/60 py-1.5 px-3 rounded-full border border-emerald-100">
               <Sprout className="h-3.5 w-3.5 text-emerald-500 animate-pulse shrink-0" />
               {studentSession.grade}학년 {studentSession.department}과
@@ -1340,7 +1360,7 @@ export default function App() {
                       className="w-full bg-linear-to-r from-emerald-600 to-green-600 text-white font-extrabold py-3.5 px-4 rounded-2xl hover:brightness-105 active:scale-[0.99] transition-all text-sm cursor-pointer shadow-lg shadow-emerald-100/50 flex items-center justify-center gap-1.5"
                     >
                       <LogIn className="h-4.5 w-4.5" />
-                      {isAuthenticating ? '시간이 조금 걸릴 수 있습니다...' : '내 기록 확인하기'}
+                      {isAuthenticating ? '로딩 중....(시간이 조금 필요해요)' : '내 기록 확인하기'}
                     </button>
                   </form>
 
@@ -1368,7 +1388,7 @@ export default function App() {
                         <div>
                           <p className="font-extrabold text-rose-800">로그인에 실패하였습니다</p>
                           <p className="text-[11.1px] text-rose-600 font-bold leading-relaxed mt-1">
-                            학번(5자리) 또는 생년월일(8자리)이 일치하지 않습니다. 로그인이 안될 경우 교육정보부로 문의하세요.
+                            학번(5자리) 또는 비밀번호가 일치하지 않습니다. 로그인이 안될 경우 교육정보부로 문의하세요.
                           </p>
                         </div>
                       </div>
@@ -1396,9 +1416,9 @@ export default function App() {
                         setTeacherPasswordInput('');
                         setShowTeacherLogin(true);
                       }}
-                      className="px-4.5 py-2.5 text-[11px] font-black text-slate-600 hover:text-indigo-700 bg-stone-55 hover:bg-indigo-50 border border-slate-200 rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs w-full"
+                      className="px-4.5 py-2.5 text-[11px] font-bold text-yellow-900 bg-yellow-50 hover:bg-yellow-100 border border-yellow-250/65 rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs w-full"
                     >
-                      <Lock className="h-4 w-4 text-slate-500" />
+                      <Lock className="h-4 w-4 text-yellow-700" />
                       선생님 로그인 (통계 확인)
                     </button>
                   </div>
@@ -1427,7 +1447,7 @@ export default function App() {
                     </span>
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight font-sans">
-                    <span className="text-emerald-700">{studentSession.name}</span> 학생의 성장 기록
+                    <span className="text-emerald-700">{studentSession.id}</span> 학생의 성장 기록
                   </h2>
                   <p className="text-xs text-stone-400 font-medium tracking-tight font-sans">로그인 학번 : {studentSession.id} / 데이터 동기화 완료</p>
                   
@@ -1483,7 +1503,7 @@ export default function App() {
                       : 'text-stone-500 hover:text-stone-800 hover:bg-stone-50/50'
                   }`}
                 >
-                  📊 수련 성장
+                  📊 나의 타자 기록
                 </button>
                 <button
                   type="button"
@@ -2021,7 +2041,7 @@ export default function App() {
 
                   <div className="pt-2 border-t border-indigo-50/50 text-center space-y-2">
                     <p className="text-[11px] font-black text-stone-700">
-                      동의 주체: {studentSession.id} {studentSession.name}
+                      동의 주체: {studentSession.id}
                     </p>
                     <p className="text-[10px] text-stone-400 leading-normal">
                       ※ 귀하는 동의를 거부할 권리가 있으나, 동의 거부 시 본 성장 관리 프로그램을 이용할 수 없습니다. <br />
@@ -2105,10 +2125,10 @@ export default function App() {
 
               <div className="space-y-1">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">
-                  학번 및 이름
+                  로그인 학번
                 </label>
                 <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-xs font-bold text-gray-600">
-                  [{studentSession?.id}] {studentSession?.name}
+                  [{studentSession?.id}]
                 </div>
               </div>
 
@@ -2134,7 +2154,7 @@ export default function App() {
                 <input 
                   type="password"
                   maxLength={50}
-                  placeholder="원하는 비밀번호를 입력하십시오 (최소 2자)"
+                  placeholder="원하는 비밀번호를 입력하세요."
                   value={studentNewPinInput}
                   onChange={(e) => setStudentNewPinInput(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-gray-250 text-sm font-mono tracking-wide placeholder:font-sans placeholder:text-xs focus:outline-none focus:ring-2 focus:ring-yellow-500"
@@ -2229,7 +2249,7 @@ export default function App() {
                 </label>
                 <input 
                   type="password" 
-                  placeholder="학교 비밀번호 4자리"
+                  placeholder="학교 비밀번호 1번"
                   value={teacherPasswordInput}
                   onChange={(e) => setTeacherPasswordInput(e.target.value)}
                   className="w-full px-4 py-2.5 border border-slate-250 rounded-2xl text-base font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-stone-50/10"
@@ -2246,7 +2266,7 @@ export default function App() {
 
               <button 
                 type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 px-4 rounded-2xl transition-all text-xs cursor-pointer shadow-xs"
+                className="w-full bg-yellow-50 hover:bg-yellow-100 text-yellow-904 font-extrabold py-2.5 px-4 rounded-2xl transition-all text-xs cursor-pointer shadow-2xs border border-yellow-200"
               >
                 선생님 모드 들어가기 🔓
               </button>
