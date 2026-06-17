@@ -166,14 +166,16 @@ export function TeacherAnalytics({
       const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId))
         .sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
       const engSpeed = sEng.length > 0 ? sEng[sEng.length - 1].speed : 0;
+      const maxEngSpeed = sEng.length > 0 ? Math.max(...sEng.map(r => r.speed), 0) : 0;
       
       // Find latest Korean speed
       const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId))
         .sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
       const korSpeed = sKor.length > 0 ? sKor[sKor.length - 1].speed : 0;
+      const maxKorSpeed = sKor.length > 0 ? Math.max(...sKor.map(r => r.speed), 0) : 0;
 
-      const korPoints = getKoreanLevelPoints(korSpeed);
-      const engPoints = getEnglishLevelPoints(engSpeed);
+      const korPoints = getKoreanLevelPoints(maxKorSpeed);
+      const engPoints = getEnglishLevelPoints(maxEngSpeed);
       // Final Certified Level is governed by the lower denominator
       const finalPoints = Math.min(korPoints, engPoints);
 
@@ -183,11 +185,11 @@ export function TeacherAnalytics({
         for (const m of sortedMonths) {
           // English speed in or before month m
           const engRecsUpToM = sEng.filter(r => getMonthNumber(r.month) <= getMonthNumber(m));
-          const engSpeedAtM = engRecsUpToM.length > 0 ? engRecsUpToM[engRecsUpToM.length - 1].speed : 0;
+          const engSpeedAtM = engRecsUpToM.length > 0 ? Math.max(...engRecsUpToM.map(r => r.speed)) : 0;
           
           // Korean speed in or before month m
           const korRecsUpToM = sKor.filter(r => getMonthNumber(r.month) <= getMonthNumber(m));
-          const korSpeedAtM = korRecsUpToM.length > 0 ? korRecsUpToM[korRecsUpToM.length - 1].speed : 0;
+          const korSpeedAtM = korRecsUpToM.length > 0 ? Math.max(...korRecsUpToM.map(r => r.speed)) : 0;
           
           const ep = getEnglishLevelPoints(engSpeedAtM);
           const kp = getKoreanLevelPoints(korSpeedAtM);
@@ -203,8 +205,8 @@ export function TeacherAnalytics({
         ...s,
         korSpeed,
         engSpeed,
-        maxKorSpeed: sKor.length > 0 ? Math.max(...sKor.map(r => r.speed), 0) : 0,
-        maxEngSpeed: sEng.length > 0 ? Math.max(...sEng.map(r => r.speed), 0) : 0,
+        maxKorSpeed,
+        maxEngSpeed,
         korPoints,
         engPoints,
         finalPoints,
@@ -264,6 +266,46 @@ export function TeacherAnalytics({
     });
   }, [studentCertificates, filterGrade, filterDept, filterMonth, filterLevel, searchQuery]);
 
+  // Calculation of May (도입월) certificate status specifically based on May speed
+  // to avoid students disappearing from May stats when they improve in subsequent months.
+  const mayStats = useMemo(() => {
+    const validStudents = studentCertificates.filter(s => !s.isExcluded);
+    let num1 = 0; // 1급 (points = 3)
+    let num2 = 0; // 2급 (points = 2)
+    let num3 = 0; // 3급 (points = 1)
+    let certifiedCount = 0;
+
+    validStudents.forEach(s => {
+      // Find May English speed specifically
+      const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId) && r.month === '5월');
+      const engSpeedVal = sEng.length > 0 ? sEng[0].speed : 0;
+
+      // Find May Korean speed specifically
+      const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId) && r.month === '5월');
+      const korSpeedVal = sKor.length > 0 ? sKor[0].speed : 0;
+
+      const ep = getEnglishLevelPoints(engSpeedVal);
+      const kp = getKoreanLevelPoints(korSpeedVal);
+      const pts = Math.min(ep, kp);
+
+      if (pts === 3) num1++;
+      else if (pts === 2) num2++;
+      else if (pts === 1) num3++;
+      
+      if (pts > 0) {
+        certifiedCount++;
+      }
+    });
+
+    return {
+      num1,
+      num2,
+      num3,
+      certifiedCount,
+      totalCount: validStudents.length
+    };
+  }, [studentCertificates, englishDb, koreanDb]);
+
   // 🟠 AGGREGATES: SCHOOL, GRADE AND DEPARTMENT STATISTICS
   const aggregateStats = useMemo(() => {
     const validStudents = studentCertificates.filter(s => !s.isExcluded);
@@ -277,9 +319,11 @@ export function TeacherAnalytics({
     const level3Count = validStudents.filter(s => s.finalPoints === 1).length;
     const failCount = totalCount - certifiedCount;
 
-    // Averages
-    const avgKor = totalCount > 0 ? Math.round(validStudents.reduce((sum, s) => sum + s.korSpeed, 0) / totalCount) : 0;
-    const avgEng = totalCount > 0 ? Math.round(validStudents.reduce((sum, s) => sum + s.engSpeed, 0) / totalCount) : 0;
+    // Averages (using maximum speeds and excluding 0/결시 students)
+    const korActiveStudents = validStudents.filter(s => s.maxKorSpeed > 0);
+    const engActiveStudents = validStudents.filter(s => s.maxEngSpeed > 0);
+    const avgKor = korActiveStudents.length > 0 ? Math.round(korActiveStudents.reduce((sum, s) => sum + s.maxKorSpeed, 0) / korActiveStudents.length) : 0;
+    const avgEng = engActiveStudents.length > 0 ? Math.round(engActiveStudents.reduce((sum, s) => sum + s.maxEngSpeed, 0) / engActiveStudents.length) : 0;
 
     // Grade comparison
     const grades = ['1', '2', '3'];
@@ -291,10 +335,13 @@ export function TeacherAnalytics({
       });
       const total = list.length;
       const certified = list.filter(s => s.isCertified).length;
-      const rate = total > 0 ? parseFloat(((certified / total) * 105).toFixed(1)) : 0; // wait, let's keep it (certified / total) * 100
       const actualRate = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
-      const korSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.korSpeed, 0) / total) : 0;
-      const engSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.engSpeed, 0) / total) : 0;
+
+      const korActive = list.filter(s => s.maxKorSpeed > 0);
+      const engActive = list.filter(s => s.maxEngSpeed > 0);
+      const korSpeedAvg = korActive.length > 0 ? Math.round(korActive.reduce((sum, s) => sum + s.maxKorSpeed, 0) / korActive.length) : 0;
+      const engSpeedAvg = engActive.length > 0 ? Math.round(engActive.reduce((sum, s) => sum + s.maxEngSpeed, 0) / engActive.length) : 0;
+
       return { grade: g, total, certified, rate: actualRate, korSpeedAvg, engSpeedAvg };
     });
 
@@ -311,8 +358,12 @@ export function TeacherAnalytics({
       const total = list.length;
       const certified = list.filter(s => s.isCertified).length;
       const rate = total > 0 ? parseFloat(((certified / total) * 100).toFixed(1)) : 0;
-      const korSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.korSpeed, 0) / total) : 0;
-      const engSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.engSpeed, 0) / total) : 0;
+
+      const korActive = list.filter(s => s.maxKorSpeed > 0);
+      const engActive = list.filter(s => s.maxEngSpeed > 0);
+      const korSpeedAvg = korActive.length > 0 ? Math.round(korActive.reduce((sum, s) => sum + s.maxKorSpeed, 0) / korActive.length) : 0;
+      const engSpeedAvg = engActive.length > 0 ? Math.round(engActive.reduce((sum, s) => sum + s.maxEngSpeed, 0) / engActive.length) : 0;
+
       return { department: d, total, certified, rate, korSpeedAvg, engSpeedAvg };
     }).sort((a, b) => b.rate - a.rate); // Sort by certified achievement rate descending
 
@@ -338,24 +389,28 @@ export function TeacherAnalytics({
           return sGradeNum === targetGradeNum && isDeptMatch(s.department, d);
         });
         const total = list.length;
-        const korSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.maxKorSpeed, 0) / total) : 0;
-        const engSpeedAvg = total > 0 ? Math.round(list.reduce((sum, s) => sum + s.maxEngSpeed, 0) / total) : 0;
-        
-        // Korean certificate achievement is speed >= 150 (Level 3+)
-        const korLevelCount = list.filter(s => s.maxKorSpeed >= 150).length;
-        // English certificate achievement is speed >= 100 (Level 3+)
-        const engLevelCount = list.filter(s => s.maxEngSpeed >= 100).length;
 
-        const korRate = total > 0 ? parseFloat(((korLevelCount / total) * 100).toFixed(1)) : 0;
-        const engRate = total > 0 ? parseFloat(((engLevelCount / total) * 100).toFixed(1)) : 0;
+        const korActive = list.filter(s => s.maxKorSpeed > 0);
+        const engActive = list.filter(s => s.maxEngSpeed > 0);
+        const korSpeedAvg = korActive.length > 0 ? Math.round(korActive.reduce((sum, s) => sum + s.maxKorSpeed, 0) / korActive.length) : 0;
+        const engSpeedAvg = engActive.length > 0 ? Math.round(engActive.reduce((sum, s) => sum + s.maxEngSpeed, 0) / engActive.length) : 0;
+        
+        // Korean certificate achievement (Level 3+ -> korPoints >= 1)
+        const korLevelCount = list.filter(s => s.korPoints >= 1).length;
+        // English certificate achievement (Level 3+ -> engPoints >= 1)
+        const engLevelCount = list.filter(s => s.engPoints >= 1).length;
+
+        const korRate = total > 0 ? parseFloat(((korLevelCount / total) * 105).toFixed(1)) : 0; // wait, let's keep it (korLevelCount / total) * 100
+        const actualKorRate = total > 0 ? parseFloat(((korLevelCount / total) * 100).toFixed(1)) : 0;
+        const actualEngRate = total > 0 ? parseFloat(((engLevelCount / total) * 100).toFixed(1)) : 0;
 
         classCombinedStats.push({
           grade: g,
           department: d,
           displayName: `${g}학년 ${d}`,
           total,
-          korRate,
-          engRate,
+          korRate: actualKorRate,
+          engRate: actualEngRate,
           korSpeedAvg,
           engSpeedAvg
         });
@@ -688,21 +743,27 @@ export function TeacherAnalytics({
 
   // ✨ 4. TIME SERIES FOR GRAPH TREND DISPLAY
   const growthTrendsTimeline = useMemo(() => {
-    return sortedMonths.map(m => {
-      const korRecords = koreanDb.filter(r => r.month === m);
-      const engRecords = englishDb.filter(r => r.month === m);
+    return sortedMonths
+      .filter(m => !!mvpLocks[m]) // Only show months whose MVP lock is closed/locked (MVP 마감)
+      .map(m => {
+        const korRecords = koreanDb.filter(r => r.month === m);
+        const engRecords = englishDb.filter(r => r.month === m);
 
-      const korAvg = korRecords.length > 0 ? Math.round(korRecords.reduce((sum, r) => sum + r.speed, 0) / korRecords.length) : 0;
-      const engAvg = engRecords.length > 0 ? Math.round(engRecords.reduce((sum, r) => sum + r.speed, 0) / engRecords.length) : 0;
+        // Exclude 결시 (absent, speed === 0)
+        const activeKor = korRecords.filter(r => r.speed > 0);
+        const activeEng = engRecords.filter(r => r.speed > 0);
 
-      return {
-        month: m,
-        korAvg,
-        engAvg,
-        recordsCount: korRecords.length + engRecords.length
-      };
-    });
-  }, [sortedMonths, koreanDb, englishDb]);
+        const korAvg = activeKor.length > 0 ? Math.round(activeKor.reduce((sum, r) => sum + r.speed, 0) / activeKor.length) : 0;
+        const engAvg = activeEng.length > 0 ? Math.round(activeEng.reduce((sum, r) => sum + r.speed, 0) / activeEng.length) : 0;
+
+        return {
+          month: m,
+          korAvg,
+          engAvg,
+          recordsCount: activeKor.length + activeEng.length
+        };
+      });
+  }, [sortedMonths, koreanDb, englishDb, mvpLocks]);
 
   // ✨ 5. INTEGRATED STATS PRECOMPUTED MATRIX
   const integratedStats = useMemo(() => {
@@ -1263,26 +1324,32 @@ export function TeacherAnalytics({
                               <td className="py-2.5 px-3 font-bold text-stone-850 text-[13px]">{s.name}</td>
                               <td className="py-2.5 px-3 text-stone-500 font-medium">{s.grade}학년 / {s.department}</td>
                               <td className="py-2.5 px-3">
-                                <span className="font-mono font-bold text-amber-700 text-[12.5px]">{s.korSpeed}타</span>
-                                <span className={`ml-1 px-1.5 py-0.2 text-[9.5px] rounded-md font-bold ${
-                                  s.korPoints === 3 ? 'bg-amber-50 text-amber-700' :
-                                  s.korPoints === 2 ? 'bg-slate-100 text-slate-700' :
-                                  s.korPoints === 1 ? 'bg-orange-50 text-orange-700' :
-                                  'bg-stone-100 text-stone-400'
-                                }`}>
-                                  {getLevelName(s.korPoints)}
-                                </span>
+                                <div>
+                                  <span className="font-mono font-bold text-amber-700 text-[12.5px]">{s.maxKorSpeed}타</span>
+                                  <span className={`ml-1 px-1.5 py-0.2 text-[9.5px] rounded-md font-bold ${
+                                    s.korPoints === 3 ? 'bg-amber-50 text-amber-700' :
+                                    s.korPoints === 2 ? 'bg-slate-100 text-slate-700' :
+                                    s.korPoints === 1 ? 'bg-orange-50 text-orange-700' :
+                                    'bg-stone-100 text-stone-400'
+                                  }`}>
+                                    {getLevelName(s.korPoints)}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-stone-400">최근: {s.korSpeed}타</div>
                               </td>
                               <td className="py-2.5 px-3">
-                                <span className="font-mono font-bold text-violet-755 text-[12.5px]">{s.engSpeed}타</span>
-                                <span className={`ml-1 px-1.5 py-0.2 text-[9.5px] rounded-md font-bold ${
-                                  s.engPoints === 3 ? 'bg-amber-50 text-amber-700' :
-                                  s.engPoints === 2 ? 'bg-slate-105 text-slate-700' :
-                                  s.engPoints === 1 ? 'bg-orange-50 text-orange-705' :
-                                  'bg-stone-100 text-stone-400'
-                                }`}>
-                                  {getLevelName(s.engPoints)}
-                                </span>
+                                <div>
+                                  <span className="font-mono font-bold text-violet-755 text-[12.5px]">{s.maxEngSpeed}타</span>
+                                  <span className={`ml-1 px-1.5 py-0.2 text-[9.5px] rounded-md font-bold ${
+                                    s.engPoints === 3 ? 'bg-amber-50 text-amber-700' :
+                                    s.engPoints === 2 ? 'bg-slate-105 text-slate-700' :
+                                    s.engPoints === 1 ? 'bg-orange-50 text-orange-705' :
+                                    'bg-stone-100 text-stone-400'
+                                  }`}>
+                                    {getLevelName(s.engPoints)}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-stone-400">최근: {s.engSpeed}타</div>
                               </td>
                               <td className="py-2.5 px-3 text-center">
                                 {s.levelAchievedMonth !== '-' ? (
@@ -1830,9 +1897,9 @@ export function TeacherAnalytics({
               </div>
 
               {/* Graphical Plot container */}
-              {growthTrendsTimeline.length < 2 ? (
+              {growthTrendsTimeline.length === 0 ? (
                 <div className="text-center py-16 text-stone-400 text-xs font-sans">
-                  6월부터 제공 가능합니다.
+                  각 월의 MVP 마감 처리를 완료하면 성장 그래프가 활성화됩니다.
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -1840,17 +1907,29 @@ export function TeacherAnalytics({
                   {/* Interactive Indicator */}
                   <div className="p-3.5 bg-indigo-50 border border-indigo-100 rounded-xl text-xs flex flex-col md:flex-row md:justify-between md:items-center gap-2 text-[11px] font-medium leading-relaxed font-sans text-indigo-900/90">
                     <p>
-                      💡 <strong>전교생 분석 결과:</strong> 5월 도입 이래, 평균 한글 타수는 
-                      <strong className="text-indigo-650 mx-1 font-mono font-bold">
-                        {growthTrendsTimeline[0].korAvg}타 ➡️ {growthTrendsTimeline[growthTrendsTimeline.length - 1].korAvg}타
-                      </strong> 
-                      ({growthTrendsTimeline[growthTrendsTimeline.length - 1].korAvg - growthTrendsTimeline[0].korAvg}타 우상향), 
-                      영문 타수는 
-                      <strong className="text-indigo-650 mx-1 font-mono font-bold">
-                        {growthTrendsTimeline[0].engAvg}타 ➡️ {growthTrendsTimeline[growthTrendsTimeline.length - 1].engAvg}타
-                      </strong> 
-                      ({growthTrendsTimeline[growthTrendsTimeline.length - 1].engAvg - growthTrendsTimeline[0].engAvg}타 우상향)으로 집계되었습니다. 
-                      타자 훈련 검정 체계 연동 효과가 완벽히 입증되고 있습니다.
+                      💡 <strong>전교생 분석 결과:</strong> 
+                      {growthTrendsTimeline.length === 1 ? (
+                        <>
+                          현재 <strong className="text-indigo-650 mx-1 font-sans">{growthTrendsTimeline[0].month}</strong> 데이터가 마감되었습니다. 
+                          평균 속도는 한글 <strong className="text-indigo-650 mx-1 font-mono font-bold">{growthTrendsTimeline[0].korAvg}타</strong>, 
+                          영어 <strong className="text-indigo-650 mx-1 font-mono font-bold">{growthTrendsTimeline[0].engAvg}타</strong>입니다. 
+                          다음 달 MVP 마감을 완료하면 본격적인 지속 성장 추이가 시각화됩니다!
+                        </>
+                      ) : (
+                        <>
+                          5월 도입 이래, 평균 한글 타수는 
+                          <strong className="text-indigo-650 mx-1 font-mono font-bold">
+                            {growthTrendsTimeline[0].korAvg}타 ➡️ {growthTrendsTimeline[growthTrendsTimeline.length - 1].korAvg}타
+                          </strong> 
+                          ({growthTrendsTimeline[growthTrendsTimeline.length - 1].korAvg - growthTrendsTimeline[0].korAvg}타 우상향), 
+                          영문 타수는 
+                          <strong className="text-indigo-650 mx-1 font-mono font-bold">
+                            {growthTrendsTimeline[0].engAvg}타 ➡️ {growthTrendsTimeline[growthTrendsTimeline.length - 1].engAvg}타
+                          </strong> 
+                          ({growthTrendsTimeline[growthTrendsTimeline.length - 1].engAvg - growthTrendsTimeline[0].engAvg}타 우상향)으로 집계되었습니다. 
+                          타자 훈련 검정 체계 연동 효과가 완벽히 입증되고 있습니다.
+                        </>
+                      )}
                     </p>
                   </div>
 
@@ -2130,22 +2209,20 @@ export function TeacherAnalytics({
                           <span className="text-[10px] font-extrabold text-stone-500 block">🏆 5월 인증 통과 우수생 비율</span>
                           <div className="space-y-1 text-[10px]">
                             {(() => {
-                              const mayAchievers = studentCertificates.filter(s => s.levelAchievedMonth === '5월');
-                              const totalCount = studentCertificates.length || 1;
-                              const ratioOfTotal = Math.round((mayAchievers.length / totalCount) * 100);
-                              
-                              const num1 = mayAchievers.filter(s => s.finalPoints === 3).length;
-                              const num2 = mayAchievers.filter(s => s.finalPoints === 2).length;
-                              const num3 = mayAchievers.filter(s => s.finalPoints === 1).length;
+                              const totalCount = mayStats.totalCount || 1;
+                              const ratioOfTotalValue = Math.round((mayStats.certifiedCount / totalCount) * 100);
+                              const num1 = mayStats.num1;
+                              const num2 = mayStats.num2;
+                              const num3 = mayStats.num3;
 
                               return (
                                 <>
                                   <div className="flex justify-between items-center text-stone-700">
                                     <span>5월 인증서 취득</span>
-                                    <span className="font-extrabold font-mono text-stone-900">{mayAchievers.length}명 ({ratioOfTotal}%)</span>
+                                    <span className="font-extrabold font-mono text-stone-900">{mayStats.certifiedCount}명 ({ratioOfTotalValue}%)</span>
                                   </div>
                                   <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden mt-0.5">
-                                    <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${ratioOfTotal}%` }} />
+                                    <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${ratioOfTotalValue}%` }} />
                                   </div>
                                   <div className="flex justify-between text-[8.5px] text-stone-400 font-bold pt-1">
                                     <span>1급: {num1}명</span>

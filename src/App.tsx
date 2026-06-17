@@ -223,89 +223,56 @@ export default function App() {
 
     const validStudents = Array.from(studentMap.values()).filter(s => !isExcludedStudentName(s.name));
 
-    // 2. Map latest Korean and English speeds
+    // 2. Map latest and peak Korean and English speeds
     const studentsWithLatestSpeeds = validStudents.map(s => {
       const cleanId = cleanStudentId(s.studentId);
       
       const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanId)
         .sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
       const engSpeed = sEng.length > 0 ? sEng[sEng.length - 1].speed : 0;
+      const maxEngSpeed = sEng.length > 0 ? Math.max(...sEng.map(r => r.speed), 0) : 0;
 
       const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanId)
         .sort((a,b) => getMonthNumber(a.month) - getMonthNumber(b.month));
       const korSpeed = sKor.length > 0 ? sKor[sKor.length - 1].speed : 0;
+      const maxKorSpeed = sKor.length > 0 ? Math.max(...sKor.map(r => r.speed), 0) : 0;
 
       return {
         ...s,
         engSpeed,
-        korSpeed
+        korSpeed,
+        maxEngSpeed,
+        maxKorSpeed
       };
     });
 
     const listGrades = ['1', '2', '3'];
-    const listDepts = ['항공서비스', '부사관경영', 'SNS마케팅', '콘텐츠디자인'];
 
-    const getKorClassAvg = (grade: string, dept: string) => {
-      const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
-      const list = studentsWithLatestSpeeds.filter(s => {
-        const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
-        return sGradeNum === targetGradeNum && 
-          normalizeDepartment(s.department) === normalizeDepartment(dept) && 
-          s.korSpeed > 0;
-      });
-      if (list.length === 0) return 0;
-      const sum = list.reduce((acc, s) => acc + s.korSpeed, 0);
-      return Math.round(sum / list.length);
-    };
+    // Unify averages: Exclude 결시 (absent, speed === 0) and use maximum speeds over all months
+    const korActive = studentsWithLatestSpeeds.filter(s => s.maxKorSpeed > 0);
+    const engActive = studentsWithLatestSpeeds.filter(s => s.maxEngSpeed > 0);
 
-    const getEngClassAvg = (grade: string, dept: string) => {
-      const targetGradeNum = String(grade).replace(/[^0-9]/g, '');
-      const list = studentsWithLatestSpeeds.filter(s => {
-        const sGradeNum = String(s.grade).replace(/[^0-9]/g, '');
-        return sGradeNum === targetGradeNum && 
-          normalizeDepartment(s.department) === normalizeDepartment(dept) && 
-          s.engSpeed > 0;
-      });
-      if (list.length === 0) return 0;
-      const sum = list.reduce((acc, s) => acc + s.engSpeed, 0);
-      return Math.round(sum / list.length);
-    };
+    const korSchoolAvg = korActive.length > 0 ? Math.round(korActive.reduce((sum, s) => sum + s.maxKorSpeed, 0) / korActive.length) : 0;
+    const engSchoolAvg = engActive.length > 0 ? Math.round(engActive.reduce((sum, s) => sum + s.maxEngSpeed, 0) / engActive.length) : 0;
 
-    // Calculate Korean averages
     const korGradeAvg: { [grade: string]: number } = { '1': 0, '2': 0, '3': 0 };
-    const allKorClassAverages: number[] = [];
-
-    listGrades.forEach(g => {
-      const activeClassAverages: number[] = [];
-      listDepts.forEach(d => {
-        const classAvg = getKorClassAvg(g, d);
-        if (classAvg > 0) {
-          activeClassAverages.push(classAvg);
-          allKorClassAverages.push(classAvg);
-        }
-      });
-      korGradeAvg[g] = activeClassAverages.length > 0 ? Math.round(activeClassAverages.reduce((sum, a) => sum + a, 0) / activeClassAverages.length) : 0;
-    });
-
-    const korSchoolAvg = allKorClassAverages.length > 0 ? Math.round(allKorClassAverages.reduce((sum, a) => sum + a, 0) / allKorClassAverages.length) : 0;
-
-    // Calculate English averages
     const engGradeAvg: { [grade: string]: number } = { '1': 0, '2': 0, '3': 0 };
-    const allEngClassAverages: number[] = [];
 
     listGrades.forEach(g => {
-      const activeClassAverages: number[] = [];
-      listDepts.forEach(d => {
-        const classAvg = getEngClassAvg(g, d);
-        if (classAvg > 0) {
-          activeClassAverages.push(classAvg);
-          allEngClassAverages.push(classAvg);
-        }
+      const gKorActive = korActive.filter(s => {
+        const sGradeNum = String(s.grade || '').replace(/[^0-9]/g, '');
+        const targetGradeNum = String(g).replace(/[^0-9]/g, '');
+        return sGradeNum === targetGradeNum;
       });
-      engGradeAvg[g] = activeClassAverages.length > 0 ? Math.round(activeClassAverages.reduce((sum, a) => sum + a, 0) / activeClassAverages.length) : 0;
-    });
+      korGradeAvg[g] = gKorActive.length > 0 ? Math.round(gKorActive.reduce((sum, s) => sum + s.maxKorSpeed, 0) / gKorActive.length) : 0;
 
-    const engSchoolAvg = allEngClassAverages.length > 0 ? Math.round(allEngClassAverages.reduce((sum, a) => sum + a, 0) / allEngClassAverages.length) : 0;
+      const gEngActive = engActive.filter(s => {
+        const sGradeNum = String(s.grade || '').replace(/[^0-9]/g, '');
+        const targetGradeNum = String(g).replace(/[^0-9]/g, '');
+        return sGradeNum === targetGradeNum;
+      });
+      engGradeAvg[g] = gEngActive.length > 0 ? Math.round(gEngActive.reduce((sum, s) => sum + s.maxEngSpeed, 0) / gEngActive.length) : 0;
+    });
 
     return {
       korean: {
