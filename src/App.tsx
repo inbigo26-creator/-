@@ -1967,12 +1967,12 @@ export default function App() {
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm">🏆</span>
-                          <h3 className="text-sm font-black text-slate-900 tracking-tight">공식 타자 인증 등급(급수) 기준표</h3>
+                          <h3 className="text-sm font-black text-slate-900 tracking-tight">인비고 타자 인증 급수 기준표</h3>
                         </div>
-                        <p className="text-[10.5px] text-stone-400 font-bold">목표 최고 속도에 도달하여 공식 등급을 올리고 실력을 키워보세요!</p>
+                        <p className="text-[10.5px] text-stone-400 font-bold">꾸준한 연습으로 타자 급수 취득에 도전하세요!</p>
                       </div>
                       <span className="self-start sm:self-center px-2 py-0.5 bg-emerald-50 text-emerald-750 text-[9.5px] font-black rounded-lg border border-emerald-100 shadow-3xs select-none">
-                        실시간 자동 반영
+                        한글/영어 급수 기준
                       </span>
                     </div>
 
