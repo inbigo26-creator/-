@@ -278,11 +278,11 @@ export function TeacherAnalytics({
     validStudents.forEach(s => {
       // Find May English speed specifically
       const sEng = englishDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId) && r.month === '5월');
-      const engSpeedVal = sEng.length > 0 ? sEng[0].speed : 0;
+      const engSpeedVal = sEng.length > 0 ? Math.max(...sEng.map(r => r.speed), 0) : 0;
 
       // Find May Korean speed specifically
       const sKor = koreanDb.filter(r => cleanStudentId(r.studentId) === cleanStudentId(s.studentId) && r.month === '5월');
-      const korSpeedVal = sKor.length > 0 ? sKor[0].speed : 0;
+      const korSpeedVal = sKor.length > 0 ? Math.max(...sKor.map(r => r.speed), 0) : 0;
 
       const ep = getEnglishLevelPoints(engSpeedVal);
       const kp = getKoreanLevelPoints(korSpeedVal);
@@ -1265,7 +1265,7 @@ export function TeacherAnalytics({
                         <option value="1">1급 취득자</option>
                         <option value="2">2급 취득자</option>
                         <option value="3">3급 취득자</option>
-                        <option value="0">급수 미취득</option>
+                        <option value="0">타자 꿈나무</option>
                       </select>
                     </div>
 
@@ -1316,7 +1316,7 @@ export function TeacherAnalytics({
                           if (s.finalPoints === 3) displayFinal = '🥇 타자 1급';
                           else if (s.finalPoints === 2) displayFinal = '🥈 타자 2급';
                           else if (s.finalPoints === 1) displayFinal = '🥉 타자 3급';
-                          else displayFinal = '타자 꿈나무';
+                          else displayFinal = '🌱 타자 꿈나무';
 
                           return (
                             <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
@@ -2185,7 +2185,7 @@ export function TeacherAnalytics({
                         </div>
 
                         <p className="text-[11px] text-stone-500 leading-relaxed font-sans">
-                          프로그램 도입 최초 시점인 <strong>5월 검정 결과</strong>는 수련 전 기준 성적(Baseline) 역할을 수행하며, 학생 성장 곡선의 시작 좌표가 됩니다.
+                          프로그램 도입 시점인 <strong>5월 검정 결과</strong>는 타자 실력의 기준 역할을 하며, 성장 곡선의 시작 좌표가 됩니다.
                         </p>
 
                         {/* May Key Metrics Indicators */}
@@ -2193,20 +2193,28 @@ export function TeacherAnalytics({
                           <div className="p-2.5 bg-white border border-stone-150 rounded-xl">
                             <span className="text-[9.5px] font-bold text-purple-600 block">5월 한글 평균</span>
                             <span className="text-sm font-black font-mono text-purple-950">
-                              {growthTrendsTimeline.find(t => t.month === '5월')?.korAvg || 0}타
+                              {(() => {
+                                const korRecords = koreanDb.filter(r => r.month === '5월');
+                                const activeKor = korRecords.filter(r => r.speed > 0);
+                                return activeKor.length > 0 ? Math.round(activeKor.reduce((sum, r) => sum + r.speed, 0) / activeKor.length) : 0;
+                              })()}타
                             </span>
                           </div>
                           <div className="p-2.5 bg-white border border-stone-150 rounded-xl">
                             <span className="text-[9.5px] font-bold text-indigo-600 block">5월 영어 평균</span>
                             <span className="text-sm font-black font-mono text-indigo-950">
-                              {growthTrendsTimeline.find(t => t.month === '5월')?.engAvg || 0}타
+                              {(() => {
+                                const engRecords = englishDb.filter(r => r.month === '5월');
+                                const activeEng = engRecords.filter(r => r.speed > 0);
+                                return activeEng.length > 0 ? Math.round(activeEng.reduce((sum, r) => sum + r.speed, 0) / activeEng.length) : 0;
+                              })()}타
                             </span>
                           </div>
                         </div>
 
                         {/* 5월 급수 취득 비중 */}
                         <div className="p-3 bg-white border border-stone-150 rounded-xl space-y-1.5 font-sans">
-                          <span className="text-[10px] font-extrabold text-stone-500 block">🏆 5월 인증 통과 우수생 비율</span>
+                          <span className="text-[10px] font-extrabold text-stone-500 block">🏆 5월 인증 통과 비율</span>
                           <div className="space-y-1 text-[10px]">
                             {(() => {
                               const totalCount = mayStats.totalCount || 1;
