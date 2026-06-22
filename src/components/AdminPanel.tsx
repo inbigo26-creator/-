@@ -105,19 +105,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // 🛡️ Privacy Policy File Handlers
   const handleFileRead = (file: File) => {
     if (!file) return;
-    if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) {
-      alert('텍스트(.txt) 또는 마크다운(.md) 파일만 업로드할 수 있습니다.');
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.txt') && !name.endsWith('.md') && !name.endsWith('.pdf')) {
+      alert('텍스트(.txt), 마크다운(.md) 또는 PDF(.pdf) 파일만 업로드할 수 있습니다.');
       return;
     }
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      if (text) {
-        setPrivacyText(text);
-        setPrivacySaveSuccess(false);
-      }
-    };
-    reader.readAsText(file, 'UTF-8');
+    if (name.endsWith('.pdf')) {
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        if (dataUrl) {
+          setPrivacyText(dataUrl);
+          setPrivacySaveSuccess(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        if (text) {
+          setPrivacyText(text);
+          setPrivacySaveSuccess(false);
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -1345,7 +1357,14 @@ function saveStudentPinGas(studentId, pin) {
                       
                       <button
                         type="button"
-                        onClick={() => onToggleMvpLock && onToggleMvpLock(month, winners)}
+                        onClick={() => {
+                          if (isLocked) {
+                            if (!confirm('이미 해당 월의 MVP 선정이 안전하게 마감되었습니다.\n\n정말로 마감을 취소하고 실시간 계산 모드로 복원하시겠습니까? (이후 실시간 스프레드시트 기록에 의해 성적이 바뀔 수 있습니다)')) {
+                              return;
+                            }
+                          }
+                          onToggleMvpLock && onToggleMvpLock(month, winners);
+                        }}
                         className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer text-center shrink-0 border shadow-xs h-9 ${
                           isLocked 
                             ? 'bg-white border-amber-300 text-amber-700 hover:bg-amber-50' 
@@ -1372,7 +1391,7 @@ function saveStudentPinGas(studentId, pin) {
               <div className="space-y-1 flex-1">
                 <h3 className="text-sm font-black text-slate-800">🛡️ 개인정보처리방침 파일 등록 및 상세 설정</h3>
                 <p className="text-xs text-stone-500 leading-relaxed font-bold">
-                  학생 회원 및 사용자가 조회할 수 있는 <strong className="text-emerald-805">개인정보처리방침</strong> 파일(.txt, .md)을 등록하거나 내용을 직접 편집할 수 있습니다. 등록된 방침은 대시보드 화면 맨 아래의 링크를 통해 학생들이 투명하게 확인할 수 있습니다.
+                  학생 회원 및 사용자가 조회할 수 있는 <strong className="text-emerald-805">개인정보처리방침</strong> 파일(.txt, .md, .pdf)을 등록하거나 내용을 직접 편집할 수 있습니다. 등록된 방침은 대시보드 화면 맨 아래의 링크를 통해 학생들이 투명하게 확인할 수 있습니다.
                 </p>
               </div>
             </div>
@@ -1392,35 +1411,64 @@ function saveStudentPinGas(studentId, pin) {
               <input 
                 type="file" 
                 id="privacy-file-upload" 
-                accept=".txt,.md" 
+                accept=".txt,.md,.pdf" 
                 onChange={handleFileChange} 
                 className="hidden" 
               />
               <label htmlFor="privacy-file-upload" className="cursor-pointer space-y-1.5 block">
                 <div className="text-slate-400 font-bold text-xs">
-                  📁 마크다운(.md) 또는 텍스트(.txt) 파일을 여기에 드래그해 놓거나 <span className="text-emerald-600 underline font-black">컴퓨터에서 선택</span> 하세요
+                  📁 마크다운(.md), 텍스트(.txt) 또는 PDF(.pdf) 파일을 여기에 드래그해 놓거나 <span className="text-emerald-600 underline font-black">컴퓨터에서 선택</span> 하세요
                 </div>
                 <p className="text-[10px] text-stone-400">
-                  파일 업로드 시 아래 창에 내용이 자동으로 인식되어 불러와집니다.
+                  파일 업로드 시 아래 창에 내용이 자동으로 인식되어 불러와집니다. PDF 업로드 시 학생들이 PDF 원본 형태로 깨끗하게 열어볼 수 있도록 지원됩니다.
                 </p>
               </label>
             </div>
 
-            {/* Direct Edit Textarea */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-slate-700 block">
-                ✍️ 방침 내용 수동 편집 시 적용 창
-              </label>
-              <textarea
-                value={privacyText}
-                onChange={(e) => {
-                  setPrivacyText(e.target.value);
-                  setPrivacySaveSuccess(false);
-                }}
-                placeholder="여기에 직접 처리방침 내용을 입력하거나 위의 파일 업로드를 이용하십시오. 빈 상태로 저장 시 기본 탑재된 방침안이 적용됩니다."
-                className="w-full min-h-[140px] text-[11px] font-medium font-sans p-3 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white leading-relaxed"
-              />
-            </div>
+            {/* Direct Edit Textarea / PDF Preview */}
+            {privacyText && privacyText.startsWith('data:application/pdf') ? (
+              <div className="space-y-1.5 p-4.5 bg-emerald-50/15 border border-emerald-100 rounded-2xl relative">
+                <div className="flex items-center justify-between pb-1">
+                  <span className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
+                    📄 등록 대기 중인 PDF 개인정보처리방침
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('등록된 PDF 방침 파일을 제거하고 텍스트 방침으로 전환하시겠습니까?')) {
+                        setPrivacyText('');
+                        setPrivacySaveSuccess(false);
+                      }
+                    }}
+                    className="px-2.5 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50 border border-rose-100 rounded-lg cursor-pointer"
+                  >
+                    PDF 제거하기
+                  </button>
+                </div>
+                <div className="w-full h-[280px] rounded-xl overflow-hidden border border-slate-200 shadow-2xs">
+                  <iframe
+                    src={privacyText}
+                    className="w-full h-full"
+                    title="Uploaded PDF View"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black text-slate-700 block">
+                  ✍️ 방침 내용 수동 편집 시 적용 창
+                </label>
+                <textarea
+                  value={privacyText}
+                  onChange={(e) => {
+                    setPrivacyText(e.target.value);
+                    setPrivacySaveSuccess(false);
+                  }}
+                  placeholder="여기에 직접 처리방침 내용을 입력하거나 위의 파일 업로드를 이용하십시오. 빈 상태로 저장 시 기본 탑재된 방침안이 적용됩니다."
+                  className="w-full min-h-[140px] text-[11px] font-medium font-sans p-3 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white leading-relaxed"
+                />
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2 justify-between items-center">
               <button

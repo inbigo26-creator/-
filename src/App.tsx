@@ -143,6 +143,9 @@ export default function App() {
 
   // Modals toggle
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showAdminPasswordModal, setShowAdminPasswordModal] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminPasswordError, setAdminPasswordError] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
@@ -191,7 +194,15 @@ export default function App() {
   const [mvpLocks, setMvpLocks] = useState<{[month: string]: boolean}>(() => {
     try {
       const stored = localStorage.getItem(`school_mvp_locks_${spreadsheetId}`);
-      return stored ? JSON.parse(stored) : {};
+      if (stored && stored !== "{}") return JSON.parse(stored);
+      
+      const globalStored = localStorage.getItem('school_mvp_locks_global');
+      if (globalStored) {
+        // Safe sync to current spreadsheet too
+        localStorage.setItem(`school_mvp_locks_${spreadsheetId}`, globalStored);
+        return JSON.parse(globalStored);
+      }
+      return {};
     } catch (_) {
       return {};
     }
@@ -200,7 +211,15 @@ export default function App() {
   const [frozenMvpWinners, setFrozenMvpWinners] = useState<{[month: string]: any[]}>(() => {
     try {
       const stored = localStorage.getItem(`school_mvp_frozen_winners_${spreadsheetId}`);
-      return stored ? JSON.parse(stored) : {};
+      if (stored && stored !== "{}") return JSON.parse(stored);
+
+      const globalStored = localStorage.getItem('school_mvp_frozen_winners_global');
+      if (globalStored) {
+        // Safe sync to current spreadsheet too
+        localStorage.setItem(`school_mvp_frozen_winners_${spreadsheetId}`, globalStored);
+        return JSON.parse(globalStored);
+      }
+      return {};
     } catch (_) {
       return {};
     }
@@ -208,11 +227,17 @@ export default function App() {
 
   useEffect(() => {
     try {
-      // Correct spreadsheet change sync
-      const storedLocks = localStorage.getItem(`school_mvp_locks_${spreadsheetId}`);
+      // Correct spreadsheet change sync with global backup falling back if empty
+      let storedLocks = localStorage.getItem(`school_mvp_locks_${spreadsheetId}`);
+      if (!storedLocks || storedLocks === "{}") {
+        storedLocks = localStorage.getItem('school_mvp_locks_global');
+      }
       setMvpLocks(storedLocks ? JSON.parse(storedLocks) : {});
 
-      const storedWinners = localStorage.getItem(`school_mvp_frozen_winners_${spreadsheetId}`);
+      let storedWinners = localStorage.getItem(`school_mvp_frozen_winners_${spreadsheetId}`);
+      if (!storedWinners || storedWinners === "{}") {
+        storedWinners = localStorage.getItem('school_mvp_frozen_winners_global');
+      }
       setFrozenMvpWinners(storedWinners ? JSON.parse(storedWinners) : {});
     } catch (e) {
       console.error('Error reloading MVP lock configuration:', e);
@@ -223,7 +248,10 @@ export default function App() {
     const isLocked = !!mvpLocks[month];
     const nextLocks = { ...mvpLocks, [month]: !isLocked };
     setMvpLocks(nextLocks);
+    
+    // Save to both specific & global keys
     localStorage.setItem(`school_mvp_locks_${spreadsheetId}`, JSON.stringify(nextLocks));
+    localStorage.setItem('school_mvp_locks_global', JSON.stringify(nextLocks));
 
     const nextWinners = { ...frozenMvpWinners };
     if (!isLocked) {
@@ -232,7 +260,10 @@ export default function App() {
       delete nextWinners[month];
     }
     setFrozenMvpWinners(nextWinners);
+    
+    // Save to both specific & global keys
     localStorage.setItem(`school_mvp_frozen_winners_${spreadsheetId}`, JSON.stringify(nextWinners));
+    localStorage.setItem('school_mvp_frozen_winners_global', JSON.stringify(nextWinners));
   };
 
   // 📋 Calculate student-level latest speed averages (excluding special status students) for school & grade comparison
@@ -1313,7 +1344,11 @@ export default function App() {
                 authDb={authDb}
                 englishDb={englishDb}
                 koreanDb={koreanDb}
-                onShowSettings={() => setShowAdmin(true)}
+                onShowSettings={() => {
+                  setAdminPasswordInput('');
+                  setAdminPasswordError(null);
+                  setShowAdminPasswordModal(true);
+                }}
                 spreadsheetId={spreadsheetId}
                 mvpLocks={mvpLocks}
                 onToggleMvpLock={handleToggleMvpLock}
@@ -2223,6 +2258,80 @@ export default function App() {
         />
       )}
 
+      {showAdminPasswordModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-150 shadow-xl max-w-sm w-full p-6 sm:p-8 relative overflow-hidden animate-scale-up font-sans flex flex-col space-y-6">
+            <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-indigo-500 to-slate-800" />
+            
+            <div className="flex items-center gap-3 pb-2 border-b border-stone-105">
+              <div className="p-2.5 bg-indigo-50 text-indigo-650 rounded-xl border border-indigo-100">
+                <Settings className="h-5 w-5 animate-spin-once" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-slate-950 font-sans tracking-tight">
+                  관리자 권한 확인
+                </h3>
+                <p className="text-[10px] text-stone-400 font-bold">보안 설정 진입을 위한 암호 입력</p>
+              </div>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (adminPasswordInput === 'inbigo1004@') {
+                setShowAdminPasswordModal(false);
+                setShowAdmin(true);
+                setAdminPasswordInput('');
+                setAdminPasswordError(null);
+              } else {
+                setAdminPasswordError('비밀번호가 올바르지 않습니다.');
+              }
+            }} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-500 block">
+                  ⚙️ 관리자 설정 비밀번호
+                </label>
+                <input
+                  type="password"
+                  value={adminPasswordInput}
+                  onChange={(e) => {
+                    setAdminPasswordInput(e.target.value);
+                    setAdminPasswordError(null);
+                  }}
+                  autoFocus
+                  placeholder="비밀번호를 입력하세요"
+                  className="w-full text-xs font-semibold p-3 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none bg-slate-50 focus:bg-white transition-all"
+                />
+                {adminPasswordError && (
+                  <p className="text-[11px] text-rose-600 font-bold flex items-center gap-1">
+                    <span>⚠️</span> {adminPasswordError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdminPasswordModal(false);
+                    setAdminPasswordInput('');
+                    setAdminPasswordError(null);
+                  }}
+                  className="flex-1 py-2.5 text-xs font-bold border border-stone-200 hover:bg-stone-50 text-stone-500 rounded-xl transition-all cursor-pointer text-center"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 text-xs font-black bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all cursor-pointer text-center shadow-xs"
+                >
+                  확인
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showStudentPasswordChangeModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 font-sans">
           <div className="relative bg-white rounded-3xl w-full max-w-md border border-gray-100 shadow-xl overflow-hidden flex flex-col my-8 animate-scale-up border-yellow-200">
@@ -2582,8 +2691,22 @@ export default function App() {
             </div>
 
             <div className="space-y-4 text-xs tracking-tight text-stone-605 leading-relaxed font-sans overflow-y-auto flex-1 pr-2 break-words break-keep">
-              <div className="whitespace-pre-wrap font-medium p-4.5 bg-stone-50 border border-stone-150 rounded-2xl leading-relaxed font-sans text-stone-750 break-words break-keep">
-                {localStorage.getItem('privacy_policy_text') || `[인비 챌린지 개인정보처리방침 (기본값)]
+              {(() => {
+                const storedText = localStorage.getItem('privacy_policy_text') || '';
+                if (storedText.startsWith('data:application/pdf')) {
+                  return (
+                    <div className="w-full h-[52vh] flex flex-col rounded-2xl border border-stone-150 overflow-hidden bg-slate-50">
+                      <iframe
+                        src={storedText}
+                        className="w-full h-full border-0"
+                        title="Privacy Policy PDF View"
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <div className="whitespace-pre-wrap font-medium p-4.5 bg-stone-50 border border-stone-150 rounded-2xl leading-relaxed font-sans text-stone-750 break-words break-keep">
+                    {storedText || `[인비 챌린지 개인정보처리방침 (기본값)]
 
 본 프로그램(이하 '인비 챌린지')은 학생들의 타자 수련 능력 향상도 관리를 위해 양질의 교육용 정보서비스로 기획 및 구성 되었습니다. 정보 보호 책임하에 최소한의 안전 조치 및 정보보호 법령상의 규정을 철저히 준수하고 아래와 같이 개인정보처리방침을 공개합니다.
 
@@ -2600,7 +2723,9 @@ export default function App() {
 
 4. 동의권 및 불이익 고지
 - 학생 가입자 및 이용자는 개인정보 수집 및 처리 동의를 거부하실 권리가 있습니다. 단, 동의를 거부하는 경우 개인 타자 분석 시스템 내 실시간 순위 산정, 공로 인증서 발급 등의 대시보드의 사용 권한이 일부 제한될 수 있습니다.`}
-              </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="pt-2 border-t border-stone-105 flex justify-end">
