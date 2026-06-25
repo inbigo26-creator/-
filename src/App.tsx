@@ -1687,17 +1687,14 @@ export default function App() {
                       {activeHallMonth ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           
-                          {/* section: Speeds */}
-                          <div className="space-y-6">
-                            
-                            {/* Kor Speed */}
-                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                          {/* Kor Speed */}
+                          <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs flex flex-col h-full">
                               <h4 className="text-xs font-black text-rose-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                                 <Star className="h-4 w-4" />
                                 한글 타자 최고 타수 (3명)
                               </h4>
                               
-                              <div className="space-y-2.5">
+                              <div className="space-y-2.5 flex-1">
                                 {monthlyKorSpeed.length === 0 ? (
                                   <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
                                 ) : (
@@ -1726,13 +1723,13 @@ export default function App() {
                             </div>
 
                             {/* Eng Speed */}
-                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs flex flex-col h-full">
                               <h4 className="text-xs font-black text-indigo-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                                 <Star className="h-4 w-4" />
                                 영어 타자 최고 타수 (3명)
                               </h4>
                               
-                              <div className="space-y-2.5">
+                              <div className="space-y-2.5 flex-1">
                                 {monthlyEngSpeed.length === 0 ? (
                                   <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
                                 ) : (
@@ -1759,20 +1756,15 @@ export default function App() {
                                 )}
                               </div>
                             </div>
-                            
-                          </div>
 
-                          {/* section: Cumulative Improvements */}
-                          <div className="space-y-6">
-                            
                             {/* Kor growth */}
-                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs flex flex-col h-full">
                               <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                                 <TrendingUp className="h-4 w-4" />
                                 한글 타자 최고 향상 (3명)
                               </h4>
                               
-                              <div className="space-y-2.5">
+                              <div className="space-y-2.5 flex-1">
                                 {monthlyKorGrowth.length === 0 ? (
                                   <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
                                 ) : (
@@ -1804,13 +1796,13 @@ export default function App() {
                             </div>
 
                             {/* Eng growth */}
-                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                            <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs flex flex-col h-full">
                               <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                                 <TrendingUp className="h-4 w-4" />
                                 영어 타자 최고 향상 (3명)
                               </h4>
                               
-                              <div className="space-y-2.5">
+                              <div className="space-y-2.5 flex-1">
                                 {monthlyEngGrowth.length === 0 ? (
                                   <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
                                 ) : (
@@ -1841,8 +1833,6 @@ export default function App() {
                               </div>
                             </div>
 
-                          </div>
-
                         </div>
                       ) : (
                         <p className="text-stone-400 text-xs text-center py-10 font-bold">지정 가능한 시상 연월이 존재하지 않습니다.</p>
@@ -1865,17 +1855,14 @@ export default function App() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                       
-                      {/* section: Speeds */}
-                      <div className="space-y-6">
-                        
-                        {/* Kor Speed */}
-                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                      {/* Kor Speed */}
+                      <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs flex flex-col h-full">
                           <h4 className="text-xs font-black text-rose-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                             <Star className="h-4 w-4 text-rose-500" />
                             한글 타자 최고 타수 (최종 3명)
                           </h4>
 
-                          <div className="space-y-2.5">
+                          <div className="space-y-2.5 flex-1">
                             {cumulativeFinalAwards.korSpeed.length === 0 ? (
                               <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
                             ) : (
@@ -1904,13 +1891,13 @@ export default function App() {
                         </div>
 
                         {/* Eng Speed */}
-                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs flex flex-col h-full">
                           <h4 className="text-xs font-black text-indigo-700 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                             <Star className="h-4 w-4" />
                             영어 타자 최고 타수 (최종 3명)
                           </h4>
 
-                          <div className="space-y-2.5">
+                          <div className="space-y-2.5 flex-1">
                             {cumulativeFinalAwards.engSpeed.length === 0 ? (
                               <p className="text-center text-xs text-stone-400 py-8 font-medium">시상 결과가 없습니다.</p>
                             ) : (
@@ -1938,19 +1925,14 @@ export default function App() {
                           </div>
                         </div>
 
-                      </div>
-
-                      {/* section: Cumulative Improvements */}
-                      <div className="space-y-6">
-                        
                         {/* Kor growth */}
-                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs flex flex-col h-full">
                           <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                             <TrendingUp className="h-4 w-4 text-emerald-600" />
                             한글 타자 최고 향상 (최종 3명)
                           </h4>
 
-                          <div className="space-y-2.5">
+                          <div className="space-y-2.5 flex-1">
                             {cumulativeFinalAwards.korGrowth.length === 0 ? (
                               <p className="text-center text-xs text-stone-400 py-8 leading-normal font-medium font-sans">기록 측정을 위한 2회차 이상의<br/>기록 입력 축적이 필요합니다.</p>
                             ) : (
@@ -1982,13 +1964,13 @@ export default function App() {
                         </div>
 
                         {/* Eng growth */}
-                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs">
+                        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4 shadow-2xs flex flex-col h-full">
                           <h4 className="text-xs font-black text-emerald-800 tracking-wider uppercase border-b pb-2 flex items-center gap-1.5">
                             <TrendingUp className="h-4 w-4 text-emerald-600" />
                             영어 타자 최고 향상 (최종 3명)
                           </h4>
 
-                          <div className="space-y-2.5">
+                          <div className="space-y-2.5 flex-1">
                             {cumulativeFinalAwards.engGrowth.length === 0 ? (
                               <p className="text-center text-xs text-stone-400 py-8 leading-normal font-medium font-sans">기록 측정을 위한 2회차 이상의<br/>기록 입력 축적이 필요합니다.</p>
                             ) : (
@@ -2018,8 +2000,6 @@ export default function App() {
                             )}
                           </div>
                         </div>
-
-                      </div>
 
                     </div>
                   </div>
