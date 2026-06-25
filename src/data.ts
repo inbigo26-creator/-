@@ -870,9 +870,15 @@ export async function saveConsentToSpreadsheet(
             }
 
             if (foundRowIndex !== -1) {
-              const updateColIndex = idxAgreed !== -1 ? idxAgreed : 2;
-              const colLetter = String.fromCharCode(65 + updateColIndex); // A, B, C, D...
-              const updateRange = `${activeSheetName}!${colLetter}${foundRowIndex}`;
+              const maxColIdx = Math.max(idxId, idxName !== -1 ? idxName : 1, idxAgreed !== -1 ? idxAgreed : 2);
+              const rowValues = new Array(maxColIdx + 1).fill('');
+              rowValues[idxId] = studentId;
+              rowValues[idxName !== -1 ? idxName : 1] = name;
+              rowValues[idxAgreed !== -1 ? idxAgreed : 2] = agreementStatus;
+
+              // Generate end column letter (e.g. A, B, C, D...)
+              const endColLetter = String.fromCharCode(65 + maxColIdx);
+              const updateRange = `${activeSheetName}!A${foundRowIndex}:${endColLetter}${foundRowIndex}`;
               
               const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(updateRange)}?valueInputOption=USER_ENTERED`;
               const updateRes = await fetch(updateUrl, {
@@ -882,11 +888,11 @@ export async function saveConsentToSpreadsheet(
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  values: [[agreementStatus]]
+                  values: [rowValues]
                 })
               });
               if (updateRes.ok) {
-                console.log(`Directly updated cell ${updateRange} to '${agreementStatus}'`);
+                console.log(`Directly updated row ${foundRowIndex} in ${activeSheetName} with updated settings/consent values.`);
                 updated = true;
               } else {
                 throw new Error(`동의 데이터 직접 셀 업데이트 쓰기 실패: ${await updateRes.text()}`);

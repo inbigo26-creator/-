@@ -244,6 +244,41 @@ export default function App() {
     }
   }, [spreadsheetId]);
 
+  // Sync MVP locks & frozen winners from Spreadsheet data (privacyDb) if present (ensures permanent global lock states across all devices)
+  useEffect(() => {
+    if (!privacyDb || privacyDb.length === 0) return;
+    
+    const locksRecord = privacyDb.find(p => p.studentId === 'settingsmvplocks');
+    if (locksRecord && locksRecord.name) {
+      try {
+        const currentLocksStr = JSON.stringify(mvpLocks);
+        if (locksRecord.name !== currentLocksStr) {
+          const parsedLocks = JSON.parse(locksRecord.name);
+          setMvpLocks(parsedLocks);
+          localStorage.setItem(`school_mvp_locks_${spreadsheetId}`, locksRecord.name);
+          localStorage.setItem('school_mvp_locks_global', locksRecord.name);
+        }
+      } catch (e) {
+        console.error('Error parsing settingsmvplocks from spreadsheet:', e);
+      }
+    }
+    
+    const winnersRecord = privacyDb.find(p => p.studentId === 'settingsmvpwinners');
+    if (winnersRecord && winnersRecord.name) {
+      try {
+        const currentWinnersStr = JSON.stringify(frozenMvpWinners);
+        if (winnersRecord.name !== currentWinnersStr) {
+          const parsedWinners = JSON.parse(winnersRecord.name);
+          setFrozenMvpWinners(parsedWinners);
+          localStorage.setItem(`school_mvp_frozen_winners_${spreadsheetId}`, winnersRecord.name);
+          localStorage.setItem('school_mvp_frozen_winners_global', winnersRecord.name);
+        }
+      } catch (e) {
+        console.error('Error parsing settingsmvpwinners from spreadsheet:', e);
+      }
+    }
+  }, [privacyDb, spreadsheetId]);
+
   const handleToggleMvpLock = (month: string, currentWinners: any[]) => {
     const isLocked = !!mvpLocks[month];
     const nextLocks = { ...mvpLocks, [month]: !isLocked };
@@ -264,6 +299,34 @@ export default function App() {
     // Save to both specific & global keys
     localStorage.setItem(`school_mvp_frozen_winners_${spreadsheetId}`, JSON.stringify(nextWinners));
     localStorage.setItem('school_mvp_frozen_winners_global', JSON.stringify(nextWinners));
+
+    // Optimistically update local privacyDb state so the sync useEffect won't trigger with old values
+    const serializedLocks = JSON.stringify(nextLocks);
+    const serializedWinners = JSON.stringify(nextWinners);
+    setPrivacyDb(prev => [
+      ...prev.filter(p => p.studentId !== 'settingsmvplocks' && p.studentId !== 'settingsmvpwinners'),
+      { studentId: 'settingsmvplocks', name: serializedLocks, agreed: true },
+      { studentId: 'settingsmvpwinners', name: serializedWinners, agreed: true }
+    ]);
+
+    // Push changes asynchronously to the spreadsheet itself
+    saveConsentToSpreadsheet(
+      spreadsheetId,
+      'settingsmvplocks',
+      serializedLocks,
+      googleToken,
+      appsScriptUrl,
+      'Y'
+    ).catch(err => console.error('Failed saving MVP locks to spreadsheet:', err));
+
+    saveConsentToSpreadsheet(
+      spreadsheetId,
+      'settingsmvpwinners',
+      serializedWinners,
+      googleToken,
+      appsScriptUrl,
+      'Y'
+    ).catch(err => console.error('Failed saving MVP winners to spreadsheet:', err));
   };
 
   // 📋 Calculate student-level latest speed averages (excluding special status students) for school & grade comparison
