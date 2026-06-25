@@ -1652,8 +1652,8 @@ export function TeacherAnalytics({
                               </span>
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-amber-700 font-bold">{c.value}타</span>
-                                {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">제외(기존 MVP) ⏭️</span>}
-                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">선정 🏆</span>}
+                                {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">제외(기존 MVP)⏭️</span>}
+                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">🏆선정</span>}
                               </div>
                             </div>
                           );
@@ -1680,8 +1680,8 @@ export function TeacherAnalytics({
                               </span>
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-purple-700 font-bold">{c.value}타</span>
-                                {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">기합격 이월 ⏭️</span>}
-                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">월별시상 🏆</span>}
+                                {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">제외(기존 MVP) ⏭️</span>}
+                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">🏆선정</span>}
                               </div>
                             </div>
                           );
@@ -1713,8 +1713,8 @@ export function TeacherAnalytics({
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <span className="font-mono text-emerald-600 font-bold">+{c.value}타 성장</span>
-                                  {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">기합격 이월 ⏭️</span>}
-                                  {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">월별시상 🏆</span>}
+                                  {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">제외(기존 MVP)⏭️</span>}
+                                  {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">🏆선정</span>}
                                 </div>
                               </div>
                             );
@@ -1747,8 +1747,8 @@ export function TeacherAnalytics({
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <span className="font-mono text-emerald-600 font-bold">+{c.value}타 성장</span>
-                                  {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">기합격 이월 ⏭️</span>}
-                                  {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">월별시상 🏆</span>}
+                                  {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">제외(기존 MVP)⏭️</span>}
+                                  {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">🏆선정</span>}
                                 </div>
                               </div>
                             );
