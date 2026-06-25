@@ -1489,12 +1489,12 @@ export function TeacherAnalytics({
                         {isSelectedMonthLocked ? (
                           <span className="text-[10px] text-amber-800 font-extrabold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
                             <Lock className="h-3 w-3 text-amber-600" />
-                            <span>마감됨 (🔒 명단 고정 완료)</span>
+                            <span>마감 (🔒 MVP 확정)</span>
                           </span>
                         ) : (
                           <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 flex items-center gap-1.5 animate-pulse">
                             <Unlock className="h-3 w-3 text-indigo-500" />
-                            <span>실시간 계산 분석 중 (미마감)</span>
+                            <span>실시간 분석 중(마감 전)</span>
                           </span>
                         )}
                       </div>
@@ -1652,8 +1652,8 @@ export function TeacherAnalytics({
                               </span>
                               <div className="flex items-center gap-2">
                                 <span className="font-mono text-amber-700 font-bold">{c.value}타</span>
-                                {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">기합격 이월 ⏭️</span>}
-                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">월별시상 🏆</span>}
+                                {isPastWinner && <span className="text-[9px] bg-slate-100 text-slate-500 font-bold border rounded px-1">제외(기존 MVP) ⏭️</span>}
+                                {isMatchedWinner && <span className="text-[9px] bg-indigo-100 text-indigo-700 font-black border border-indigo-200 rounded px-1">선정 🏆</span>}
                               </div>
                             </div>
                           );
