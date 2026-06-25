@@ -248,15 +248,67 @@ export default function App() {
   useEffect(() => {
     if (!privacyDb || privacyDb.length === 0) return;
     
+    // Helper to safely parse mvpLocks JSON with fallback self-healing for unquoted strings (due to older Apps Script versions stripping quotes)
+    const parseMvpLocksHealed = (str: string): {[month: string]: boolean} => {
+      try {
+        return JSON.parse(str);
+      } catch (e) {
+        console.warn('[Self-Healing] Failed standard JSON parse for mvpLocks, applying heuristic:', e);
+        const result: {[month: string]: boolean} = {};
+        let clean = str.trim();
+        if (clean.startsWith('{') && clean.endsWith('}')) {
+          clean = clean.substring(1, clean.length - 1);
+          if (!clean.trim()) return {};
+          const pairs = clean.split(',');
+          pairs.forEach(pair => {
+            const colonIndex = pair.indexOf(':');
+            if (colonIndex !== -1) {
+              const key = pair.substring(0, colonIndex).replace(/['"“”]/g, '').trim();
+              const valStr = pair.substring(colonIndex + 1).replace(/['"“”]/g, '').trim().toLowerCase();
+              if (key) {
+                result[key] = (valStr === 'true');
+              }
+            }
+          });
+        }
+        return result;
+      }
+    };
+
+    // Helper to safely parse frozenMvpWinners JSON with fallback self-healing for unquoted strings
+    const parseMvpWinnersHealed = (str: string): {[month: string]: any[]} => {
+      try {
+        return JSON.parse(str);
+      } catch (e) {
+        console.warn('[Self-Healing] Failed standard JSON parse for mvpWinners, applying heuristic:', e);
+        try {
+          const jsonLike = str
+            .replace(/([{,]\s*)([a-zA-Z0-9가-힣]+)\s*:/g, '$1"$2":')
+            .replace(/:\s*([a-zA-Z가-힣]+)(?=\s*[,}\]])/g, (match, p1) => {
+              const lower = p1.toLowerCase();
+              if (lower === 'true' || lower === 'false' || lower === 'null') {
+                return ': ' + p1;
+              }
+              return ': "' + p1 + '"';
+            });
+          return JSON.parse(jsonLike);
+        } catch (err) {
+          console.error('[Self-Healing] Relaxed parsing of frozenMvpWinners failed:', err);
+          return {};
+        }
+      }
+    };
+
     const locksRecord = privacyDb.find(p => p.studentId === 'settingsmvplocks');
     if (locksRecord && locksRecord.name) {
       try {
+        const parsedLocks = parseMvpLocksHealed(locksRecord.name);
         const currentLocksStr = JSON.stringify(mvpLocks);
-        if (locksRecord.name !== currentLocksStr) {
-          const parsedLocks = JSON.parse(locksRecord.name);
+        const normalizedParsedLocksStr = JSON.stringify(parsedLocks);
+        if (normalizedParsedLocksStr !== currentLocksStr) {
           setMvpLocks(parsedLocks);
-          localStorage.setItem(`school_mvp_locks_${spreadsheetId}`, locksRecord.name);
-          localStorage.setItem('school_mvp_locks_global', locksRecord.name);
+          localStorage.setItem(`school_mvp_locks_${spreadsheetId}`, normalizedParsedLocksStr);
+          localStorage.setItem('school_mvp_locks_global', normalizedParsedLocksStr);
         }
       } catch (e) {
         console.error('Error parsing settingsmvplocks from spreadsheet:', e);
@@ -266,18 +318,19 @@ export default function App() {
     const winnersRecord = privacyDb.find(p => p.studentId === 'settingsmvpwinners');
     if (winnersRecord && winnersRecord.name) {
       try {
+        const parsedWinners = parseMvpWinnersHealed(winnersRecord.name);
         const currentWinnersStr = JSON.stringify(frozenMvpWinners);
-        if (winnersRecord.name !== currentWinnersStr) {
-          const parsedWinners = JSON.parse(winnersRecord.name);
+        const normalizedParsedWinnersStr = JSON.stringify(parsedWinners);
+        if (normalizedParsedWinnersStr !== currentWinnersStr) {
           setFrozenMvpWinners(parsedWinners);
-          localStorage.setItem(`school_mvp_frozen_winners_${spreadsheetId}`, winnersRecord.name);
-          localStorage.setItem('school_mvp_frozen_winners_global', winnersRecord.name);
+          localStorage.setItem(`school_mvp_frozen_winners_${spreadsheetId}`, normalizedParsedWinnersStr);
+          localStorage.setItem('school_mvp_frozen_winners_global', normalizedParsedWinnersStr);
         }
       } catch (e) {
         console.error('Error parsing settingsmvpwinners from spreadsheet:', e);
       }
     }
-  }, [privacyDb, spreadsheetId]);
+  }, [privacyDb, spreadsheetId, mvpLocks, frozenMvpWinners]);
 
   const handleToggleMvpLock = (month: string, currentWinners: any[]) => {
     const isLocked = !!mvpLocks[month];

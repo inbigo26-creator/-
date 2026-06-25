@@ -607,11 +607,17 @@ function isAgreedValueGas(val) {
 }
 
 /**
- * 값 정제 헬퍼 (소수점 .0 및 따옴표 제거)
+ * 값 정제 헬퍼 (소수점 .0 및 따옴표 제거 - JSON 형식 문자열은 유지)
  */
 function cleanValue(val) {
   if (val === null || val === undefined) return '';
-  var str = String(val).trim().replace(/['"“”]/g, '');
+  var str = String(val).trim();
+  // JSON 형식 문자열인 경우 따옴표를 정제하지 않고 반환
+  if ((str.indexOf('{') === 0 && str.lastIndexOf('}') === str.length - 1) ||
+      (str.indexOf('[') === 0 && str.lastIndexOf(']') === str.length - 1)) {
+    return str;
+  }
+  str = str.replace(/['"“”]/g, '');
   if (str.endsWith('.0')) {
     str = str.substring(0, str.length - 2);
   }
